@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { listChunks } from '@/../lib/db/vectorStore';
+import { listChunks } from '@lib/db/vectorStore';
+
 
 export const dynamic = 'force-dynamic';
 

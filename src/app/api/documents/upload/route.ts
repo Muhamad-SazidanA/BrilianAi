@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { queuePdfIngestion } from '@/../lib/queue/ingestQueue';
+import { queuePdfIngestion } from '@lib/queue/ingestQueue';
+
 
 export const dynamic = 'force-dynamic';
 

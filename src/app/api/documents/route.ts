@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { listBatches } from '@/../lib/db/vectorStore';
+import { listBatches } from '@lib/db/vectorStore';
+
 
 export const dynamic = 'force-dynamic';
 
