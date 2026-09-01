@@ -1,0 +1,38 @@
+{
+  "name": "brilian-ai",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "vitest",
+    "db:migrate": "node scripts/migrate.js",
+    "verify:vision": "node scripts/verify-vision.mjs",
+    "verify:db": "node scripts/verify-db-vector.mjs"
+  },
+  "dependencies": {
+    "@langchain/core": "^0.3.40",
+    "@langchain/ollama": "^0.2.0",
+    "@langchain/textsplitters": "^0.1.0",
+    "bullmq": "^5.41.0",
+    "dotenv": "^16.4.7",
+    "mupdf": "^0.2.0",
+    "next": "^14.2.24",
+    "pg": "^8.13.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.19",
+    "@types/pg": "^8.11.11",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "14.2.24",
+    "tsx": "^4.23.13",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}
