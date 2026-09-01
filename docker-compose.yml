@@ -3,8 +3,7 @@ services:
     image: pgvector/pgvector:pg16
     container_name: brilian_postgres
     restart: unless-stopped
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+    # Port TIDAK di-expose ke host — hanya internal antar service di compose ini
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -17,13 +16,14 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - brilian_internal
 
   redis:
     image: redis:7-alpine
     container_name: brilian_redis
     restart: unless-stopped
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
+    # Port TIDAK di-expose ke host — hanya internal
     volumes:
       - redis_data:/data
     healthcheck:
@@ -31,13 +31,14 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - brilian_internal
 
   ollama:
     image: ollama/ollama:latest
     container_name: brilian_ollama
     restart: unless-stopped
-    ports:
-      - "11434:11434"
+    # Port TIDAK di-expose ke host — hanya internal
     volumes:
       - ollama_data:/root/.ollama
     healthcheck:
@@ -45,6 +46,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - brilian_internal
 
   app:
     build:
@@ -53,14 +56,15 @@ services:
     container_name: brilian_app
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      # Port 9000 di host → 3000 di container (hindari konflik dengan app lain)
+      - "9000:3000"
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/brilian_ai}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-brilian_ai}
+      REDIS_URL: redis://redis:6379
       REDIS_HOST: redis
       REDIS_PORT: "6379"
-      OLLAMA_ENDPOINT: ${OLLAMA_ENDPOINT:-http://ollama:11434}
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      OLLAMA_ENDPOINT: http://ollama:11434
+      OLLAMA_BASE_URL: http://ollama:11434
       NODE_ENV: production
     depends_on:
       postgres:
@@ -75,6 +79,13 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    networks:
+      - brilian_internal
+
+networks:
+  brilian_internal:
+    name: brilian_internal
+    driver: bridge
 
 volumes:
   postgres_data:
