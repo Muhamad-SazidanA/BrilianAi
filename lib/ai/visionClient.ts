@@ -43,8 +43,8 @@ export async function extractPageText(
     process.env.OLLAMA_BASE_URL ||
     'http://localhost:11434';
   const maxRetries = options?.maxRetries ?? 3;
-  const timeoutMs = options?.timeoutMs ?? 60000;
-  const initialBackoffMs = options?.initialBackoffMs ?? 500;
+  const timeoutMs = options?.timeoutMs ?? 300000; // 5 menit timeout per halaman untuk CPU
+  const initialBackoffMs = options?.initialBackoffMs ?? 1000;
 
   const base64Image = imageBuffer.toString('base64');
 
@@ -97,7 +97,8 @@ export async function extractPageText(
       return String(content || '').trim();
     } catch (error) {
       attempt++;
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const cause = error instanceof Error && (error as any).cause ? ` (Detail: ${(error as any).cause})` : '';
+      const errorMessage = `${error instanceof Error ? error.message : String(error)}${cause}`;
 
       if (attempt <= maxRetries) {
         console.warn(
