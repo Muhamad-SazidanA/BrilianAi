@@ -63,18 +63,24 @@ export async function ingestPdf(
   const chunkCount = chunks.length;
   console.log(`[IngestPipeline] ✓ Menghasilkan ${chunkCount} chunks dengan pelacakan halaman.`);
 
-  // 4. Batch generate embeddings for all chunks (in sub-batches of 50 to prevent huge single payload)
+  // 4. Batch generate embeddings for all chunks in safe micro-batches of 10
   let embeddings: number[][] = [];
   if (chunkCount > 0) {
     console.log(`[IngestPipeline] 🧠 3/4 Membuat embedding vector 1024-dim (BGE-M3) untuk ${chunkCount} chunks...`);
     const chunkContents = chunks.map((c) => c.content);
     
-    // Process embeddings in batches of 50 chunks for safety
-    const EMBED_BATCH_SIZE = 50;
+    // Process embeddings in micro-batches of 10 chunks to prevent HeadersTimeoutError
+    const EMBED_BATCH_SIZE = 10;
     for (let i = 0; i < chunkContents.length; i += EMBED_BATCH_SIZE) {
       const slice = chunkContents.slice(i, i + EMBED_BATCH_SIZE);
       const batchEmbeds = await embedTexts(slice);
       embeddings.push(...batchEmbeds);
+
+      const processedCount = Math.min(i + slice.length, chunkCount);
+      if (processedCount % 50 === 0 || processedCount === chunkCount || chunkCount <= 50) {
+        const percent = ((processedCount / chunkCount) * 100).toFixed(1);
+        console.log(`[IngestPipeline] -> Embedding progress: ${processedCount}/${chunkCount} chunks (${percent}%)...`);
+      }
     }
   }
 

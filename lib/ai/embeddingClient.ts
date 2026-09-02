@@ -1,5 +1,19 @@
 import { OllamaEmbeddings } from '@langchain/ollama';
 
+// Configure Node.js undici dispatcher timeout to allow long AI/LLM inferences without UND_ERR_HEADERS_TIMEOUT
+try {
+  const { setGlobalDispatcher, Agent } = require('undici');
+  setGlobalDispatcher(
+    new Agent({
+      headersTimeout: 600000, // 10 menit
+      bodyTimeout: 600000,
+      connectTimeout: 60000,
+    })
+  );
+} catch {
+  // Ignore if undici is not directly loaded in current environment
+}
+
 export interface EmbeddingClientOptions {
   model?: string;
   baseUrl?: string;
@@ -7,8 +21,6 @@ export interface EmbeddingClientOptions {
 
 /**
  * Generates vector embeddings for a batch of text strings using Ollama (model: bge-m3, 1024 dimensions).
- *
- * Calls Ollama in a single batch request via embedDocuments(texts) rather than one by one.
  *
  * @param texts - Array of string chunks to embed
  * @param options - Optional configuration (baseUrl, model)

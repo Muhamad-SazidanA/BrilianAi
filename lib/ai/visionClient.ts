@@ -1,6 +1,20 @@
 import { ChatOllama } from '@langchain/ollama';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 
+// Configure Node.js undici dispatcher timeout to allow long AI/LLM inferences without UND_ERR_HEADERS_TIMEOUT
+try {
+  const { setGlobalDispatcher, Agent } = require('undici');
+  setGlobalDispatcher(
+    new Agent({
+      headersTimeout: 600000, // 10 menit
+      bodyTimeout: 600000,
+      connectTimeout: 60000,
+    })
+  );
+} catch {
+  // Ignore if undici is not directly loaded in current environment
+}
+
 export interface VisionClientOptions {
   model?: string;
   baseUrl?: string;
