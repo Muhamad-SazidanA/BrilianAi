@@ -77,6 +77,7 @@ export async function extractPageText(
       const client = new ChatOllama({
         model,
         baseUrl,
+        numCtx: 8192,
       });
 
       const response = await client.invoke(messages, {
