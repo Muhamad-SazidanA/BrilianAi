@@ -20,48 +20,42 @@ describe('ingestPdf (End-to-End Ingestion Service Pipeline)', () => {
     // Track execution order
     const executionOrder: string[] = [];
 
-    // 1. Mock inspectPdfPages (2 pages: page 1 has digital text, page 2 falls back to vision)
-    vi.spyOn(renderPagesModule, 'inspectPdfPages').mockImplementation(async () => {
-      executionOrder.push('1.inspectPdfPages');
+    // 1. Mock extractPdfPagesTextHybrid (2 pages)
+    vi.spyOn(renderPagesModule, 'extractPdfPagesTextHybrid').mockImplementation(async () => {
+      executionOrder.push('1.extractPdfPagesTextHybrid');
       return [
-        { pageNumber: 1, digitalText: '', imageBuffer: dummyPagePng },
-        { pageNumber: 2, digitalText: '', imageBuffer: dummyPagePng },
+        { pageNumber: 1, text: 'Teks halaman dokumen 1.' },
+        { pageNumber: 2, text: 'Teks halaman dokumen 2.' },
       ];
     });
 
-    // 2. Mock extractPageText
-    vi.spyOn(visionClientModule, 'extractPageText').mockImplementation(async () => {
-      executionOrder.push('2.extractPageText');
-      return 'Teks hasil AI Vision halaman dokumen.';
-    });
-
-    // 3. Mock chunkWithPageOffsets
+    // 2. Mock chunkWithPageOffsets
     vi.spyOn(chunkingModule, 'chunkWithPageOffsets').mockImplementation(async () => {
-      executionOrder.push('3.chunkWithPageOffsets');
+      executionOrder.push('2.chunkWithPageOffsets');
       return [
         { content: 'Chunk 1 teks', sourcePageStart: 1, sourcePageEnd: 1 },
         { content: 'Chunk 2 teks', sourcePageStart: 1, sourcePageEnd: 2 },
       ];
     });
 
-    // 4. Mock embedTexts
+    // 3. Mock embedTexts
     vi.spyOn(embeddingModule, 'embedTexts').mockImplementation(async () => {
-      executionOrder.push('4.embedTexts');
+      executionOrder.push('3.embedTexts');
       return [
         new Array(1024).fill(0.01),
         new Array(1024).fill(0.02),
       ];
     });
 
-    // 5. Mock createUploadBatch
+    // 4. Mock createUploadBatch
     vi.spyOn(vectorStoreModule, 'createUploadBatch').mockImplementation(async () => {
-      executionOrder.push('5.createUploadBatch');
+      executionOrder.push('4.createUploadBatch');
       return mockBatchId;
     });
 
-    // 6. Mock insertChunks
+    // 5. Mock insertChunks
     vi.spyOn(vectorStoreModule, 'insertChunks').mockImplementation(async () => {
-      executionOrder.push('6.insertChunks');
+      executionOrder.push('5.insertChunks');
     });
 
     // Spy on fs.writeFileSync to ensure zero disk write
@@ -79,13 +73,11 @@ describe('ingestPdf (End-to-End Ingestion Service Pipeline)', () => {
 
     // Verify Order
     expect(executionOrder).toEqual([
-      '1.inspectPdfPages',
-      '2.extractPageText',
-      '2.extractPageText',
-      '3.chunkWithPageOffsets',
-      '4.embedTexts',
-      '5.createUploadBatch',
-      '6.insertChunks',
+      '1.extractPdfPagesTextHybrid',
+      '2.chunkWithPageOffsets',
+      '3.embedTexts',
+      '4.createUploadBatch',
+      '5.insertChunks',
     ]);
 
     // Verify 100% in-memory: no file written to disk
