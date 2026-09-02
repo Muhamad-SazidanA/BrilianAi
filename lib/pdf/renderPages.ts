@@ -31,8 +31,8 @@ export async function renderPdfPagesToImages(buffer: Buffer): Promise<Buffer[]> 
   for (let i = 0; i < pageCount; i++) {
     try {
       const page = doc.loadPage(i);
-      // Scale by 1.5x for optimal AI Vision OCR / reading clarity without token overflow
-      const pixmap = page.toPixmap(mupdf.Matrix.scale(1.5, 1.5), mupdf.ColorSpace.DeviceRGB);
+      // Scale 1.0x produces crisp ~595x842 px images (~800 visual tokens), perfectly fitting context & using minimum RAM
+      const pixmap = page.toPixmap(mupdf.Matrix.scale(1.0, 1.0), mupdf.ColorSpace.DeviceRGB);
       const pngBytes = pixmap.asPNG();
       imageBuffers.push(Buffer.from(pngBytes));
     } catch (error) {
