@@ -20,10 +20,13 @@ describe('ingestPdf (End-to-End Ingestion Service Pipeline)', () => {
     // Track execution order
     const executionOrder: string[] = [];
 
-    // 1. Mock renderPdfPagesToImages (2 pages)
-    vi.spyOn(renderPagesModule, 'renderPdfPagesToImages').mockImplementation(async () => {
-      executionOrder.push('1.renderPdfPagesToImages');
-      return [dummyPagePng, dummyPagePng];
+    // 1. Mock inspectPdfPages (2 pages: page 1 has digital text, page 2 falls back to vision)
+    vi.spyOn(renderPagesModule, 'inspectPdfPages').mockImplementation(async () => {
+      executionOrder.push('1.inspectPdfPages');
+      return [
+        { pageNumber: 1, digitalText: '', imageBuffer: dummyPagePng },
+        { pageNumber: 2, digitalText: '', imageBuffer: dummyPagePng },
+      ];
     });
 
     // 2. Mock extractPageText
@@ -76,7 +79,7 @@ describe('ingestPdf (End-to-End Ingestion Service Pipeline)', () => {
 
     // Verify Order
     expect(executionOrder).toEqual([
-      '1.renderPdfPagesToImages',
+      '1.inspectPdfPages',
       '2.extractPageText',
       '2.extractPageText',
       '3.chunkWithPageOffsets',

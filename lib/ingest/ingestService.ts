@@ -1,4 +1,4 @@
-import { renderPdfPagesToImages } from '../pdf/renderPages';
+import { inspectPdfPages } from '../pdf/renderPages';
 import { extractPageText } from '../ai/visionClient';
 import { chunkWithPageOffsets, PageText } from '../chunking/splitWithPageTracking';
 import { embedTexts } from '../ai/embeddingClient';
@@ -15,15 +15,18 @@ export interface IngestOptions {
   visionConcurrency?: number;
   chunkSize?: number;
   chunkOverlap?: number;
+  minDigitalTextLength?: number;
 }
 
 /**
- * Executes the complete end-to-end PDF ingestion pipeline:
- * 1. Render all PDF pages to in-memory PNG image buffers (mupdf).
- * 2. Extract substantive text per page using AI Vision (qwen2.5vl:7b via ChatOllama, concurrency limited).
- * 3. Split combined text into sliding-window chunks while tracking source page ranges.
- * 4. Generate 1024-dimension embeddings for all chunks in batch (bge-m3 via OllamaEmbeddings).
- * 5. Create an upload batch record in PostgreSQL.
+ * Executes the complete end-to-end Hybrid PDF ingestion pipeline:
+ * 1. Inspect all PDF pages in-memory (extract digital text & render image buffers).
+ * 2. Hybrid Text Extraction:
+ *    - If a page contains substantive digital text (>= 40 chars) -> extract instantly (Fast-Path).
+ *    - If a page has minimal/no digital text (scanned image, photo, chart) -> invoke Ollama AI Vision.
+ * 3. Split combined text into sliding-window chunks with source page range tracking.
+ * 4. Generate 1024-dimension embeddings for all chunks (bge-m3 via OllamaEmbeddings).
+ * 5. Create upload batch record in PostgreSQL.
  * 6. Store all document chunks with pgvector embeddings in database within a single transaction.
  * 7. Return summary { uploadBatchId, originalFilename, pageCount, chunkCount }.
  *
@@ -46,34 +49,53 @@ export async function ingestPdf(
   const visionConcurrency = options?.visionConcurrency ?? 1;
   const chunkSize = options?.chunkSize ?? 800;
   const chunkOverlap = options?.chunkOverlap ?? 150;
+  const minDigitalTextLength = options?.minDigitalTextLength ?? 40;
 
   console.log(`[IngestPipeline] 🚀 Memulai ingestion file "${filename}" (${(fileBuffer.length / 1024).toFixed(1)} KB)...`);
 
-  // 1. Render all PDF pages to PNG image buffers
-  console.log(`[IngestPipeline] 📄 1/4 Merender halaman PDF ke gambar in-memory...`);
-  const pageImages = await renderPdfPagesToImages(fileBuffer);
-  const pageCount = pageImages.length;
+  // 1. Inspect all PDF pages in-memory
+  console.log(`[IngestPipeline] 📄 1/4 Memeriksa halaman PDF (Hybrid Engine)...`);
+  const pagesData = await inspectPdfPages(fileBuffer);
+  const pageCount = pagesData.length;
 
   if (pageCount === 0) {
     throw new Error('PDF document contains 0 renderable pages.');
   }
-  console.log(`[IngestPipeline] ✓ Berhasil merender ${pageCount} halaman.`);
+  console.log(`[IngestPipeline] ✓ Berhasil memeriksa ${pageCount} halaman.`);
 
-  // 2. Extract text for each page with concurrency limit
-  console.log(`[IngestPipeline] 🤖 2/4 Menjalankan AI Vision OCR untuk ${pageCount} halaman...`);
+  // 2. Hybrid Text Extraction
+  console.log(`[IngestPipeline] ⚡ 2/4 Memproses ekstraksi teks untuk ${pageCount} halaman...`);
   const pagesText: PageText[] = [];
 
-  for (let i = 0; i < pageImages.length; i += visionConcurrency) {
-    const slice = pageImages.slice(i, i + visionConcurrency);
+  for (let i = 0; i < pagesData.length; i += visionConcurrency) {
+    const slice = pagesData.slice(i, i + visionConcurrency);
     const extractedBatch = await Promise.all(
-      slice.map(async (imageBuffer, sliceIndex) => {
-        const pageNumber = i + sliceIndex + 1;
-        console.log(`[IngestPipeline] -> AI Vision sedang memindai Halaman ${pageNumber}/${pageCount}...`);
-        const text = await extractPageText(imageBuffer);
-        console.log(`[IngestPipeline] -> Halaman ${pageNumber} selesai dipindai (${text.length} karakter diekstrak).`);
+      slice.map(async (pageItem) => {
+        const pageNumber = pageItem.pageNumber;
+
+        // Check if digital text is available and substantive
+        if (pageItem.digitalText && pageItem.digitalText.length >= minDigitalTextLength) {
+          console.log(
+            `[IngestPipeline] ⚡ Halaman ${pageNumber}/${pageCount}: Fast-Path Teks Digital (${pageItem.digitalText.length} karakter) - Instant!`
+          );
+          return {
+            pageNumber,
+            text: pageItem.digitalText,
+          };
+        }
+
+        // Fallback to AI Vision (Qwen2.5-VL) for scanned/image pages
+        console.log(
+          `[IngestPipeline] 🤖 Halaman ${pageNumber}/${pageCount}: Teks digital minim/scan, memindai via AI Vision...`
+        );
+        const text = await extractPageText(pageItem.imageBuffer);
+        const finalText = text || pageItem.digitalText || '';
+        console.log(
+          `[IngestPipeline] -> Halaman ${pageNumber} selesai dipindai (${finalText.length} karakter diekstrak).`
+        );
         return {
           pageNumber,
-          text,
+          text: finalText,
         };
       })
     );
