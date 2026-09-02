@@ -43,19 +43,24 @@ export async function ingestPdf(
     throw new Error('Invalid PDF file buffer: Buffer is empty or not provided.');
   }
 
-  const visionConcurrency = options?.visionConcurrency ?? 3;
+  const visionConcurrency = options?.visionConcurrency ?? 1;
   const chunkSize = options?.chunkSize ?? 800;
   const chunkOverlap = options?.chunkOverlap ?? 150;
 
+  console.log(`[IngestPipeline] 🚀 Memulai ingestion file "${filename}" (${(fileBuffer.length / 1024).toFixed(1)} KB)...`);
+
   // 1. Render all PDF pages to PNG image buffers
+  console.log(`[IngestPipeline] 📄 1/4 Merender halaman PDF ke gambar in-memory...`);
   const pageImages = await renderPdfPagesToImages(fileBuffer);
   const pageCount = pageImages.length;
 
   if (pageCount === 0) {
     throw new Error('PDF document contains 0 renderable pages.');
   }
+  console.log(`[IngestPipeline] ✓ Berhasil merender ${pageCount} halaman.`);
 
-  // 2. Extract text for each page with concurrency limit (e.g. 3 at a time)
+  // 2. Extract text for each page with concurrency limit
+  console.log(`[IngestPipeline] 🤖 2/4 Menjalankan AI Vision OCR untuk ${pageCount} halaman...`);
   const pagesText: PageText[] = [];
 
   for (let i = 0; i < pageImages.length; i += visionConcurrency) {
@@ -63,7 +68,9 @@ export async function ingestPdf(
     const extractedBatch = await Promise.all(
       slice.map(async (imageBuffer, sliceIndex) => {
         const pageNumber = i + sliceIndex + 1;
+        console.log(`[IngestPipeline] -> AI Vision sedang memindai Halaman ${pageNumber}/${pageCount}...`);
         const text = await extractPageText(imageBuffer);
+        console.log(`[IngestPipeline] -> Halaman ${pageNumber} selesai dipindai (${text.length} karakter diekstrak).`);
         return {
           pageNumber,
           text,
@@ -74,12 +81,15 @@ export async function ingestPdf(
   }
 
   // 3. Sliding-window chunking with source page range tracking
+  console.log(`[IngestPipeline] ✂️ 3/4 Memotong teks menjadi Chunks dengan Sliding Window (size: ${chunkSize}, overlap: ${chunkOverlap})...`);
   const chunks = await chunkWithPageOffsets(pagesText, chunkSize, chunkOverlap);
   const chunkCount = chunks.length;
+  console.log(`[IngestPipeline] ✓ Menghasilkan ${chunkCount} chunks dengan pelacakan halaman.`);
 
   // 4. Batch generate embeddings for all chunks
   let embeddings: number[][] = [];
   if (chunkCount > 0) {
+    console.log(`[IngestPipeline] 🧠 4/4 Membuat embedding vector 1024-dim (BGE-M3)...`);
     const chunkContents = chunks.map((c) => c.content);
     embeddings = await embedTexts(chunkContents);
   }
@@ -101,6 +111,8 @@ export async function ingestPdf(
     // If no text was extracted at all, ensure batch chunk_count is 0
     await insertChunks(batchId, []);
   }
+
+  console.log(`[IngestPipeline] ✅ SUKSES! Batch ID: ${batchId}, Total Halaman: ${pageCount}, Total Chunks: ${chunkCount} tersimpan di pgvector.`);
 
   // 7. Return complete upload result
   return {
