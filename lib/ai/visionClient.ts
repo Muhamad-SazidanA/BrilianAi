@@ -32,7 +32,11 @@ export async function extractPageText(
     return '';
   }
 
-  const model = options?.model || 'qwen2.5vl:7b';
+  const model =
+    options?.model ||
+    process.env.VISION_MODEL_NAME ||
+    process.env.VISION_MODEL ||
+    'qwen2.5vl:3b';
   const baseUrl =
     options?.baseUrl ||
     process.env.OLLAMA_ENDPOINT ||
