@@ -72,7 +72,9 @@ export function getIngestWorker(): Worker<IngestJobData, UploadResult> {
       },
       {
         connection,
-        concurrency: 2,
+        concurrency: 1,
+        lockDuration: 600000, // 10 menit lock duration untuk tugas AI Vision
+        maxStalledCount: 1,
       }
     );
 
