@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import KnowledgeRepresentation, { CuratedInsightItem } from '@/components/KnowledgeRepresentation';
+import ChatbotWidget from '@/components/ChatbotWidget';
 
 interface UploadBatch {
   id: string;
@@ -661,6 +662,12 @@ export default function DashboardPage() {
 
         </div>
       </main>
+
+      {/* Floating AI Chatbot Widget (Gemma 2 2B) */}
+      <ChatbotWidget
+        documentId={activeBatch?.id}
+        documentName={activeBatch?.original_filename}
+      />
     </div>
   );
 }
