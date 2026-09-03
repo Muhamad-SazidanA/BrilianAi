@@ -47,6 +47,9 @@ jobs:
             docker compose down --remove-orphans 2>/dev/null || true
             docker compose up -d --build
 
+            echo "📦 Menjalankan migrasi database untuk tabel baru..."
+            docker exec -i brilian_postgres psql -U postgres -d brilian_ai < db/migrations/002_create_curated_insights_table.sql || true
+
             echo "🧠 Memeriksa & mengunduh model AI ke Ollama..."
             chmod +x scripts/pull-models.sh
             bash scripts/pull-models.sh
