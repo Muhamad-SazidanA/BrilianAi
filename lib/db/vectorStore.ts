@@ -200,7 +200,6 @@ export async function listChunks(batchId: string): Promise<DocumentChunk[]> {
       content,
       source_page_start,
       source_page_end,
-      embedding,
       created_at
     FROM document_chunks
     WHERE upload_batch_id = $1

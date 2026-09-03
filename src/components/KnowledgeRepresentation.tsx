@@ -123,6 +123,17 @@ export default function KnowledgeRepresentation({
     }
   };
 
+  // Pagination State (Options: 10, 20, 50, 100, 'all', Default: 10)
+  const [pageSize, setPageSize] = useState<number | 'all'>(10);
+  const [rawPage, setRawPage] = useState<number>(1);
+  const [curatedPage, setCuratedPage] = useState<number>(1);
+
+  // Reset page to 1 when search or pageSize changes
+  useEffect(() => {
+    setRawPage(1);
+    setCuratedPage(1);
+  }, [searchQuery, pageSize]);
+
   // Filter items
   const filteredRaw = rawChunks.filter(
     (c) =>
@@ -140,7 +151,159 @@ export default function KnowledgeRepresentation({
     );
   });
 
+  // Pagination calculations
+  const rawTotal = filteredRaw.length;
+  const rawLimit = pageSize === 'all' ? rawTotal : pageSize;
+  const rawTotalPages = Math.max(1, Math.ceil(rawTotal / (rawLimit || 1)));
+  const paginatedRaw =
+    pageSize === 'all'
+      ? filteredRaw
+      : filteredRaw.slice((rawPage - 1) * (pageSize as number), rawPage * (pageSize as number));
+
+  const curatedTotal = filteredCurated.length;
+  const curatedLimit = pageSize === 'all' ? curatedTotal : pageSize;
+  const curatedTotalPages = Math.max(1, Math.ceil(curatedTotal / (curatedLimit || 1)));
+  const paginatedCurated =
+    pageSize === 'all'
+      ? filteredCurated
+      : filteredCurated.slice((curatedPage - 1) * (pageSize as number), curatedPage * (pageSize as number));
+
   const totalChunksCount = rawChunks.length + curatedInsights.length;
+
+  const renderPaginationControls = (
+    currentPage: number,
+    totalPages: number,
+    totalItems: number,
+    onPageChange: (p: number) => void
+  ) => {
+    const startIdx = totalItems === 0 ? 0 : (currentPage - 1) * (pageSize === 'all' ? totalItems : pageSize) + 1;
+    const endIdx = pageSize === 'all' ? totalItems : Math.min(currentPage * pageSize, totalItems);
+
+    return (
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '0.85rem',
+          marginTop: '1.25rem',
+          padding: '0.75rem 1.1rem',
+          borderRadius: '10px',
+          background: '#0d1322',
+          border: '1px solid #1e293b',
+        }}
+      >
+        {/* Info & Page Size Options */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+            Menampilkan <strong style={{ color: '#fff' }}>{startIdx}-{endIdx}</strong> dari <strong style={{ color: '#fff' }}>{totalItems}</strong>
+          </span>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Limit:</span>
+            {([10, 20, 50, 100, 'all'] as const).map((size) => {
+              const isSelected = pageSize === size;
+              return (
+                <button
+                  key={size}
+                  onClick={() => {
+                    setPageSize(size);
+                    setRawPage(1);
+                    setCuratedPage(1);
+                  }}
+                  style={{
+                    padding: '0.2rem 0.5rem',
+                    borderRadius: '5px',
+                    border: isSelected ? '1px solid #6366f1' : '1px solid #1e293b',
+                    background: isSelected ? 'rgba(99, 102, 241, 0.25)' : 'transparent',
+                    color: isSelected ? '#a5b4fc' : '#94a3b8',
+                    fontSize: '0.72rem',
+                    fontWeight: isSelected ? 700 : 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {size === 'all' ? 'All' : size}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Navigation Buttons */}
+        {pageSize !== 'all' && totalPages > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+            <button
+              onClick={() => onPageChange(1)}
+              disabled={currentPage === 1}
+              style={{
+                padding: '0.25rem 0.55rem',
+                borderRadius: '6px',
+                border: '1px solid #1e293b',
+                background: '#131b2e',
+                color: currentPage === 1 ? '#475569' : '#cbd5e1',
+                fontSize: '0.72rem',
+                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+              }}
+            >
+              ⏮
+            </button>
+            <button
+              onClick={() => onPageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              style={{
+                padding: '0.25rem 0.55rem',
+                borderRadius: '6px',
+                border: '1px solid #1e293b',
+                background: '#131b2e',
+                color: currentPage === 1 ? '#475569' : '#cbd5e1',
+                fontSize: '0.72rem',
+                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+              }}
+            >
+              ◀ Prev
+            </button>
+
+            <span style={{ fontSize: '0.75rem', color: '#94a3b8', padding: '0 0.4rem' }}>
+              Hal <strong style={{ color: '#fff' }}>{currentPage}</strong> / {totalPages}
+            </span>
+
+            <button
+              onClick={() => onPageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              style={{
+                padding: '0.25rem 0.55rem',
+                borderRadius: '6px',
+                border: '1px solid #1e293b',
+                background: '#131b2e',
+                color: currentPage === totalPages ? '#475569' : '#cbd5e1',
+                fontSize: '0.72rem',
+                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+              }}
+            >
+              Next ▶
+            </button>
+            <button
+              onClick={() => onPageChange(totalPages)}
+              disabled={currentPage === totalPages}
+              style={{
+                padding: '0.25rem 0.55rem',
+                borderRadius: '6px',
+                border: '1px solid #1e293b',
+                background: '#131b2e',
+                color: currentPage === totalPages ? '#475569' : '#cbd5e1',
+                fontSize: '0.72rem',
+                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+              }}
+            >
+              ⏭
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div
@@ -354,122 +517,128 @@ export default function KnowledgeRepresentation({
               Tidak ada konten mentah yang cocok dengan pencarian.
             </div>
           ) : (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(440px, 1fr))',
-                gap: '1rem',
-              }}
-            >
-              {filteredRaw.map((chunk) => {
-                const pageLabel =
-                  chunk.source_page_start === chunk.source_page_end
-                    ? `Halaman ${chunk.source_page_start}`
-                    : `Halaman ${chunk.source_page_start}-${chunk.source_page_end}`;
+            <>
+              {renderPaginationControls(rawPage, rawTotalPages, rawTotal, setRawPage)}
 
-                return (
-                  <div
-                    key={chunk.id}
-                    style={{
-                      borderRadius: '10px',
-                      border: '1px solid #1e293b',
-                      background: '#0d1322',
-                      padding: '1.1rem 1.25rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      transition: 'border-color 0.2s',
-                    }}
-                  >
-                    {/* Top Row: Page Title + Mentah & Low Badges */}
-                    <div>
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          marginBottom: '0.75rem',
-                        }}
-                      >
-                        <h4
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(440px, 1fr))',
+                  gap: '1rem',
+                  marginTop: '1rem',
+                }}
+              >
+                {paginatedRaw.map((chunk) => {
+                  const pageLabel =
+                    chunk.source_page_start === chunk.source_page_end
+                      ? `Halaman ${chunk.source_page_start}`
+                      : `Halaman ${chunk.source_page_start}-${chunk.source_page_end}`;
+
+                  return (
+                    <div
+                      key={chunk.id}
+                      style={{
+                        borderRadius: '10px',
+                        border: '1px solid #1e293b',
+                        background: '#0d1322',
+                        padding: '1.1rem 1.25rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        transition: 'border-color 0.2s',
+                      }}
+                    >
+                      {/* Top Row: Page Title + Mentah & Low Badges */}
+                      <div>
+                        <div
                           style={{
-                            margin: 0,
-                            fontSize: '0.92rem',
-                            fontWeight: 700,
-                            color: '#f8fafc',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '0.75rem',
                           }}
                         >
-                          {pageLabel}
-                        </h4>
+                          <h4
+                            style={{
+                              margin: 0,
+                              fontSize: '0.92rem',
+                              fontWeight: 700,
+                              color: '#f8fafc',
+                            }}
+                          >
+                            {pageLabel}
+                          </h4>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                          <span
-                            style={{
-                              fontSize: '0.7rem',
-                              padding: '0.15rem 0.45rem',
-                              borderRadius: '4px',
-                              background: '#1e293b',
-                              border: '1px solid #334155',
-                              color: '#94a3b8',
-                              fontWeight: 600,
-                            }}
-                          >
-                            mentah
-                          </span>
-                          <span
-                            style={{
-                              fontSize: '0.7rem',
-                              padding: '0.15rem 0.45rem',
-                              borderRadius: '4px',
-                              background: '#27272a',
-                              border: '1px solid #3f3f46',
-                              color: '#a1a1aa',
-                              fontWeight: 600,
-                            }}
-                          >
-                            low
-                          </span>
-                          {/* Sesuai instruksi user: Bagian konten/chunk mentah TIDAK BISA diedit (read-only) */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <span
+                              style={{
+                                fontSize: '0.7rem',
+                                padding: '0.15rem 0.45rem',
+                                borderRadius: '4px',
+                                background: '#1e293b',
+                                border: '1px solid #334155',
+                                color: '#94a3b8',
+                                fontWeight: 600,
+                              }}
+                            >
+                              mentah
+                            </span>
+                            <span
+                              style={{
+                                fontSize: '0.7rem',
+                                padding: '0.15rem 0.45rem',
+                                borderRadius: '4px',
+                                background: '#27272a',
+                                border: '1px solid #3f3f46',
+                                color: '#a1a1aa',
+                                fontWeight: 600,
+                              }}
+                            >
+                              low
+                            </span>
+                          </div>
                         </div>
+
+                        {/* Content Preview */}
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: '0.8rem',
+                            color: '#cbd5e1',
+                            lineHeight: '1.55',
+                            maxHeight: '180px',
+                            overflowY: 'auto',
+                            wordBreak: 'break-word',
+                            whiteSpace: 'pre-line',
+                          }}
+                        >
+                          {chunk.content}
+                        </p>
                       </div>
 
-                      {/* Content Body */}
-                      <p
-                        style={{
-                          margin: 0,
-                          fontSize: '0.8rem',
-                          lineHeight: '1.55',
-                          color: '#94a3b8',
-                          maxHeight: '140px',
-                          overflowY: 'auto',
-                          wordBreak: 'break-word',
-                          whiteSpace: 'pre-line',
-                        }}
-                      >
-                        {chunk.content}
-                      </p>
+                      {/* Bottom Row: Raw Tag */}
+                      <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid #172033' }}>
+                        <span
+                          style={{
+                            fontSize: '0.7rem',
+                            padding: '0.18rem 0.5rem',
+                            borderRadius: '4px',
+                            background: '#1e3a8a33',
+                            border: '1px solid #2563eb66',
+                            color: '#60a5fa',
+                            fontWeight: 700,
+                          }}
+                        >
+                          raw
+                        </span>
+                      </div>
                     </div>
+                  );
+                })}
+              </div>
 
-                    {/* Bottom Row: Raw Tag */}
-                    <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid #172033' }}>
-                      <span
-                        style={{
-                          fontSize: '0.7rem',
-                          padding: '0.18rem 0.5rem',
-                          borderRadius: '4px',
-                          background: '#1e3a8a33',
-                          border: '1px solid #2563eb66',
-                          color: '#60a5fa',
-                          fontWeight: 700,
-                        }}
-                      >
-                        raw
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+              {renderPaginationControls(rawPage, rawTotalPages, rawTotal, setRawPage)}
+            </>
           )}
         </div>
       )}
@@ -517,182 +686,192 @@ export default function KnowledgeRepresentation({
               Tidak ada insight kurasi yang cocok dengan pencarian.
             </div>
           ) : (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(440px, 1fr))',
-                gap: '1rem',
-              }}
-            >
-              {filteredCurated.map((item) => {
-                const importanceBadgeStyle =
-                  item.importance === 'high'
-                    ? { bg: '#7f1d1d44', border: '#ef444466', text: '#f87171' }
-                    : item.importance === 'medium'
-                    ? { bg: '#78350f44', border: '#f59e0b66', text: '#fbbf24' }
-                    : { bg: '#1e293b', border: '#334155', text: '#94a3b8' };
+            <>
+              {renderPaginationControls(curatedPage, curatedTotalPages, curatedTotal, setCuratedPage)}
 
-                return (
-                  <div
-                    key={item.id}
-                    style={{
-                      borderRadius: '10px',
-                      border: '1px solid #1e293b',
-                      background: '#0d1322',
-                      padding: '1.1rem 1.25rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      transition: 'border-color 0.2s',
-                    }}
-                  >
-                    <div>
-                      {/* Top Row: Title + Importance Badge + Edit Icon ✏️ */}
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'flex-start',
-                          gap: '0.75rem',
-                          marginBottom: '0.75rem',
-                        }}
-                      >
-                        <h4
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(440px, 1fr))',
+                  gap: '1rem',
+                  marginTop: '1rem',
+                }}
+              >
+                {paginatedCurated.map((item) => {
+                  const importanceBadgeStyle =
+                    item.importance === 'high'
+                      ? { bg: '#7f1d1d44', border: '#ef444466', text: '#f87171' }
+                      : item.importance === 'medium'
+                      ? { bg: '#78350f44', border: '#f59e0b66', text: '#fbbf24' }
+                      : { bg: '#1e293b', border: '#334155', text: '#94a3b8' };
+
+                  return (
+                    <div
+                      key={item.id}
+                      style={{
+                        borderRadius: '10px',
+                        border: '1px solid #1e293b',
+                        background: '#0d1322',
+                        padding: '1.1rem 1.25rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        transition: 'border-color 0.2s',
+                      }}
+                    >
+                      <div>
+                        {/* Top Row: Title + Importance Badge + Edit Icon ✏️ */}
+                        <div
                           style={{
-                            margin: 0,
-                            fontSize: '0.92rem',
-                            fontWeight: 700,
-                            color: '#f8fafc',
-                            lineHeight: '1.4',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'flex-start',
+                            gap: '0.75rem',
+                            marginBottom: '0.75rem',
                           }}
                         >
-                          {item.title}
-                        </h4>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexShrink: 0 }}>
-                          <span
+                          <h4
                             style={{
-                              fontSize: '0.7rem',
-                              padding: '0.15rem 0.45rem',
-                              borderRadius: '4px',
-                              background: importanceBadgeStyle.bg,
-                              border: `1px solid ${importanceBadgeStyle.border}`,
-                              color: importanceBadgeStyle.text,
-                              fontWeight: 600,
-                              textTransform: 'lowercase',
+                              margin: 0,
+                              fontSize: '0.95rem',
+                              fontWeight: 700,
+                              color: '#f8fafc',
+                              lineHeight: '1.4',
                             }}
                           >
-                            {item.importance}
-                          </span>
+                            {item.title}
+                          </h4>
 
-                          {/* Tombol Edit ✏️ (HANYA AKTIF UNTUK INSIGHT KURASI) */}
-                          <button
-                            onClick={() => openEditModal(item)}
-                            title="Edit Insight Kurasi"
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#fbbf24',
-                              cursor: 'pointer',
-                              fontSize: '0.85rem',
-                              padding: '0.15rem 0.25rem',
-                              display: 'flex',
-                              alignItems: 'center',
-                            }}
-                          >
-                            ✏️
-                          </button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexShrink: 0 }}>
+                            <span
+                              style={{
+                                fontSize: '0.7rem',
+                                padding: '0.15rem 0.5rem',
+                                borderRadius: '4px',
+                                background: importanceBadgeStyle.bg,
+                                border: `1px solid ${importanceBadgeStyle.border}`,
+                                color: importanceBadgeStyle.text,
+                                fontWeight: 700,
+                                textTransform: 'uppercase',
+                              }}
+                            >
+                              {item.importance}
+                            </span>
+
+                            {/* Tombol Edit ✏️ (HANYA untuk Insight Kurasi sesuai instruksi pengguna) */}
+                            <button
+                              onClick={() => openEditModal(item)}
+                              title="Edit Insight Kurasi ini"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '0.25rem 0.45rem',
+                                borderRadius: '5px',
+                                background: 'rgba(255, 255, 255, 0.08)',
+                                border: '1px solid rgba(255, 255, 255, 0.15)',
+                                color: '#f8fafc',
+                                cursor: 'pointer',
+                                fontSize: '0.8rem',
+                                transition: 'all 0.15s ease',
+                              }}
+                            >
+                              ✏️
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Middle Row: Content with clean styling */}
+                        <div
+                          style={{
+                            margin: 0,
+                            fontSize: '0.82rem',
+                            color: '#cbd5e1',
+                            lineHeight: '1.6',
+                            maxHeight: '220px',
+                            overflowY: 'auto',
+                            wordBreak: 'break-word',
+                            whiteSpace: 'pre-line',
+                          }}
+                        >
+                          {item.content}
                         </div>
                       </div>
 
-                      {/* Curated Content Body */}
-                      <p
+                      {/* Bottom Row: Collection Badge + AI Source + Tags */}
+                      <div
                         style={{
-                          margin: 0,
-                          fontSize: '0.8rem',
-                          lineHeight: '1.55',
-                          color: '#cbd5e1',
-                          maxHeight: '140px',
-                          overflowY: 'auto',
-                          wordBreak: 'break-word',
-                          whiteSpace: 'pre-line',
-                        }}
-                      >
-                        {item.content}
-                      </p>
-                    </div>
-
-                    {/* Bottom Row: [📁 Category] [🤖 AI] [Tags...] */}
-                    <div
-                      style={{
-                        marginTop: '1rem',
-                        paddingTop: '0.75rem',
-                        borderTop: '1px solid #172033',
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        alignItems: 'center',
-                        gap: '0.4rem',
-                      }}
-                    >
-                      {/* Collection/Category Pill */}
-                      <span
-                        style={{
-                          fontSize: '0.68rem',
-                          padding: '0.15rem 0.45rem',
-                          borderRadius: '4px',
-                          background: '#1e1b4b',
-                          border: '1px solid #4338ca',
-                          color: '#818cf8',
-                          fontWeight: 600,
-                          display: 'inline-flex',
+                          marginTop: '1.25rem',
+                          paddingTop: '0.85rem',
+                          borderTop: '1px solid #172033',
+                          display: 'flex',
                           alignItems: 'center',
-                          gap: '0.25rem',
+                          gap: '0.4rem',
+                          flexWrap: 'wrap',
                         }}
                       >
-                        📁 {item.category || 'track1_financial'}
-                      </span>
+                        {/* Collection Category Badge (e.g., [📁 track1_financial]) */}
+                        <span
+                          style={{
+                            fontSize: '0.7rem',
+                            padding: '0.18rem 0.5rem',
+                            borderRadius: '4px',
+                            background: '#1e3a8a33',
+                            border: '1px solid #2563eb66',
+                            color: '#60a5fa',
+                            fontWeight: 600,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                          }}
+                        >
+                          📁 {item.category || 'track1_financial'}
+                        </span>
 
-                      {/* AI Badge */}
-                      <span
-                        style={{
-                          fontSize: '0.68rem',
-                          padding: '0.15rem 0.45rem',
-                          borderRadius: '4px',
-                          background: '#581c8744',
-                          border: '1px solid #9333ea66',
-                          color: '#c084fc',
-                          fontWeight: 700,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.2rem',
-                        }}
-                      >
-                        🤖 AI
-                      </span>
+                        {/* AI Source Badge (e.g., [🤖 AI]) */}
+                        <span
+                          style={{
+                            fontSize: '0.7rem',
+                            padding: '0.18rem 0.45rem',
+                            borderRadius: '4px',
+                            background: '#064e3b33',
+                            border: '1px solid #05966966',
+                            color: '#34d399',
+                            fontWeight: 700,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.2rem',
+                          }}
+                        >
+                          🤖 AI
+                        </span>
 
-                      {/* Topic Tags */}
-                      {Array.isArray(item.tags) &&
-                        item.tags.map((tag, idx) => (
-                          <span
-                            key={idx}
-                            style={{
-                              fontSize: '0.68rem',
-                              padding: '0.15rem 0.45rem',
-                              borderRadius: '4px',
-                              background: '#1e293b',
-                              border: '1px solid #334155',
-                              color: '#cbd5e1',
-                              fontWeight: 500,
-                            }}
-                          >
-                            {tag}
-                          </span>
-                        ))}
+                        {/* Topic Tags */}
+                        {Array.isArray(item.tags) &&
+                          item.tags.map((tag, idx) => (
+                            <span
+                              key={idx}
+                              style={{
+                                fontSize: '0.68rem',
+                                padding: '0.15rem 0.45rem',
+                                borderRadius: '4px',
+                                background: '#1e293b',
+                                border: '1px solid #334155',
+                                color: '#cbd5e1',
+                                fontWeight: 500,
+                              }}
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+
+              {renderPaginationControls(curatedPage, curatedTotalPages, curatedTotal, setCuratedPage)}
+            </>
           )}
         </div>
       )}
