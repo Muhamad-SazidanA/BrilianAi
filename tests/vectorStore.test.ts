@@ -4,6 +4,8 @@ import {
   insertChunks,
   listBatches,
   listChunks,
+  deleteUploadBatch,
+  updateUploadBatchFilename,
   ChunkInput,
 } from '../lib/db/vectorStore';
 import * as dbClient from '../lib/db/dbClient';
@@ -128,4 +130,24 @@ describe('vectorStore (PostgreSQL + pgvector Store)', () => {
     const [sql] = mockPool.query.mock.calls[0];
     expect(sql).toContain('ORDER BY uploaded_at DESC');
   });
+
+  it('5. deleteUploadBatch() should execute DELETE and return true on success', async () => {
+    mockPool.query.mockResolvedValueOnce({ rowCount: 1 });
+
+    const result = await deleteUploadBatch('batch-to-delete');
+    expect(result).toBe(true);
+    expect(mockPool.query).toHaveBeenCalledWith('DELETE FROM upload_batches WHERE id = $1;', ['batch-to-delete']);
+  });
+
+  it('6. updateUploadBatchFilename() should execute UPDATE and return updated record', async () => {
+    mockPool.query.mockResolvedValueOnce({
+      rows: [{ id: 'b1', original_filename: 'nama_baru.pdf', chunk_count: 5, page_count: 2, uploaded_at: new Date() }],
+      rowCount: 1,
+    });
+
+    const result = await updateUploadBatchFilename('b1', 'nama_baru.pdf');
+    expect(result.original_filename).toBe('nama_baru.pdf');
+    expect(mockPool.query).toHaveBeenCalledWith(expect.stringContaining('UPDATE upload_batches'), ['nama_baru.pdf', 'b1']);
+  });
 });
+

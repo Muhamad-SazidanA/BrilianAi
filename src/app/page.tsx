@@ -41,6 +41,11 @@ export default function DashboardPage() {
   const [batches, setBatches] = useState<UploadBatch[]>([]);
   const [isLoadingBatches, setIsLoadingBatches] = useState<boolean>(true);
 
+  // Document CRUD state
+  const [editingBatch, setEditingBatch] = useState<UploadBatch | null>(null);
+  const [newBatchName, setNewBatchName] = useState<string>('');
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+
   // Inspector state
   const [activeBatch, setActiveBatch] = useState<UploadBatch | null>(null);
   const [chunks, setChunks] = useState<DocumentChunk[]>([]);
@@ -68,6 +73,67 @@ export default function DashboardPage() {
       console.error('Failed to fetch batches:', err);
     } finally {
       setIsLoadingBatches(false);
+    }
+  };
+
+  const handleDeleteBatch = async (batchId: string, filename: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm(`Hapus dokumen "${filename}" beserta seluruh chunks dan insight-nya?`)) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/documents/${batchId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Gagal menghapus dokumen');
+      }
+
+      if (activeBatch?.id === batchId) {
+        setActiveBatch(null);
+        setChunks([]);
+        setCuratedInsights([]);
+      }
+
+      await fetchBatches();
+    } catch (err: any) {
+      alert(err.message || 'Gagal menghapus dokumen');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleOpenRename = (batch: UploadBatch, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingBatch(batch);
+    setNewBatchName(batch.original_filename);
+  };
+
+  const handleSaveRename = async () => {
+    if (!editingBatch || !newBatchName.trim()) return;
+
+    try {
+      const res = await fetch(`/api/documents/${editingBatch.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: newBatchName.trim() }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Gagal mengubah nama dokumen');
+      }
+
+      if (activeBatch?.id === editingBatch.id) {
+        setActiveBatch((prev) => (prev ? { ...prev, original_filename: newBatchName.trim() } : null));
+      }
+
+      setEditingBatch(null);
+      await fetchBatches();
+    } catch (err: any) {
+      alert(err.message || 'Gagal mengubah nama dokumen');
     }
   };
 
@@ -640,6 +706,44 @@ export default function DashboardPage() {
                           >
                             {batch.chunk_count} Chunks
                           </span>
+
+                          {/* Action Buttons: Rename ✏️ & Delete 🗑️ */}
+                          <button
+                            onClick={(e) => handleOpenRename(batch, e)}
+                            title="Ubah Nama Dokumen"
+                            style={{
+                              padding: '0.3rem 0.55rem',
+                              borderRadius: '6px',
+                              background: 'rgba(251, 191, 36, 0.12)',
+                              border: '1px solid rgba(251, 191, 36, 0.3)',
+                              color: '#fbbf24',
+                              fontSize: '0.75rem',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                            }}
+                          >
+                            ✏️
+                          </button>
+
+                          <button
+                            onClick={(e) => handleDeleteBatch(batch.id, batch.original_filename, e)}
+                            title="Hapus Dokumen Beserta Seluruh Chunks & Insights"
+                            disabled={isDeleting}
+                            style={{
+                              padding: '0.3rem 0.55rem',
+                              borderRadius: '6px',
+                              background: 'rgba(239, 68, 68, 0.12)',
+                              border: '1px solid rgba(239, 68, 68, 0.3)',
+                              color: '#f87171',
+                              fontSize: '0.75rem',
+                              cursor: isDeleting ? 'not-allowed' : 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                            }}
+                          >
+                            🗑️
+                          </button>
                         </div>
                       </div>
                     );
@@ -647,6 +751,93 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
+
+            {/* Rename Document Modal */}
+            {editingBatch && (
+              <div
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  background: 'rgba(0, 0, 0, 0.75)',
+                  backdropFilter: 'blur(4px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 10000,
+                  padding: '1rem',
+                }}
+              >
+                <div
+                  style={{
+                    width: '100%',
+                    maxWidth: '440px',
+                    borderRadius: '12px',
+                    background: '#0f172a',
+                    border: '1px solid #334155',
+                    padding: '1.5rem',
+                    boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
+                  }}
+                >
+                  <h3 style={{ margin: '0 0 1rem 0', color: '#fff', fontSize: '1rem', fontWeight: 700 }}>
+                    ✏️ Ubah Nama Dokumen
+                  </h3>
+                  <label style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '0.35rem' }}>
+                    Nama File Baru:
+                  </label>
+                  <input
+                    type="text"
+                    value={newBatchName}
+                    onChange={(e) => setNewBatchName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSaveRename();
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.6rem 0.8rem',
+                      borderRadius: '8px',
+                      background: '#0b1120',
+                      border: '1px solid #334155',
+                      color: '#fff',
+                      fontSize: '0.85rem',
+                      marginBottom: '1.25rem',
+                      outline: 'none',
+                    }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                    <button
+                      onClick={() => setEditingBatch(null)}
+                      style={{
+                        padding: '0.45rem 0.95rem',
+                        borderRadius: '6px',
+                        background: 'transparent',
+                        border: '1px solid #334155',
+                        color: '#94a3b8',
+                        fontSize: '0.8rem',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Batal
+                    </button>
+                    <button
+                      onClick={handleSaveRename}
+                      disabled={!newBatchName.trim()}
+                      style={{
+                        padding: '0.45rem 1.1rem',
+                        borderRadius: '6px',
+                        background: 'var(--accent-primary, #6366f1)',
+                        border: 'none',
+                        color: '#fff',
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        cursor: !newBatchName.trim() ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      Simpan
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Knowledge Representation Section (Dual-Chunk: Mentah & Insight Kurasi) */}
             {activeBatch && (

@@ -143,6 +143,48 @@ export async function listBatches(): Promise<UploadBatch[]> {
 }
 
 /**
+ * Deletes an upload batch by ID.
+ * Cascades to document_chunks and curated_insights automatically.
+ */
+export async function deleteUploadBatch(batchId: string): Promise<boolean> {
+  const pool = getPool();
+  const sql = `DELETE FROM upload_batches WHERE id = $1;`;
+  const result = await pool.query(sql, [batchId]);
+  return (result.rowCount ?? 0) > 0;
+}
+
+/**
+ * Updates the original filename of an upload batch.
+ */
+export async function updateUploadBatchFilename(
+  batchId: string,
+  newFilename: string
+): Promise<UploadBatch> {
+  const pool = getPool();
+  const sql = `
+    UPDATE upload_batches
+    SET original_filename = $1
+    WHERE id = $2
+    RETURNING id, original_filename, chunk_count, page_count, uploaded_at;
+  `;
+  const result = await pool.query<UploadBatch>(sql, [newFilename, batchId]);
+  if (result.rowCount === 0) {
+    throw new Error(`Upload batch with ID ${batchId} not found.`);
+  }
+  return result.rows[0];
+}
+
+/**
+ * Deletes all upload batches and their cascading chunks (Purge all documents).
+ */
+export async function deleteAllUploadBatches(): Promise<number> {
+  const pool = getPool();
+  const sql = `DELETE FROM upload_batches;`;
+  const result = await pool.query(sql);
+  return result.rowCount ?? 0;
+}
+
+/**
  * Lists all document chunks for a specific batch ID, ordered by chunk_index ascending.
  *
  * @param batchId - UUID of the upload batch
