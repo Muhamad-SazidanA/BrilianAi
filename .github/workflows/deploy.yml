@@ -47,4 +47,8 @@ jobs:
             docker compose down --remove-orphans 2>/dev/null || true
             docker compose up -d --build
 
+            echo "🧠 Memeriksa & mengunduh model AI ke Ollama..."
+            chmod +x scripts/pull-models.sh
+            bash scripts/pull-models.sh
+
             echo "✅ Deploy selesai! App berjalan di port 9000"

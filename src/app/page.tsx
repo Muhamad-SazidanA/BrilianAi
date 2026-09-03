@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import KnowledgeRepresentation, { CuratedInsightItem } from '@/components/KnowledgeRepresentation';
 
 interface UploadBatch {
   id: string;
@@ -42,6 +43,7 @@ export default function DashboardPage() {
   // Inspector state
   const [activeBatch, setActiveBatch] = useState<UploadBatch | null>(null);
   const [chunks, setChunks] = useState<DocumentChunk[]>([]);
+  const [curatedInsights, setCuratedInsights] = useState<CuratedInsightItem[]>([]);
   const [isLoadingChunks, setIsLoadingChunks] = useState<boolean>(false);
   const [chunkSearchQuery, setChunkSearchQuery] = useState<string>('');
   const [copiedChunkId, setCopiedChunkId] = useState<string | number | null>(null);
@@ -162,20 +164,42 @@ export default function DashboardPage() {
     }
   };
 
+  const fetchCuratedInsights = async (batchId: string) => {
+    try {
+      const res = await fetch(`/api/documents/${batchId}/curate`);
+      if (res.ok) {
+        const data: CuratedInsightItem[] = await res.json();
+        setCuratedInsights(data);
+      }
+    } catch (err) {
+      console.error('Gagal mengambil insight kurasi:', err);
+    }
+  };
+
   const inspectBatch = async (batch: UploadBatch) => {
     setActiveBatch(batch);
     setIsLoadingChunks(true);
     setChunks([]);
+    setCuratedInsights([]);
     setChunkSearchQuery('');
 
     try {
-      const res = await fetch(`/api/documents/${batch.id}/chunks`);
-      if (res.ok) {
-        const data: DocumentChunk[] = await res.json();
+      const [chunksRes, curatedRes] = await Promise.all([
+        fetch(`/api/documents/${batch.id}/chunks`),
+        fetch(`/api/documents/${batch.id}/curate`),
+      ]);
+
+      if (chunksRes.ok) {
+        const data: DocumentChunk[] = await chunksRes.json();
         setChunks(data);
       }
+
+      if (curatedRes.ok) {
+        const data: CuratedInsightItem[] = await curatedRes.json();
+        setCuratedInsights(data);
+      }
     } catch (err) {
-      console.error('Gagal mengambil chunks:', err);
+      console.error('Gagal mengambil data batch:', err);
     } finally {
       setIsLoadingChunks(false);
     }
@@ -623,139 +647,16 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* Chunks Inspector Section */}
+            {/* Knowledge Representation Section (Dual-Chunk: Mentah & Insight Kurasi) */}
             {activeBatch && (
-              <div className="glass-panel" style={{ padding: '1.75rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ fontSize: '1.2rem' }}>🔍</span>
-                      <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#fff' }}>
-                        Chunks Viewer: {activeBatch.original_filename}
-                      </h2>
-                    </div>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-                      Batch ID: <code>{activeBatch.id}</code> • Total {chunks.length} Chunks tersimpan
-                    </p>
-                  </div>
-
-                  {/* Search Bar */}
-                  <input
-                    type="text"
-                    value={chunkSearchQuery}
-                    onChange={(e) => setChunkSearchQuery(e.target.value)}
-                    placeholder="Cari kata kunci dalam chunks..."
-                    style={{
-                      padding: '0.5rem 0.85rem',
-                      borderRadius: '8px',
-                      border: '1px solid var(--border-subtle)',
-                      background: 'rgba(15, 23, 42, 0.6)',
-                      color: '#fff',
-                      fontSize: '0.8rem',
-                      width: '240px',
-                    }}
-                  />
-                </div>
-
-                {isLoadingChunks ? (
-                  <div style={{ textAlign: 'center', padding: '3rem 0', color: 'var(--text-muted)' }}>
-                    Memuat chunks dari pgvector...
-                  </div>
-                ) : filteredChunks.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                    {chunkSearchQuery ? 'Tidak ada chunk yang cocok dengan pencarian.' : 'Dokumen ini belum memiliki chunk.'}
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '550px', overflowY: 'auto' }}>
-                    {filteredChunks.map((chunk) => {
-                      const isCopied = copiedChunkId === chunk.id;
-                      return (
-                        <div
-                          key={chunk.id}
-                          style={{
-                            padding: '1.1rem',
-                            borderRadius: '10px',
-                            background: 'rgba(15, 23, 42, 0.6)',
-                            border: '1px solid var(--border-subtle)',
-                          }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                              <span
-                                style={{
-                                  fontSize: '0.75rem',
-                                  fontWeight: 700,
-                                  color: '#fff',
-                                  background: 'var(--bg-tertiary)',
-                                  padding: '0.2rem 0.5rem',
-                                  borderRadius: '5px',
-                                }}
-                              >
-                                Chunk #{chunk.chunk_index + 1}
-                              </span>
-
-                              <span
-                                style={{
-                                  fontSize: '0.75rem',
-                                  fontWeight: 600,
-                                  color: 'var(--accent-amber)',
-                                  background: 'rgba(245, 158, 11, 0.12)',
-                                  border: '1px solid rgba(245, 158, 11, 0.25)',
-                                  padding: '0.2rem 0.5rem',
-                                  borderRadius: '5px',
-                                }}
-                              >
-                                📖 Halaman {chunk.source_page_start} - {chunk.source_page_end}
-                              </span>
-
-                              <span
-                                style={{
-                                  fontSize: '0.7rem',
-                                  color: 'var(--text-muted)',
-                                }}
-                              >
-                                {chunk.content.length} karakter
-                              </span>
-                            </div>
-
-                            <button
-                              onClick={() => copyToClipboard(chunk.content, chunk.id)}
-                              style={{
-                                background: 'transparent',
-                                border: 'none',
-                                color: isCopied ? 'var(--accent-emerald)' : 'var(--text-secondary)',
-                                fontSize: '0.75rem',
-                                cursor: 'pointer',
-                                fontWeight: 600,
-                              }}
-                            >
-                              {isCopied ? '✓ Tersalin!' : '📋 Salin Teks'}
-                            </button>
-                          </div>
-
-                          <div
-                            style={{
-                              padding: '0.85rem',
-                              borderRadius: '8px',
-                              background: 'rgba(0, 0, 0, 0.3)',
-                              color: '#e2e8f0',
-                              fontSize: '0.85rem',
-                              lineHeight: '1.55',
-                              whiteSpace: 'pre-wrap',
-                              fontFamily: 'inherit',
-                              borderLeft: '3px solid var(--accent-primary)',
-                            }}
-                          >
-                            {chunk.content}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              <KnowledgeRepresentation
+                batchId={activeBatch.id}
+                filename={activeBatch.original_filename}
+                rawChunks={chunks}
+                curatedInsights={curatedInsights}
+                onRefreshCurated={() => fetchCuratedInsights(activeBatch.id)}
+              />
             )}
-
           </div>
 
         </div>

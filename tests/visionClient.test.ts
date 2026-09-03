@@ -26,7 +26,7 @@ describe('extractPageText (AI Vision Client)', () => {
     const mockExtractedText = 'Laporan Keuangan Kuartal 1: Pertumbuhan pendapatan meningkat 15%.';
 
     vi.mocked(ChatOllama.prototype.invoke).mockResolvedValueOnce(
-      new AIMessage({ content: mockExtractedText })
+      new AIMessage({ content: mockExtractedText }) as any
     );
 
     const result = await extractPageText(dummyPngBuffer, {
@@ -55,23 +55,23 @@ describe('extractPageText (AI Vision Client)', () => {
 
   it('3. should ensure the request payload sent to Ollama includes images array with the correct base64 data', async () => {
     vi.mocked(ChatOllama.prototype.invoke).mockResolvedValueOnce(
-      new AIMessage({ content: 'Teks terdeteksi: HALO DUNIA 12345' })
+      new AIMessage({ content: 'Teks terdeteksi: HALO DUNIA 12345' }) as any
     );
 
     await extractPageText(dummyPngBuffer, { initialBackoffMs: 10 });
 
     expect(ChatOllama.prototype.invoke).toHaveBeenCalledTimes(1);
 
-    const callArgs = vi.mocked(ChatOllama.prototype.invoke).mock.calls[0][0];
+    const callArgs = vi.mocked(ChatOllama.prototype.invoke).mock.calls[0][0] as any[];
     expect(Array.isArray(callArgs)).toBe(true);
 
     // 1. System prompt check
-    const systemMsg = callArgs.find((m) => m instanceof SystemMessage || m._getType?.() === 'system');
+    const systemMsg = callArgs.find((m: any) => m instanceof SystemMessage || m._getType?.() === 'system');
     expect(systemMsg).toBeDefined();
     expect(systemMsg.content).toBe(SYSTEM_VISION_PROMPT);
 
     // 2. Human message with image base64 check
-    const humanMsg = callArgs.find((m) => m instanceof HumanMessage || m._getType?.() === 'human');
+    const humanMsg = callArgs.find((m: any) => m instanceof HumanMessage || m._getType?.() === 'human');
     expect(humanMsg).toBeDefined();
 
     // Check additional_kwargs.images

@@ -8,7 +8,7 @@ const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
   experimental: {
-    serverComponentsExternalPackages: ['mupdf', 'pg', 'bullmq'],
+    serverComponentsExternalPackages: ['mupdf', 'pg', 'bullmq', 'undici'],
   },
   webpack: (config) => {
     // Tambahkan alias @lib → root/lib/ agar Next.js webpack bisa resolve

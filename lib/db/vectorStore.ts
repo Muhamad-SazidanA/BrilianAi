@@ -167,3 +167,249 @@ export async function listChunks(batchId: string): Promise<DocumentChunk[]> {
   const result = await pool.query<DocumentChunk>(sql, [batchId]);
   return result.rows;
 }
+
+export interface SimilarChunkResult {
+  id: number | string;
+  uploadBatchId: string;
+  originalFilename: string;
+  chunkIndex: number;
+  content: string;
+  sourcePageStart: number;
+  sourcePageEnd: number;
+  similarity: number;
+}
+
+export interface SearchOptions {
+  batchId?: string;
+  limit?: number;
+  minSimilarity?: number;
+}
+
+/**
+ * Searches for the most relevant document chunks based on cosine distance of embeddings.
+ *
+ * @param queryEmbedding - 1024-dimensional embedding vector of the search query
+ * @param options - Optional filters (batchId, limit, minSimilarity)
+ * @returns Promise<SimilarChunkResult[]> - Top matched chunks sorted by similarity desc
+ */
+export async function searchSimilarChunks(
+  queryEmbedding: number[],
+  options?: SearchOptions
+): Promise<SimilarChunkResult[]> {
+  if (!queryEmbedding || queryEmbedding.length === 0) {
+    return [];
+  }
+
+  const pool = getPool();
+  const limit = options?.limit ?? 5;
+  const batchId = options?.batchId || null;
+  const vectorString = `[${queryEmbedding.join(',')}]`;
+
+  const sql = `
+    SELECT
+      c.id,
+      c.upload_batch_id AS "uploadBatchId",
+      b.original_filename AS "originalFilename",
+      c.chunk_index AS "chunkIndex",
+      c.content,
+      c.source_page_start AS "sourcePageStart",
+      c.source_page_end AS "sourcePageEnd",
+      (1 - (c.embedding <=> $1::vector)) AS similarity
+    FROM document_chunks c
+    JOIN upload_batches b ON b.id = c.upload_batch_id
+    WHERE ($2::uuid IS NULL OR c.upload_batch_id = $2)
+    ORDER BY c.embedding <=> $1::vector ASC
+    LIMIT $3;
+  `;
+
+  const result = await pool.query<SimilarChunkResult>(sql, [vectorString, batchId, limit]);
+  
+  if (options?.minSimilarity !== undefined) {
+    return result.rows.filter((row) => row.similarity >= (options.minSimilarity ?? 0));
+  }
+
+  return result.rows;
+}
+
+export interface CuratedInsightInput {
+  title: string;
+  content: string;
+  importance?: 'high' | 'medium' | 'low';
+  category?: string;
+  tags?: string[];
+  sourcePages?: string;
+  sourceChunkId?: number | string | null;
+  embedding?: number[];
+}
+
+export interface CuratedInsight {
+  id: number | string;
+  upload_batch_id: string;
+  title: string;
+  content: string;
+  importance: 'high' | 'medium' | 'low';
+  category: string;
+  tags: string[];
+  source_pages: string;
+  source_chunk_id: number | string | null;
+  embedding?: string | number[];
+  created_at: Date | string;
+}
+
+/**
+ * Inserts one or more curated insights for a batch into curated_insights table.
+ */
+export async function insertCuratedInsights(
+  batchId: string,
+  insights: CuratedInsightInput[]
+): Promise<CuratedInsight[]> {
+  if (!insights || insights.length === 0) {
+    return [];
+  }
+
+  const pool = getPool();
+  const client = await pool.connect();
+  const inserted: CuratedInsight[] = [];
+
+  try {
+    await client.query('BEGIN');
+
+    for (const item of insights) {
+      const importance = item.importance || 'medium';
+      const category = item.category || 'track1_financial';
+      const tags = item.tags || [];
+      const sourcePages = item.sourcePages || '';
+      const sourceChunkId = item.sourceChunkId || null;
+      const embedding = item.embedding ? `[${item.embedding.join(',')}]` : null;
+
+      const sql = `
+        INSERT INTO curated_insights (
+          upload_batch_id,
+          title,
+          content,
+          importance,
+          category,
+          tags,
+          source_pages,
+          source_chunk_id,
+          embedding
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::vector)
+        RETURNING *;
+      `;
+
+      const res = await client.query<CuratedInsight>(sql, [
+        batchId,
+        item.title,
+        item.content,
+        importance,
+        category,
+        tags,
+        sourcePages,
+        sourceChunkId,
+        embedding,
+      ]);
+      inserted.push(res.rows[0]);
+    }
+
+    await client.query('COMMIT');
+    return inserted;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Lists all curated insights for a specific batch ID, ordered by importance and created_at.
+ */
+export async function listCuratedInsights(batchId: string): Promise<CuratedInsight[]> {
+  const pool = getPool();
+  const sql = `
+    SELECT
+      id,
+      upload_batch_id,
+      title,
+      content,
+      importance,
+      category,
+      tags,
+      source_pages,
+      source_chunk_id,
+      created_at
+    FROM curated_insights
+    WHERE upload_batch_id = $1
+    ORDER BY
+      CASE importance
+        WHEN 'high' THEN 1
+        WHEN 'medium' THEN 2
+        WHEN 'low' THEN 3
+        ELSE 4
+      END ASC,
+      id ASC;
+  `;
+  const result = await pool.query<CuratedInsight>(sql, [batchId]);
+  return result.rows;
+}
+
+/**
+ * Updates a curated insight by ID (title, content, importance, category, tags, embedding).
+ * Note: Raw chunks remain read-only; only curated insights are editable.
+ */
+export async function updateCuratedInsight(
+  id: number | string,
+  data: Partial<Pick<CuratedInsightInput, 'title' | 'content' | 'importance' | 'category' | 'tags' | 'embedding'>>
+): Promise<CuratedInsight> {
+  const pool = getPool();
+  const updates: string[] = [];
+  const values: any[] = [];
+  let paramIndex = 1;
+
+  if (data.title !== undefined) {
+    updates.push(`title = $${paramIndex++}`);
+    values.push(data.title);
+  }
+  if (data.content !== undefined) {
+    updates.push(`content = $${paramIndex++}`);
+    values.push(data.content);
+  }
+  if (data.importance !== undefined) {
+    updates.push(`importance = $${paramIndex++}`);
+    values.push(data.importance);
+  }
+  if (data.category !== undefined) {
+    updates.push(`category = $${paramIndex++}`);
+    values.push(data.category);
+  }
+  if (data.tags !== undefined) {
+    updates.push(`tags = $${paramIndex++}`);
+    values.push(data.tags);
+  }
+  if (data.embedding !== undefined) {
+    updates.push(`embedding = $${paramIndex++}::vector`);
+    values.push(`[${data.embedding.join(',')}]`);
+  }
+
+  if (updates.length === 0) {
+    const res = await pool.query<CuratedInsight>('SELECT * FROM curated_insights WHERE id = $1', [id]);
+    if (res.rowCount === 0) throw new Error(`Curated insight with ID ${id} not found.`);
+    return res.rows[0];
+  }
+
+  values.push(id);
+  const sql = `
+    UPDATE curated_insights
+    SET ${updates.join(', ')}
+    WHERE id = $${paramIndex}
+    RETURNING *;
+  `;
+
+  const result = await pool.query<CuratedInsight>(sql, values);
+  if (result.rowCount === 0) {
+    throw new Error(`Curated insight with ID ${id} not found.`);
+  }
+  return result.rows[0];
+}
+

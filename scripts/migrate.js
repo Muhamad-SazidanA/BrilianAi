@@ -13,12 +13,16 @@ async function runMigration() {
     await client.connect();
     console.log('Connected successfully.');
 
-    const migrationPath = path.join(__dirname, '..', 'db', 'migrations', '001_create_ingestion_tables.sql');
-    const sql = fs.readFileSync(migrationPath, 'utf8');
+    const migrationsDir = path.join(__dirname, '..', 'db', 'migrations');
+    const files = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort();
 
-    console.log('Executing migration: 001_create_ingestion_tables.sql ...');
-    await client.query(sql);
-    console.log('Migration executed successfully!');
+    for (const file of files) {
+      const filePath = path.join(migrationsDir, file);
+      const sql = fs.readFileSync(filePath, 'utf8');
+      console.log(`Executing migration: ${file} ...`);
+      await client.query(sql);
+      console.log(`Migration ${file} executed successfully!`);
+    }
 
     const res = await client.query("SELECT * FROM pg_extension WHERE extname='vector';");
     console.log('Verification: pgvector extension status:', res.rows);
