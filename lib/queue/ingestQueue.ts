@@ -44,11 +44,7 @@ export function getIngestQueue(): Queue<IngestJobData, UploadResult> {
     queueInstance = new Queue<IngestJobData, UploadResult>(INGEST_QUEUE_NAME, {
       connection,
       defaultJobOptions: {
-        attempts: 2,
-        backoff: {
-          type: 'exponential',
-          delay: 2000,
-        },
+        attempts: 1, // Hindari auto-retry dokumen raksasa
         removeOnComplete: true,
         removeOnFail: 1000,
       },
@@ -73,8 +69,8 @@ export function getIngestWorker(): Worker<IngestJobData, UploadResult> {
       {
         connection,
         concurrency: 1,
-        lockDuration: 600000, // 10 menit lock duration untuk tugas AI Vision
-        maxStalledCount: 1,
+        lockDuration: 3600000, // 1 jam lock duration untuk dokumen ribuan halaman
+        maxStalledCount: 0,
       }
     );
 
