@@ -124,6 +124,180 @@ export default function ChatbotWidget({ documentId, documentName }: ChatbotWidge
     }
   };
 
+  // Helper to parse **bold** and remove ugly stray asterisks
+  const formatInlineBold = (content: string) => {
+    if (!content.includes('**') && !content.includes('*')) {
+      return content;
+    }
+
+    const parts = content.split(/(\*\*[^*]+?\*\*)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        const textInside = part.slice(2, -2);
+        return (
+          <strong key={i} style={{ color: '#ffffff', fontWeight: 700 }}>
+            {textInside}
+          </strong>
+        );
+      }
+      // Remove any stray lonely single or double asterisks
+      return part.replace(/\*+/g, '');
+    });
+  };
+
+  // Helper to format text with bold label before colon and zero asterisks
+  const formatBulletContent = (content: string) => {
+    // Strip all raw markdown asterisks
+    const cleanContent = content.replace(/\*+/g, '').trim();
+
+    // If it has a label before colon (e.g. "Holistic Care: Merawat...")
+    const colonIndex = cleanContent.indexOf(':');
+    if (colonIndex > 0 && colonIndex <= 45) {
+      const label = cleanContent.substring(0, colonIndex + 1);
+      const rest = cleanContent.substring(colonIndex + 1);
+      return (
+        <span>
+          <strong style={{ color: '#ffffff', fontWeight: 700 }}>{label}</strong>
+          <span style={{ color: '#e2e8f0' }}>{rest}</span>
+        </span>
+      );
+    }
+
+    return <span style={{ color: '#e2e8f0' }}>{cleanContent}</span>;
+  };
+
+  // Helper to render clean structured message matching reference image exactly
+  const renderMessageContent = (text: string) => {
+    if (!text) return null;
+
+    const lines = text.split('\n');
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+        {lines.map((line, idx) => {
+          const trimmed = line.trim();
+          if (!trimmed) {
+            return <div key={idx} style={{ height: '0.2rem' }} />;
+          }
+
+          // Format Source line: "Sumber: ..."
+          if (trimmed.toLowerCase().startsWith('sumber:')) {
+            const cleanSource = trimmed.replace(/\*+/g, '');
+            return (
+              <div
+                key={idx}
+                style={{
+                  marginTop: '0.45rem',
+                  padding: '0.35rem 0.65rem',
+                  borderRadius: '6px',
+                  background: 'rgba(99, 102, 241, 0.12)',
+                  border: '1px solid rgba(99, 102, 241, 0.25)',
+                  fontSize: '0.72rem',
+                  color: '#a5b4fc',
+                  fontStyle: 'italic',
+                }}
+              >
+                📄 {cleanSource}
+              </div>
+            );
+          }
+
+          // Format Section Header (e.g. "5 Pilar Filosofi Fisioterapi Modern" or "Tujuan Filosofi...")
+          const isHeader =
+            trimmed.startsWith('###') ||
+            trimmed.startsWith('##') ||
+            trimmed.startsWith('#') ||
+            (trimmed.length < 60 &&
+              !trimmed.startsWith('•') &&
+              !trimmed.startsWith('▪') &&
+              !trimmed.startsWith('-') &&
+              !trimmed.startsWith('*') &&
+              !/^\d+\./.test(trimmed) &&
+              idx < lines.length - 1 &&
+              (lines[idx + 1]?.trim().startsWith('•') ||
+                lines[idx + 1]?.trim().startsWith('▪') ||
+                lines[idx + 1]?.trim().startsWith('-') ||
+                /^\d+\./.test(lines[idx + 1]?.trim() || '')));
+
+          if (isHeader) {
+            const cleanHeader = trimmed.replace(/^#+\s*/, '').replace(/\*+/g, '');
+            return (
+              <div
+                key={idx}
+                style={{
+                  fontWeight: 700,
+                  fontSize: '0.88rem',
+                  color: '#ffffff',
+                  marginTop: idx === 0 ? '0' : '0.55rem',
+                  marginBottom: '0.1rem',
+                  lineHeight: '1.4',
+                }}
+              >
+                {cleanHeader}
+              </div>
+            );
+          }
+
+          // Format Bullet Point (• or ▪ or - or * or numbered 1.)
+          const isBullet =
+            trimmed.startsWith('•') ||
+            trimmed.startsWith('▪') ||
+            trimmed.startsWith('- ') ||
+            trimmed.startsWith('* ') ||
+            /^\d+\.\s/.test(trimmed);
+
+          if (isBullet) {
+            const bulletText = trimmed.replace(/^[•▪\-*]\s*/, '').replace(/^\d+\.\s*/, '');
+            return (
+              <div
+                key={idx}
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '0.45rem',
+                  paddingLeft: '0.1rem',
+                  lineHeight: '1.5',
+                }}
+              >
+                {/* Square bullet ▪ matching screenshot exactly */}
+                <span
+                  style={{
+                    color: '#94a3b8',
+                    fontSize: '0.8rem',
+                    lineHeight: '1.45',
+                    flexShrink: 0,
+                    userSelect: 'none',
+                  }}
+                >
+                  ▪
+                </span>
+                <div style={{ fontSize: '0.82rem', lineHeight: '1.5' }}>
+                  {formatBulletContent(bulletText)}
+                </div>
+              </div>
+            );
+          }
+
+          // Regular paragraph (intro or body): clean asterisks
+          const cleanParagraph = trimmed.replace(/\*+/g, '');
+          return (
+            <p
+              key={idx}
+              style={{
+                margin: 0,
+                color: '#f8fafc',
+                lineHeight: '1.55',
+                fontSize: '0.82rem',
+              }}
+            >
+              {cleanParagraph}
+            </p>
+          );
+        })}
+      </div>
+    );
+  };
+
   const quickQuestions = [
     'Apa ringkasan utama isi dokumen ini?',
     'Tampilkan data angka penting atau keuangan di dokumen ini.',
@@ -306,7 +480,7 @@ export default function ChatbotWidget({ documentId, documentName }: ChatbotWidge
                     whiteSpace: 'pre-wrap',
                   }}
                 >
-                  {msg.text}
+                  {renderMessageContent(msg.text)}
 
                   {/* Document Sources Citations */}
                   {msg.sources && msg.sources.length > 0 && (

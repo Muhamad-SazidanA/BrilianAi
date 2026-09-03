@@ -1,5 +1,10 @@
 import { embedTexts } from '../ai/embeddingClient';
-import { searchSimilarChunks, SimilarChunkResult } from '../db/vectorStore';
+import {
+  searchSimilarChunks,
+  searchSimilarCuratedInsights,
+  SimilarChunkResult,
+  SimilarCuratedResult,
+} from '../db/vectorStore';
 import { generateChatResponse } from '../ai/chatClient';
 
 export interface ChatSource {
@@ -29,8 +34,8 @@ export interface ChatResponseResult {
 /**
  * Orchestrates end-to-end RAG chat using:
  * 1. bge-m3 for query embedding
- * 2. pgvector for similarity search against document chunks
- * 3. llama3.2:3b for LLM generation (with strict or public knowledge grounding)
+ * 2. pgvector for similarity search against document chunks and curated insights
+ * 3. LLM generation with comprehensive structured grounding
  *
  * @param query - User's question
  * @param options - Document filters, public knowledge flag, top-K chunks
@@ -46,35 +51,60 @@ export async function askDocumentChat(
   }
 
   const allowPublicKnowledge = Boolean(options?.allowPublicKnowledge);
-  const topK = options?.topK ?? 5;
-  const minSimilarity = options?.minSimilarity ?? (allowPublicKnowledge ? 0.3 : 0.4);
+  const topK = options?.topK ?? 8;
+  const minSimilarity = options?.minSimilarity ?? (allowPublicKnowledge ? 0.2 : 0.25);
 
   // 1. Generate query embedding with BGE-M3 (1024-dim)
   const [queryEmbedding] = await embedTexts([trimmedQuery]);
 
-  // 2. Search pgvector for most similar chunks
+  // 2. Search pgvector for most similar chunks and curated insights
   let similarChunks: SimilarChunkResult[] = [];
+  let similarCurated: SimilarCuratedResult[] = [];
+
   if (queryEmbedding && queryEmbedding.length > 0) {
     similarChunks = await searchSimilarChunks(queryEmbedding, {
       batchId: options?.documentId,
       limit: topK,
       minSimilarity,
     });
+
+    try {
+      similarCurated = await searchSimilarCuratedInsights(queryEmbedding, {
+        batchId: options?.documentId,
+        limit: 5,
+        minSimilarity,
+      });
+    } catch {
+      // Fallback gracefully if curated insights table is not yet populated
+    }
   }
 
-  // 3. Format retrieved chunks into context
-  const contextParts = similarChunks.map((chunk, index) => {
-    const pageLabel =
-      chunk.sourcePageStart === chunk.sourcePageEnd
-        ? `Halaman ${chunk.sourcePageStart}`
-        : `Halaman ${chunk.sourcePageStart}-${chunk.sourcePageEnd}`;
+  // 3. Format retrieved context sections
+  const contextSections: string[] = [];
 
-    return `[Dokumen: ${chunk.originalFilename} | ${pageLabel} | Chunk #${chunk.chunkIndex + 1}]\n${chunk.content}`;
-  });
+  if (similarCurated.length > 0) {
+    const curatedLines = similarCurated.map(
+      (c) =>
+        `[Insight Kurasi: "${c.title}" | Kategori: ${c.category} | ${c.sourcePages} | Dokumen: ${c.originalFilename}]\n${c.content}`
+    );
+    contextSections.push(`=== INSIGHT KURASI TERSTRUKTUR DOKUMEN ===\n${curatedLines.join('\n\n')}`);
+  }
 
-  const contextText = contextParts.join('\n\n---\n\n');
+  if (similarChunks.length > 0) {
+    const rawLines = similarChunks.map((chunk) => {
+      const pageLabel =
+        chunk.sourcePageStart === chunk.sourcePageEnd
+          ? `Halaman ${chunk.sourcePageStart}`
+          : `Halaman ${chunk.sourcePageStart}-${chunk.sourcePageEnd}`;
 
-  // 4. Generate answer via Llama 3.2 (3B)
+      return `[Dokumen: ${chunk.originalFilename} | ${pageLabel} | Chunk #${chunk.chunkIndex + 1}]\n${chunk.content}`;
+    });
+    contextSections.push(`=== KONTEN LENGKAP HALAMAN DOKUMEN ===\n${rawLines.join('\n\n---\n\n')}`);
+  }
+
+  const contextText = contextSections.join('\n\n====================\n\n');
+
+  // 4. Generate comprehensive structured answer via LLM
   const answer = await generateChatResponse(trimmedQuery, contextText, allowPublicKnowledge);
 
   // 5. Build sources list

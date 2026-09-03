@@ -272,6 +272,70 @@ export async function searchSimilarChunks(
   return result.rows;
 }
 
+export interface SimilarCuratedResult {
+  id: number | string;
+  uploadBatchId: string;
+  originalFilename: string;
+  title: string;
+  content: string;
+  importance: string;
+  category: string;
+  tags: string[];
+  sourcePages: string;
+  similarity: number;
+}
+
+/**
+ * Searches for relevant curated insights based on cosine distance of embeddings.
+ */
+export async function searchSimilarCuratedInsights(
+  queryEmbedding: number[],
+  options?: SearchOptions
+): Promise<SimilarCuratedResult[]> {
+  if (!queryEmbedding || queryEmbedding.length === 0) {
+    return [];
+  }
+
+  const pool = getPool();
+  const limit = options?.limit ?? 5;
+  const batchId = options?.batchId || null;
+  const vectorString = `[${queryEmbedding.join(',')}]`;
+
+  const sql = `
+    SELECT
+      ci.id,
+      ci.upload_batch_id AS "uploadBatchId",
+      b.original_filename AS "originalFilename",
+      ci.title,
+      ci.content,
+      ci.importance,
+      ci.category,
+      ci.tags,
+      ci.source_pages AS "sourcePages",
+      (1 - (ci.embedding <=> $1::vector)) AS similarity
+    FROM curated_insights ci
+    JOIN upload_batches b ON b.id = ci.upload_batch_id
+    WHERE ($2::uuid IS NULL OR ci.upload_batch_id = $2)
+      AND ci.embedding IS NOT NULL
+    ORDER BY ci.embedding <=> $1::vector ASC
+    LIMIT $3;
+  `;
+
+  try {
+    const result = await pool.query<SimilarCuratedResult>(sql, [vectorString, batchId, limit]);
+    if (!result || !result.rows) {
+      return [];
+    }
+    if (options?.minSimilarity !== undefined) {
+      return result.rows.filter((row) => row.similarity >= (options.minSimilarity ?? 0));
+    }
+    return result.rows;
+  } catch (err) {
+    console.warn('[VectorStore] searchSimilarCuratedInsights warning:', err);
+    return [];
+  }
+}
+
 export interface CuratedInsightInput {
   title: string;
   content: string;
