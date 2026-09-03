@@ -173,3 +173,31 @@ export async function curateBatch(batchId: string, limit: number = 25): Promise<
 
   return results;
 }
+
+/**
+ * Continuously curates ALL raw chunks for a batch in iterative safe micro-batches (default: 20)
+ * until 100% of chunks are converted into curated insights.
+ */
+export async function curateAllChunks(
+  batchId: string,
+  microBatchSize: number = 20
+): Promise<number> {
+  let totalCurated = 0;
+  console.log(`[CurationService] Memulai kurasi AI otomatis menyeluruh untuk batch ${batchId}...`);
+
+  while (true) {
+    const newlyCurated = await curateBatch(batchId, microBatchSize);
+    if (newlyCurated.length === 0) {
+      break;
+    }
+    totalCurated += newlyCurated.length;
+    console.log(
+      `[CurationService] Progres batch ${batchId}: +${newlyCurated.length} chunks baru (total terkurasi: ${totalCurated})`
+    );
+  }
+
+  console.log(
+    `[CurationService] ✅ Selesai! Total ${totalCurated} chunks berhasil dikurasi menjadi insight untuk batch ${batchId}.`
+  );
+  return totalCurated;
+}

@@ -76,19 +76,19 @@ export default function KnowledgeRepresentation({
     }
   };
 
-  // Otomatis jalankan kurasi AI begitu data mentah tersedia
-  const autoCurationAttempted = useRef<string | null>(null);
-
+  // Otomatis jalankan kurasi AI terus-menerus sampai seluruh chunks mentah terkurasi (100%)
   useEffect(() => {
     if (
       batchId &&
       rawChunks.length > 0 &&
-      curatedInsights.length === 0 &&
-      !isCurating &&
-      autoCurationAttempted.current !== batchId
+      curatedInsights.length < rawChunks.length &&
+      !isCurating
     ) {
-      autoCurationAttempted.current = batchId;
-      handleRunAiCuration();
+      // Tunggu jeda 1.2 detik sebelum melanjutkan ke batch berikutnya
+      const timer = setTimeout(() => {
+        handleRunAiCuration();
+      }, 1200);
+      return () => clearTimeout(timer);
     }
   }, [batchId, rawChunks.length, curatedInsights.length, isCurating]);
 
@@ -478,13 +478,39 @@ export default function KnowledgeRepresentation({
             <span style={{ fontSize: '1.1rem' }}>⚡</span>
             <span>
               <strong>Kurasi AI Otomatis Berjalan (Llama 3.2):</strong>{' '}
-              {curatedInsights.length > 0
-                ? `${curatedInsights.length} insight berhasil dibuat sejauh ini. Kartu bertambah secara live.`
-                : 'Menganalisis tabel & teks dokumen mentah secara otomatis di latar belakang...'}
+              {curatedInsights.length} dari {rawChunks.length} chunks terkurasi (
+              {rawChunks.length > 0
+                ? Math.round((curatedInsights.length / rawChunks.length) * 100)
+                : 0}
+              %). Kartu bertambah secara live.
             </span>
           </div>
           <span style={{ fontSize: '0.75rem', color: '#c084fc', fontWeight: 600 }}>
             Sinkronisasi Langsung 🔄
+          </span>
+        </div>
+      )}
+
+      {/* 100% Curated Completion Banner */}
+      {!isCurating && rawChunks.length > 0 && curatedInsights.length >= rawChunks.length && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.6rem',
+            padding: '0.65rem 1.15rem',
+            marginBottom: '1rem',
+            borderRadius: '8px',
+            background: 'rgba(6, 78, 59, 0.3)',
+            border: '1px solid rgba(52, 211, 153, 0.4)',
+            color: '#a7f3d0',
+            fontSize: '0.82rem',
+          }}
+        >
+          <span style={{ fontSize: '1.1rem' }}>✅</span>
+          <span>
+            <strong>Kurasi AI Selesai 100%:</strong> Seluruh {curatedInsights.length} dari{' '}
+            {rawChunks.length} chunks mentah telah berhasil dikurasi menjadi insight terstruktur.
           </span>
         </div>
       )}
