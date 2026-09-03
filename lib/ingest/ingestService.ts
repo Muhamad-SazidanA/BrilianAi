@@ -105,7 +105,20 @@ export async function ingestPdf(
 
   console.log(`[IngestPipeline] ✅ SUKSES! Batch ID: ${batchId}, Total Halaman: ${pageCount}, Total Chunks: ${chunkCount} tersimpan di pgvector.`);
 
-  // 7. Return complete upload result
+  // 7. Otomatis langsung membuat kurasi insight di background begitu data mentah lengkap
+  if (chunkCount > 0) {
+    console.log(`[IngestPipeline] 🤖 Data mentah lengkap! Memulai kurasi AI otomatis di latar belakang untuk batch ${batchId}...`);
+    import('../curation/curationService')
+      .then(({ curateBatch }) => curateBatch(batchId, 25))
+      .then((curated) => {
+        console.log(`[IngestPipeline] ✓ Kurasi AI otomatis selesai: ${curated.length} insight berhasil dibuat untuk batch ${batchId}.`);
+      })
+      .catch((err) => {
+        console.warn(`[IngestPipeline] Kurasi AI otomatis info/warning untuk batch ${batchId}:`, err);
+      });
+  }
+
+  // 8. Return complete upload result
   return {
     uploadBatchId: batchId,
     originalFilename: filename,

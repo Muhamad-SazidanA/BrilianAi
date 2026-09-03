@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 export interface RawChunkItem {
   id: number | string;
@@ -75,6 +75,42 @@ export default function KnowledgeRepresentation({
       setIsCurating(false);
     }
   };
+
+  // Otomatis jalankan kurasi AI begitu data mentah tersedia
+  const autoCurationAttempted = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (
+      batchId &&
+      rawChunks.length > 0 &&
+      curatedInsights.length === 0 &&
+      !isCurating &&
+      autoCurationAttempted.current !== batchId
+    ) {
+      autoCurationAttempted.current = batchId;
+      handleRunAiCuration();
+    }
+  }, [batchId, rawChunks.length, curatedInsights.length, isCurating]);
+
+  // Live auto-refresh polling saat kurasi AI sedang berlangsung di background
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    if (isCurating) {
+      timer = setInterval(() => {
+        onRefreshCurated();
+      }, 3500);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [isCurating, onRefreshCurated]);
+
+  // Beralih ke tab 'curated' secara otomatis saat insight kurasi sudah siap
+  useEffect(() => {
+    if (curatedInsights.length > 0 && activeTab === 'raw') {
+      setActiveTab('curated');
+    }
+  }, [curatedInsights.length]);
 
   // Open Edit Modal for Curated Insight
   const openEditModal = (insight: CuratedInsightItem) => {
@@ -421,6 +457,37 @@ export default function KnowledgeRepresentation({
           )}
         </div>
       </div>
+
+      {/* Live Auto-Curation Progress Banner */}
+      {isCurating && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0.75rem 1.15rem',
+            marginBottom: '1rem',
+            borderRadius: '8px',
+            background: 'linear-gradient(90deg, rgba(88, 28, 135, 0.45), rgba(30, 58, 138, 0.35))',
+            border: '1px solid rgba(168, 85, 247, 0.45)',
+            color: '#e9d5ff',
+            fontSize: '0.82rem',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <span style={{ fontSize: '1.1rem' }}>⚡</span>
+            <span>
+              <strong>Kurasi AI Otomatis Berjalan (Llama 3.2):</strong>{' '}
+              {curatedInsights.length > 0
+                ? `${curatedInsights.length} insight berhasil dibuat sejauh ini. Kartu bertambah secara live.`
+                : 'Menganalisis tabel & teks dokumen mentah secara otomatis di latar belakang...'}
+            </span>
+          </div>
+          <span style={{ fontSize: '0.75rem', color: '#c084fc', fontWeight: 600 }}>
+            Sinkronisasi Langsung 🔄
+          </span>
+        </div>
+      )}
 
       {curationError && (
         <div
