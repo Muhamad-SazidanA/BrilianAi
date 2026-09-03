@@ -28,7 +28,11 @@ export async function POST(
 ) {
   try {
     const { id } = params;
-    const curated = await curateBatch(id);
+    const { searchParams } = new URL(request.url);
+    const limitParam = searchParams.get('limit');
+    const limit = limitParam ? parseInt(limitParam, 10) : 25;
+
+    const curated = await curateBatch(id, limit);
     return NextResponse.json(
       {
         message: 'Kurasi AI berhasil diselesaikan.',

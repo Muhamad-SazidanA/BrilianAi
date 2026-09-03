@@ -60,7 +60,7 @@ export default function KnowledgeRepresentation({
     setCurationError(null);
 
     try {
-      const res = await fetch(`/api/documents/${batchId}/curate`, {
+      const res = await fetch(`/api/documents/${batchId}/curate?limit=25`, {
         method: 'POST',
       });
       if (!res.ok) {
@@ -230,7 +230,7 @@ export default function KnowledgeRepresentation({
             📤 Import
           </button>
 
-          {curatedInsights.length === 0 && rawChunks.length > 0 && (
+          {rawChunks.length > 0 && (
             <button
               onClick={handleRunAiCuration}
               disabled={isCurating}
@@ -249,7 +249,11 @@ export default function KnowledgeRepresentation({
                 boxShadow: '0 0 15px rgba(168, 85, 247, 0.3)',
               }}
             >
-              {isCurating ? '⏳ Memproses Kurasi AI (Llama 3.2)...' : '✨ Jalankan Kurasi AI'}
+              {isCurating
+                ? '⏳ Mengurasi (+25 Chunks)...'
+                : curatedInsights.length === 0
+                ? '✨ Jalankan Kurasi AI (+25 Chunks)'
+                : '✨ Kurasi Lagi (+25 Chunks)'}
             </button>
           )}
         </div>
@@ -505,7 +509,7 @@ export default function KnowledgeRepresentation({
                   cursor: isCurating || rawChunks.length === 0 ? 'not-allowed' : 'pointer',
                 }}
               >
-                {isCurating ? '⏳ Sedang Menganalisis & Mengurasi...' : '🚀 Mulai Kurasi AI Sekarang'}
+                {isCurating ? '⏳ Sedang Mengurasi 25 Chunks Pertama...' : '🚀 Mulai Kurasi AI (25 Chunk Pertama)'}
               </button>
             </div>
           ) : filteredCurated.length === 0 ? (

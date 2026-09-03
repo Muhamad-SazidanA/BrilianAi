@@ -107,17 +107,34 @@ Ubah menjadi JSON Insight Kurasi sesuai format yang telah ditentukan.`;
 }
 
 /**
- * Curates all raw chunks for a given upload batch ID and saves them to curated_insights with embeddings.
+ * Curates raw chunks incrementally for a given upload batch ID (default limit: 25)
+ * and saves each insight immediately to avoid HTTP timeout and memory overload.
  */
-export async function curateBatch(batchId: string): Promise<CuratedInsight[]> {
+export async function curateBatch(batchId: string, limit: number = 25): Promise<CuratedInsight[]> {
   const rawChunks = await listChunks(batchId);
   if (rawChunks.length === 0) {
     return [];
   }
 
-  const inputs: CuratedInsightInput[] = [];
+  // Get already curated source chunk IDs to avoid re-curating
+  const existingInsights = await listCuratedInsights(batchId);
+  const curatedChunkIds = new Set(
+    existingInsights
+      .map((i) => (i.source_chunk_id ? String(i.source_chunk_id) : null))
+      .filter(Boolean)
+  );
 
-  for (const chunk of rawChunks) {
+  const uncuratedChunks = rawChunks
+    .filter((c) => !curatedChunkIds.has(String(c.id)))
+    .slice(0, limit);
+
+  if (uncuratedChunks.length === 0) {
+    return [];
+  }
+
+  const results: CuratedInsight[] = [];
+
+  for (const chunk of uncuratedChunks) {
     const pageLabel =
       chunk.source_page_start === chunk.source_page_end
         ? `Halaman ${chunk.source_page_start}`
@@ -125,24 +142,34 @@ export async function curateBatch(batchId: string): Promise<CuratedInsight[]> {
 
     const curated = await curateRawText(chunk.content, pageLabel);
 
-    inputs.push({
-      title: curated.title,
-      content: curated.content,
-      importance: curated.importance,
-      category: curated.category,
-      tags: curated.tags,
-      sourcePages: pageLabel,
-      sourceChunkId: chunk.id,
-    });
+    // Embed immediately with BGE-M3 (1024-dim)
+    let embedding: number[] = new Array(1024).fill(0);
+    try {
+      const embs = await embedTexts([`${curated.title}\n${curated.content}`]);
+      if (embs && embs[0]) {
+        embedding = embs[0];
+      }
+    } catch (embErr) {
+      console.warn('[CurationService] Embedding warning, using zero-vector fallback:', embErr);
+    }
+
+    const inserted = await insertCuratedInsights(batchId, [
+      {
+        title: curated.title,
+        content: curated.content,
+        importance: curated.importance,
+        category: curated.category,
+        tags: curated.tags,
+        sourcePages: pageLabel,
+        sourceChunkId: chunk.id,
+        embedding,
+      },
+    ]);
+
+    if (inserted.length > 0) {
+      results.push(inserted[0]);
+    }
   }
 
-  // Batch embed all curated contents using BGE-M3 (1024-dim)
-  const contents = inputs.map((i) => `${i.title}\n${i.content}`);
-  const embeddings = await embedTexts(contents);
-
-  inputs.forEach((input, idx) => {
-    input.embedding = embeddings[idx] || new Array(1024).fill(0);
-  });
-
-  return await insertCuratedInsights(batchId, inputs);
+  return results;
 }
