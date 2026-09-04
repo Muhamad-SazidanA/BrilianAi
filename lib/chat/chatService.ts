@@ -53,7 +53,7 @@ export async function askDocumentChat(
 
   const allowPublicKnowledge = Boolean(options?.allowPublicKnowledge);
   const topK = options?.topK ?? 6;
-  const minSimilarity = options?.minSimilarity ?? (allowPublicKnowledge ? 0.15 : 0.18);
+  const minSimilarity = options?.minSimilarity ?? (allowPublicKnowledge ? 0.20 : 0.28);
 
   // Jika dokumen spesifik ditargetkan, pastikan dokumen telah aktif sebagai Basis Pengetahuan AI
   if (options?.documentId) {
@@ -97,6 +97,16 @@ export async function askDocumentChat(
     } catch {
       // Fallback gracefully if curated insights table is not yet populated
     }
+  }
+
+  // Jika tidak ada konteks dokumen yang relevan dan mode publik mati, jangan panggil LLM untuk mencegah halusinasi
+  if (!allowPublicKnowledge && similarChunks.length === 0 && similarCurated.length === 0) {
+    return {
+      answer: 'Data tidak ditemukan di dalam dokumen.',
+      sources: [],
+      allowPublicKnowledge: false,
+      retrievedCount: 0,
+    };
   }
 
   // 3. Format retrieved context sections
