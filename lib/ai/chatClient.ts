@@ -88,7 +88,7 @@ export async function generateChatResponse(
     options?.model ||
     process.env.CHAT_MODEL_NAME ||
     process.env.CHAT_MODEL ||
-    'gemma2:2b';
+    'llama3.2:3b';
 
   const baseUrl =
     options?.baseUrl ||

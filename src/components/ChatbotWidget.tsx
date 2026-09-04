@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { MessageCircle, X, FileText, Send } from 'lucide-react';
 
+/* ── Types ──────────────────────────────────────────── */
 interface ChatSource {
   chunkId: number | string;
   uploadBatchId: string;
@@ -25,6 +27,16 @@ interface ChatbotWidgetProps {
   documentName?: string;
 }
 
+/* ── Quick suggestion questions ───────────────────── */
+const QUICK_QUESTIONS = [
+  'Apa ringkasan utama isi dokumen ini?',
+  'Tampilkan data angka penting atau keuangan.',
+  'Siapa saja pihak atau unit yang disebutkan?',
+];
+
+/* ═════════════════════════════════════════════════════
+   ChatbotWidget Component
+   ═════════════════════════════════════════════════════ */
 export default function ChatbotWidget({ documentId, documentName }: ChatbotWidgetProps) {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [inputQuery, setInputQuery] = useState<string>('');
@@ -35,25 +47,22 @@ export default function ChatbotWidget({ documentId, documentName }: ChatbotWidge
       id: 'welcome-1',
       sender: 'ai',
       text: documentName
-        ? `Halo! Saya AI Chatbot (**Gemma 2 2B**). Saya siap menjawab pertanyaan Anda berdasarkan isi dokumen **"${documentName}"**.`
-        : 'Halo! Saya AI Chatbot (**Gemma 2 2B**). Silakan pilih dokumen atau tanyakan isi dokumen yang telah tersimpan di sistem.',
+        ? `Halo! Saya siap menjawab pertanyaan Anda berdasarkan isi dokumen **"${documentName}"**.`
+        : 'Halo! Saya BrilianAI Chatbot. Silakan pilih dokumen atau tanyakan isi dokumen yang telah tersimpan di sistem.',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
+  // Scroll to bottom when messages update
   useEffect(() => {
     if (isOpen) {
-      scrollToBottom();
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isOpen]);
 
-  // Update welcome message when document changes
+  // Append notification when active document changes
   useEffect(() => {
     if (documentName) {
       setMessages((prev) => [
@@ -61,13 +70,14 @@ export default function ChatbotWidget({ documentId, documentName }: ChatbotWidge
         {
           id: `doc-switch-${Date.now()}`,
           sender: 'ai',
-          text: `📌 Dokumen aktif berganti ke: **${documentName}**. Silakan ajukan pertanyaan seputar dokumen ini.`,
+          text: `Dokumen aktif berganti ke: **${documentName}**. Silakan ajukan pertanyaan seputar dokumen ini.`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
     }
-  }, [documentId, documentName]);
+  }, [documentId, documentName]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /* ── Send message ─────────────────────────────────── */
   const handleSendMessage = async (queryText?: string) => {
     const textToSend = (queryText || inputQuery).trim();
     if (!textToSend || isLoading) return;
@@ -95,10 +105,7 @@ export default function ChatbotWidget({ documentId, documentName }: ChatbotWidge
       });
 
       const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Gagal mendapatkan jawaban dari AI.');
-      }
+      if (!res.ok) throw new Error(data.error || 'Gagal mendapatkan jawaban dari AI.');
 
       const aiMessage: Message = {
         id: `ai-${Date.now()}`,
@@ -107,7 +114,6 @@ export default function ChatbotWidget({ documentId, documentName }: ChatbotWidge
         sources: data.sources || [],
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
-
       setMessages((prev) => [...prev, aiMessage]);
     } catch (error: any) {
       setMessages((prev) => [
@@ -115,7 +121,7 @@ export default function ChatbotWidget({ documentId, documentName }: ChatbotWidge
         {
           id: `ai-err-${Date.now()}`,
           sender: 'ai',
-          text: `⚠️ Maaf, terjadi kesalahan: ${error.message}`,
+          text: `Maaf, terjadi kesalahan: ${error.message}`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
@@ -124,85 +130,48 @@ export default function ChatbotWidget({ documentId, documentName }: ChatbotWidge
     }
   };
 
-  // Helper to parse **bold** and remove ugly stray asterisks
-  const formatInlineBold = (content: string) => {
-    if (!content.includes('**') && !content.includes('*')) {
-      return content;
-    }
-
+  /* ── Text rendering helpers ───────────────────────── */
+  const renderInlineBold = (content: string) => {
+    if (!content.includes('**')) return content;
     const parts = content.split(/(\*\*[^*]+?\*\*)/g);
     return parts.map((part, i) => {
       if (part.startsWith('**') && part.endsWith('**')) {
-        const textInside = part.slice(2, -2);
-        return (
-          <strong key={i} style={{ color: '#ffffff', fontWeight: 700 }}>
-            {textInside}
-          </strong>
-        );
+        return <strong key={i} style={{ fontWeight: 600, color: 'var(--color-ink)' }}>{part.slice(2, -2)}</strong>;
       }
-      // Remove any stray lonely single or double asterisks
       return part.replace(/\*+/g, '');
     });
   };
 
-  // Helper to format text with bold label before colon and zero asterisks
-  const formatBulletContent = (content: string) => {
-    // Strip all raw markdown asterisks
-    const cleanContent = content.replace(/\*+/g, '').trim();
-
-    // If it has a label before colon (e.g. "Holistic Care: Merawat...")
-    const colonIndex = cleanContent.indexOf(':');
-    if (colonIndex > 0 && colonIndex <= 45) {
-      const label = cleanContent.substring(0, colonIndex + 1);
-      const rest = cleanContent.substring(colonIndex + 1);
-      return (
-        <span>
-          <strong style={{ color: '#ffffff', fontWeight: 700 }}>{label}</strong>
-          <span style={{ color: '#e2e8f0' }}>{rest}</span>
-        </span>
-      );
-    }
-
-    return <span style={{ color: '#e2e8f0' }}>{cleanContent}</span>;
-  };
-
-  // Helper to render clean structured message matching reference image exactly
   const renderMessageContent = (text: string) => {
     if (!text) return null;
-
     const lines = text.split('\n');
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
         {lines.map((line, idx) => {
           const trimmed = line.trim();
-          if (!trimmed) {
-            return <div key={idx} style={{ height: '0.2rem' }} />;
-          }
+          if (!trimmed) return <div key={idx} style={{ height: '4px' }} />;
 
-          // Format Source line: "Sumber: ..."
+          // Source line
           if (trimmed.toLowerCase().startsWith('sumber:')) {
-            const cleanSource = trimmed.replace(/\*+/g, '');
+            const clean = trimmed.replace(/\*+/g, '');
             return (
               <div
                 key={idx}
                 style={{
-                  marginTop: '0.45rem',
-                  padding: '0.35rem 0.65rem',
-                  borderRadius: '6px',
-                  background: 'rgba(99, 102, 241, 0.12)',
-                  border: '1px solid rgba(99, 102, 241, 0.25)',
-                  fontSize: '0.72rem',
-                  color: '#a5b4fc',
+                  marginTop: '4px',
+                  fontSize: '12px',
+                  lineHeight: '18px',
+                  color: 'var(--color-slate)',
                   fontStyle: 'italic',
                 }}
               >
-                📄 {cleanSource}
+                {clean}
               </div>
             );
           }
 
-          // Format Section Header (e.g. "5 Pilar Filosofi Fisioterapi Modern" or "Tujuan Filosofi...")
+          // Section header detection
           const isHeader =
             trimmed.startsWith('###') ||
             trimmed.startsWith('##') ||
@@ -220,25 +189,15 @@ export default function ChatbotWidget({ documentId, documentName }: ChatbotWidge
                 /^\d+\./.test(lines[idx + 1]?.trim() || '')));
 
           if (isHeader) {
-            const cleanHeader = trimmed.replace(/^#+\s*/, '').replace(/\*+/g, '');
+            const clean = trimmed.replace(/^#+\s*/, '').replace(/\*+/g, '');
             return (
-              <div
-                key={idx}
-                style={{
-                  fontWeight: 700,
-                  fontSize: '0.88rem',
-                  color: '#ffffff',
-                  marginTop: idx === 0 ? '0' : '0.55rem',
-                  marginBottom: '0.1rem',
-                  lineHeight: '1.4',
-                }}
-              >
-                {cleanHeader}
+              <div key={idx} style={{ fontWeight: 600, fontSize: '13px', color: 'var(--color-ink)', marginTop: idx === 0 ? 0 : '8px', lineHeight: '18px' }}>
+                {clean}
               </div>
             );
           }
 
-          // Format Bullet Point (• or ▪ or - or * or numbered 1.)
+          // Bullet point
           const isBullet =
             trimmed.startsWith('•') ||
             trimmed.startsWith('▪') ||
@@ -248,49 +207,28 @@ export default function ChatbotWidget({ documentId, documentName }: ChatbotWidge
 
           if (isBullet) {
             const bulletText = trimmed.replace(/^[•▪\-*]\s*/, '').replace(/^\d+\.\s*/, '');
+            const colonIdx = bulletText.indexOf(':');
             return (
-              <div
-                key={idx}
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '0.45rem',
-                  paddingLeft: '0.1rem',
-                  lineHeight: '1.5',
-                }}
-              >
-                {/* Square bullet ▪ matching screenshot exactly */}
-                <span
-                  style={{
-                    color: '#94a3b8',
-                    fontSize: '0.8rem',
-                    lineHeight: '1.45',
-                    flexShrink: 0,
-                    userSelect: 'none',
-                  }}
-                >
-                  ▪
-                </span>
-                <div style={{ fontSize: '0.82rem', lineHeight: '1.5' }}>
-                  {formatBulletContent(bulletText)}
+              <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', paddingLeft: '2px' }}>
+                <span style={{ color: 'var(--color-slate)', fontSize: '12px', lineHeight: '20px', flexShrink: 0 }}>•</span>
+                <div style={{ fontSize: '13px', lineHeight: '20px', color: 'var(--color-ink)' }}>
+                  {colonIdx > 0 && colonIdx <= 45 ? (
+                    <>
+                      <strong style={{ fontWeight: 600 }}>{bulletText.slice(0, colonIdx + 1)}</strong>
+                      {bulletText.slice(colonIdx + 1).replace(/\*+/g, '')}
+                    </>
+                  ) : (
+                    renderInlineBold(bulletText)
+                  )}
                 </div>
               </div>
             );
           }
 
-          // Regular paragraph (intro or body): clean asterisks
-          const cleanParagraph = trimmed.replace(/\*+/g, '');
+          // Regular paragraph
           return (
-            <p
-              key={idx}
-              style={{
-                margin: 0,
-                color: '#f8fafc',
-                lineHeight: '1.55',
-                fontSize: '0.82rem',
-              }}
-            >
-              {cleanParagraph}
+            <p key={idx} style={{ margin: 0, fontSize: '13px', lineHeight: '20px', color: 'var(--color-ink)' }}>
+              {renderInlineBold(trimmed)}
             </p>
           );
         })}
@@ -298,163 +236,157 @@ export default function ChatbotWidget({ documentId, documentName }: ChatbotWidge
     );
   };
 
-  const quickQuestions = [
-    'Apa ringkasan utama isi dokumen ini?',
-    'Tampilkan data angka penting atau keuangan di dokumen ini.',
-    'Siapa saja pihak atau unit yang disebutkan?',
-  ];
-
+  /* ── Render ──────────────────────────────────────────── */
   return (
     <>
-      {/* Floating Toggle Button (Pojok Kanan Bawah) */}
+      {/* ── Floating toggle button ─────────────────────── */}
       <button
+        id="chatbot-toggle-btn"
         onClick={() => setIsOpen(!isOpen)}
-        title="Buka AI Chatbot"
+        aria-label="Buka chat"
         style={{
           position: 'fixed',
-          bottom: '24px',
-          right: '24px',
-          width: '60px',
-          height: '60px',
+          bottom: '32px',
+          right: '32px',
+          width: '56px',
+          height: '56px',
           borderRadius: '50%',
-          background: 'linear-gradient(135deg, #6366f1, #a855f7)',
-          border: '2px solid rgba(255, 255, 255, 0.25)',
-          color: '#fff',
-          boxShadow: '0 8px 30px rgba(99, 102, 241, 0.5)',
+          backgroundColor: 'var(--color-ink)',
+          border: 'none',
+          color: '#ffffff',
+          boxShadow: 'var(--shadow-float)',
           cursor: 'pointer',
           zIndex: 9999,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: '1.6rem',
-          transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+          transition: 'background-color 0.15s, transform 0.15s',
         }}
-        onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.08)')}
-        onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.06)'; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; }}
       >
-        {isOpen ? '✕' : '💬'}
+        {isOpen
+          ? <X size={22} strokeWidth={2} />
+          : <MessageCircle size={22} strokeWidth={1.5} />
+        }
       </button>
 
-      {/* Chat Window Panel */}
+      {/* ── Chat panel ─────────────────────────────────── */}
       {isOpen && (
         <div
+          id="chatbot-panel"
+          className="chat-panel-enter"
           style={{
             position: 'fixed',
-            bottom: '96px',
-            right: '24px',
+            bottom: '100px',
+            right: '32px',
             width: '420px',
-            maxWidth: 'calc(100vw - 32px)',
-            height: '620px',
-            maxHeight: 'calc(100vh - 120px)',
-            borderRadius: '16px',
-            border: '1px solid #1e293b',
-            background: '#0a0f1d',
-            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8)',
-            zIndex: 9999,
+            maxWidth: 'calc(100vw - 48px)',
+            height: '600px',
+            maxHeight: 'calc(100vh - 130px)',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--color-hairline)',
+            backgroundColor: 'var(--color-paper)',
+            boxShadow: 'var(--shadow-float)',
+            zIndex: 9998,
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
-            fontFamily: 'inherit',
+            fontFamily: 'var(--font-sans)',
           }}
         >
-          {/* Header */}
+          {/* Panel header */}
           <div
             style={{
-              padding: '1rem 1.25rem',
-              background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(168, 85, 247, 0.15))',
-              borderBottom: '1px solid #1e293b',
+              padding: '12px 16px',
+              borderBottom: '1px solid var(--color-hairline)',
               display: 'flex',
               justifyContent: 'space-between',
-              alignItems: 'center',
+              alignItems: 'flex-start',
+              backgroundColor: 'var(--color-paper)',
             }}
           >
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontSize: '1.2rem' }}>🤖</span>
-                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>
-                  BrilianAI Chatbot
-                </h3>
-                <span
+              {/* Bot name + model badge */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <div
                   style={{
-                    fontSize: '0.65rem',
-                    padding: '0.15rem 0.45rem',
-                    borderRadius: '4px',
-                    background: '#064e3b',
-                    color: '#34d399',
-                    border: '1px solid #059669',
-                    fontWeight: 600,
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--color-hairline)',
+                    backgroundColor: 'var(--color-mist)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
                   }}
                 >
-                  gemma2:2b
-                </span>
+                  <MessageCircle size={14} strokeWidth={1.5} color="var(--color-slate)" />
+                </div>
+                <span className="type-card-title">BrilianAI Chatbot</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span className="status-dot status-dot--active" />
+                  <span className="type-data" style={{ fontSize: '11px' }}>llama3.2:3b</span>
+                </div>
               </div>
-              <p
-                style={{
-                  margin: '0.2rem 0 0 0',
-                  fontSize: '0.72rem',
-                  color: '#94a3b8',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  maxWidth: '300px',
-                }}
-              >
-                {documentName ? `📑 Dokumen: ${documentName}` : '🌐 Lintas seluruh dokumen tersimpan'}
-              </p>
+              {/* Active document */}
+              {documentName && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <FileText size={12} strokeWidth={1.5} color="var(--color-slate)" />
+                  <span className="type-meta" style={{ fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '280px' }}>
+                    {documentName}
+                  </span>
+                </div>
+              )}
             </div>
 
+            {/* Close button */}
             <button
               onClick={() => setIsOpen(false)}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#94a3b8',
-                fontSize: '1.2rem',
-                cursor: 'pointer',
-                padding: '0.25rem',
-              }}
+              className="btn btn--ghost btn--icon-sm"
+              aria-label="Tutup panel chat"
+              style={{ flexShrink: 0 }}
             >
-              ✕
+              <X size={16} strokeWidth={2} />
             </button>
           </div>
 
-          {/* Mode Toggle Bar */}
+          {/* Mode toggle */}
           <div
             style={{
-              padding: '0.5rem 1rem',
-              background: '#0d1322',
-              borderBottom: '1px solid #172033',
+              padding: '8px 16px',
+              borderBottom: '1px solid var(--color-hairline)',
+              backgroundColor: 'var(--color-mist)',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
             }}
           >
-            <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 500 }}>
-              {allowPublicKnowledge ? '🌐 Pengetahuan Umum Aktif' : '🛡️ Mode Ketat (Hanya Dokumen)'}
+            <span className="type-meta" style={{ fontSize: '12px' }}>
+              {allowPublicKnowledge ? 'Pengetahuan umum aktif' : 'Mode ketat (hanya dokumen)'}
             </span>
-
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
               <input
                 type="checkbox"
+                id="chatbot-public-toggle"
                 checked={allowPublicKnowledge}
                 onChange={(e) => setAllowPublicKnowledge(e.target.checked)}
-                style={{ cursor: 'pointer' }}
+                style={{ cursor: 'pointer', accentColor: 'var(--color-accent)' }}
               />
-              <span style={{ fontSize: '0.7rem', color: allowPublicKnowledge ? '#38bdf8' : '#64748b' }}>
-                Data Publik
-              </span>
+              <span className="type-meta" style={{ fontSize: '12px' }}>Data publik</span>
             </label>
           </div>
 
-          {/* Messages Scroll Area */}
+          {/* Messages scroll area */}
           <div
             style={{
               flex: 1,
               overflowY: 'auto',
-              padding: '1rem',
+              padding: '16px',
               display: 'flex',
               flexDirection: 'column',
-              gap: '0.85rem',
+              gap: '12px',
             }}
           >
             {messages.map((msg) => (
@@ -466,143 +398,157 @@ export default function ChatbotWidget({ documentId, documentName }: ChatbotWidge
                   alignItems: msg.sender === 'user' ? 'flex-end' : 'flex-start',
                 }}
               >
+                {/* Bubble */}
                 <div
                   style={{
-                    maxWidth: '85%',
-                    padding: '0.75rem 0.95rem',
-                    borderRadius: msg.sender === 'user' ? '14px 14px 2px 14px' : '14px 14px 14px 2px',
-                    background: msg.sender === 'user' ? 'linear-gradient(135deg, #4f46e5, #6366f1)' : '#131b2e',
-                    border: msg.sender === 'user' ? 'none' : '1px solid #1e293b',
-                    color: '#f8fafc',
-                    fontSize: '0.82rem',
-                    lineHeight: '1.5',
+                    maxWidth: '88%',
+                    padding: '10px 14px',
+                    borderRadius: msg.sender === 'user'
+                      ? 'var(--radius-md) var(--radius-md) 2px var(--radius-md)'
+                      : 'var(--radius-md)',
+                    backgroundColor: msg.sender === 'user' ? 'var(--color-accent)' : 'var(--color-mist)',
+                    color: msg.sender === 'user' ? '#ffffff' : 'var(--color-ink)',
+                    fontSize: '13px',
+                    lineHeight: '20px',
                     wordBreak: 'break-word',
-                    whiteSpace: 'pre-wrap',
                   }}
                 >
-                  {renderMessageContent(msg.text)}
+                  {msg.sender === 'user'
+                    ? <span>{msg.text}</span>
+                    : renderMessageContent(msg.text)
+                  }
 
-                  {/* Document Sources Citations */}
+                  {/* Source page chips */}
                   {msg.sources && msg.sources.length > 0 && (
                     <div
                       style={{
-                        marginTop: '0.65rem',
-                        paddingTop: '0.5rem',
-                        borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+                        marginTop: '8px',
+                        paddingTop: '8px',
+                        borderTop: '1px solid var(--color-hairline)',
                       }}
                     >
-                      <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: '0.3rem' }}>
-                        📖 Referensi Halaman Dokumen:
+                      <span className="type-meta" style={{ fontSize: '11px', display: 'block', marginBottom: '5px' }}>
+                        Referensi halaman dokumen
                       </span>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-                        {msg.sources.map((src, idx) => (
-                          <span
-                            key={idx}
-                            title={src.content.substring(0, 100) + '...'}
-                            style={{
-                              fontSize: '0.65rem',
-                              padding: '0.15rem 0.45rem',
-                              borderRadius: '4px',
-                              background: '#1e3a8a33',
-                              border: '1px solid #2563eb66',
-                              color: '#60a5fa',
-                              fontWeight: 600,
-                            }}
-                          >
-                            Hal {src.pageStart === src.pageEnd ? src.pageStart : `${src.pageStart}-${src.pageEnd}`} ({Math.round(src.similarity * 100)}%)
-                          </span>
-                        ))}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                        {msg.sources.map((src, idx) => {
+                          const isTop = idx === 0;
+                          return (
+                            <span
+                              key={idx}
+                              title={src.content.substring(0, 120) + '...'}
+                              style={{
+                                fontSize: '11px',
+                                padding: '2px 7px',
+                                borderRadius: 'var(--radius-sm)',
+                                border: `1px solid ${isTop ? 'var(--color-accent)' : 'var(--color-hairline)'}`,
+                                color: isTop ? 'var(--color-accent)' : 'var(--color-slate)',
+                                fontFamily: 'var(--font-mono)',
+                                fontWeight: 500,
+                                backgroundColor: isTop ? 'rgba(47,93,255,0.05)' : 'transparent',
+                              }}
+                            >
+                              Hal {src.pageStart === src.pageEnd ? src.pageStart : `${src.pageStart}–${src.pageEnd}`}
+                              &nbsp;
+                              <span style={{ opacity: 0.7 }}>
+                                {Math.round(src.similarity * 100)}%
+                              </span>
+                            </span>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
                 </div>
-                <span style={{ fontSize: '0.65rem', color: '#475569', marginTop: '0.2rem', padding: '0 0.3rem' }}>
+
+                {/* Timestamp */}
+                <span className="type-data" style={{ fontSize: '11px', marginTop: '3px', paddingLeft: '2px', paddingRight: '2px' }}>
                   {msg.timestamp}
                 </span>
               </div>
             ))}
 
+            {/* Loading indicator */}
             {isLoading && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', color: '#94a3b8' }}>
-                <span className="spinner" style={{ width: '14px', height: '14px', border: '2px solid #6366f1', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block' }} />
-                <span style={{ fontSize: '0.75rem' }}>Gemma 2 sedang menganalisis dokumen...</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-slate)' }}>
+                <div
+                  className="spinner"
+                  style={{
+                    width: '14px',
+                    height: '14px',
+                    border: '2px solid var(--color-hairline)',
+                    borderTopColor: 'var(--color-accent)',
+                    borderRadius: '50%',
+                    flexShrink: 0,
+                  }}
+                />
+                <span className="type-meta" style={{ fontSize: '12px' }}>AI sedang menganalisis dokumen...</span>
               </div>
             )}
 
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Quick Suggestions (if fewer messages) */}
+          {/* Quick questions */}
           {messages.length <= 2 && (
-            <div style={{ padding: '0 1rem 0.5rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-              <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>Pertanyaan Cepat:</span>
-              {quickQuestions.map((q, idx) => (
+            <div style={{ padding: '0 16px 8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <span className="type-meta" style={{ fontSize: '11px', fontWeight: 600, marginBottom: '2px' }}>Pertanyaan cepat</span>
+              {QUICK_QUESTIONS.map((q, idx) => (
                 <button
                   key={idx}
                   onClick={() => handleSendMessage(q)}
                   style={{
                     textAlign: 'left',
-                    padding: '0.35rem 0.6rem',
-                    borderRadius: '6px',
-                    background: '#0d1322',
-                    border: '1px solid #1e293b',
-                    color: '#94a3b8',
-                    fontSize: '0.72rem',
+                    padding: '6px 10px',
+                    borderRadius: 'var(--radius-sm)',
+                    backgroundColor: 'var(--color-mist)',
+                    border: '1px solid var(--color-hairline)',
+                    color: 'var(--color-ink)',
+                    fontSize: '12px',
                     cursor: 'pointer',
-                    transition: 'all 0.15s ease',
+                    transition: 'border-color 0.15s',
+                    lineHeight: '18px',
+                    fontFamily: 'var(--font-sans)',
                   }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--color-accent)'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--color-hairline)'; }}
                 >
-                  💡 {q}
+                  {q}
                 </button>
               ))}
             </div>
           )}
 
-          {/* Input Box Bar */}
+          {/* Input bar */}
           <div
             style={{
-              padding: '0.75rem 1rem',
-              background: '#080c16',
-              borderTop: '1px solid #1e293b',
+              padding: '10px 16px',
+              borderTop: '1px solid var(--color-hairline)',
               display: 'flex',
-              gap: '0.5rem',
+              gap: '8px',
+              backgroundColor: 'var(--color-paper)',
             }}
           >
             <input
+              id="chatbot-input"
               type="text"
               value={inputQuery}
               onChange={(e) => setInputQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSendMessage();
-              }}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSendMessage(); }}
               placeholder="Ketik pertanyaan tentang dokumen..."
               disabled={isLoading}
-              style={{
-                flex: 1,
-                padding: '0.6rem 0.85rem',
-                borderRadius: '8px',
-                background: '#0f172a',
-                border: '1px solid #1e293b',
-                color: '#fff',
-                fontSize: '0.8rem',
-                outline: 'none',
-              }}
+              className="input-field"
+              style={{ flex: 1 }}
             />
-
             <button
+              id="chatbot-send-btn"
               onClick={() => handleSendMessage()}
               disabled={isLoading || !inputQuery.trim()}
-              style={{
-                padding: '0.6rem 1rem',
-                borderRadius: '8px',
-                background: !inputQuery.trim() || isLoading ? '#1e293b' : 'linear-gradient(135deg, #6366f1, #a855f7)',
-                border: 'none',
-                color: '#fff',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                cursor: !inputQuery.trim() || isLoading ? 'not-allowed' : 'pointer',
-              }}
+              className="btn btn--solid btn--sm"
+              aria-label="Kirim pesan"
+              style={{ flexShrink: 0, padding: '6px 12px' }}
             >
+              <Send size={14} strokeWidth={2} />
               Kirim
             </button>
           </div>

@@ -1,7 +1,20 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
+import {
+  Search,
+  CheckCircle2,
+  Pencil,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  FileText,
+  AlertCircle,
+} from 'lucide-react';
 
+/* ── Types ──────────────────────────────────────────────── */
 export interface RawChunkItem {
   id: number | string;
   chunk_index: number;
@@ -32,6 +45,9 @@ interface KnowledgeRepresentationProps {
   onRefreshCurated: () => Promise<void>;
 }
 
+/* ═══════════════════════════════════════════════════════════
+   KnowledgeRepresentation Component
+   ═══════════════════════════════════════════════════════════ */
 export default function KnowledgeRepresentation({
   batchId,
   filename,
@@ -44,7 +60,7 @@ export default function KnowledgeRepresentation({
   const [isCurating, setIsCurating] = useState<boolean>(false);
   const [curationError, setCurationError] = useState<string | null>(null);
 
-  // Edit Modal State (HANYA untuk Insight Kurasi sesuai instruksi pengguna)
+  // Edit Modal State
   const [editingInsight, setEditingInsight] = useState<CuratedInsightItem | null>(null);
   const [editTitle, setEditTitle] = useState<string>('');
   const [editContent, setEditContent] = useState<string>('');
@@ -52,6 +68,11 @@ export default function KnowledgeRepresentation({
   const [editCategory, setEditCategory] = useState<string>('');
   const [editTagsString, setEditTagsString] = useState<string>('');
   const [isSavingEdit, setIsSavingEdit] = useState<boolean>(false);
+
+  // Pagination State
+  const [pageSize, setPageSize] = useState<number | 'all'>(10);
+  const [rawPage, setRawPage] = useState<number>(1);
+  const [curatedPage, setCuratedPage] = useState<number>(1);
 
   // Trigger AI Curation for this batch
   const handleRunAiCuration = async () => {
@@ -76,7 +97,7 @@ export default function KnowledgeRepresentation({
     }
   };
 
-  // Otomatis jalankan kurasi AI terus-menerus sampai seluruh chunks mentah terkurasi (100%)
+  // Otomatis jalankan kurasi AI sampai seluruh chunks mentah terkurasi
   useEffect(() => {
     if (
       batchId &&
@@ -84,15 +105,14 @@ export default function KnowledgeRepresentation({
       curatedInsights.length < rawChunks.length &&
       !isCurating
     ) {
-      // Tunggu jeda 1.2 detik sebelum melanjutkan ke batch berikutnya
       const timer = setTimeout(() => {
         handleRunAiCuration();
       }, 1200);
       return () => clearTimeout(timer);
     }
-  }, [batchId, rawChunks.length, curatedInsights.length, isCurating]);
+  }, [batchId, rawChunks.length, curatedInsights.length, isCurating]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Live auto-refresh polling saat kurasi AI sedang berlangsung di background
+  // Live auto-refresh polling saat kurasi AI sedang berlangsung
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
     if (isCurating) {
@@ -110,7 +130,7 @@ export default function KnowledgeRepresentation({
     if (curatedInsights.length > 0 && activeTab === 'raw') {
       setActiveTab('curated');
     }
-  }, [curatedInsights.length]);
+  }, [curatedInsights.length, activeTab]);
 
   // Open Edit Modal for Curated Insight
   const openEditModal = (insight: CuratedInsightItem) => {
@@ -118,7 +138,7 @@ export default function KnowledgeRepresentation({
     setEditTitle(insight.title);
     setEditContent(insight.content);
     setEditImportance(insight.importance);
-    setEditCategory(insight.category || 'track1_financial');
+    setEditCategory(insight.category || 'ringkasan');
     setEditTagsString(Array.isArray(insight.tags) ? insight.tags.join(', ') : '');
   };
 
@@ -158,11 +178,6 @@ export default function KnowledgeRepresentation({
       setIsSavingEdit(false);
     }
   };
-
-  // Pagination State (Options: 10, 20, 50, 100, 'all', Default: 10)
-  const [pageSize, setPageSize] = useState<number | 'all'>(10);
-  const [rawPage, setRawPage] = useState<number>(1);
-  const [curatedPage, setCuratedPage] = useState<number>(1);
 
   // Reset page to 1 when search or pageSize changes
   useEffect(() => {
@@ -206,14 +221,15 @@ export default function KnowledgeRepresentation({
 
   const totalChunksCount = rawChunks.length + curatedInsights.length;
 
+  // Pagination Controls Renderer (sesuai design.md §5)
   const renderPaginationControls = (
     currentPage: number,
     totalPages: number,
     totalItems: number,
     onPageChange: (p: number) => void
   ) => {
-    const startIdx = totalItems === 0 ? 0 : (currentPage - 1) * (pageSize === 'all' ? totalItems : pageSize) + 1;
-    const endIdx = pageSize === 'all' ? totalItems : Math.min(currentPage * pageSize, totalItems);
+    const startIdx = totalItems === 0 ? 0 : (currentPage - 1) * (pageSize === 'all' ? totalItems : (pageSize as number)) + 1;
+    const endIdx = pageSize === 'all' ? totalItems : Math.min(currentPage * (pageSize as number), totalItems);
 
     return (
       <div
@@ -222,42 +238,60 @@ export default function KnowledgeRepresentation({
           justifyContent: 'space-between',
           alignItems: 'center',
           flexWrap: 'wrap',
-          gap: '0.85rem',
-          marginTop: '1.25rem',
-          padding: '0.75rem 1.1rem',
-          borderRadius: '10px',
-          background: '#0d1322',
-          border: '1px solid #1e293b',
+          gap: '12px',
+          padding: '12px 0 6px',
         }}
       >
-        {/* Info & Page Size Options */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
-            Menampilkan <strong style={{ color: '#fff' }}>{startIdx}-{endIdx}</strong> dari <strong style={{ color: '#fff' }}>{totalItems}</strong>
+        {/* Info kiri */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <span className="type-meta">
+            Menampilkan <span className="type-data">{startIdx}–{endIdx}</span> dari{' '}
+            <span className="type-data">{totalItems}</span>
           </span>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Limit:</span>
-            {([10, 20, 50, 100, 'all'] as const).map((size) => {
+          {/* Segmented limit buttons */}
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              border: '1px solid var(--color-hairline)',
+              borderRadius: 'var(--radius-sm)',
+              overflow: 'hidden',
+            }}
+          >
+            <span
+              className="type-meta"
+              style={{
+                padding: '2px 8px',
+                fontSize: '11px',
+                borderRight: '1px solid var(--color-hairline)',
+                backgroundColor: 'var(--color-mist)',
+              }}
+            >
+              Limit
+            </span>
+            {([10, 20, 50, 100, 'all'] as const).map((size, idx) => {
               const isSelected = pageSize === size;
               return (
                 <button
                   key={size}
+                  type="button"
                   onClick={() => {
                     setPageSize(size);
                     setRawPage(1);
                     setCuratedPage(1);
                   }}
                   style={{
-                    padding: '0.2rem 0.5rem',
-                    borderRadius: '5px',
-                    border: isSelected ? '1px solid #6366f1' : '1px solid #1e293b',
-                    background: isSelected ? 'rgba(99, 102, 241, 0.25)' : 'transparent',
-                    color: isSelected ? '#a5b4fc' : '#94a3b8',
-                    fontSize: '0.72rem',
-                    fontWeight: isSelected ? 700 : 500,
+                    padding: '2px 8px',
+                    border: 'none',
+                    borderLeft: idx > 0 ? '1px solid var(--color-hairline)' : 'none',
+                    backgroundColor: isSelected ? 'var(--color-mist)' : 'transparent',
+                    color: isSelected ? 'var(--color-ink)' : 'var(--color-slate)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '12px',
+                    fontWeight: isSelected ? 600 : 400,
                     cursor: 'pointer',
-                    transition: 'all 0.15s ease',
+                    transition: 'background-color 0.1s',
                   }}
                 >
                   {size === 'all' ? 'All' : size}
@@ -267,73 +301,31 @@ export default function KnowledgeRepresentation({
           </div>
         </div>
 
-        {/* Navigation Buttons */}
+        {/* Kontrol kanan: Prev / Next */}
         {pageSize !== 'all' && totalPages > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <button
-              onClick={() => onPageChange(1)}
-              disabled={currentPage === 1}
-              style={{
-                padding: '0.25rem 0.55rem',
-                borderRadius: '6px',
-                border: '1px solid #1e293b',
-                background: '#131b2e',
-                color: currentPage === 1 ? '#475569' : '#cbd5e1',
-                fontSize: '0.72rem',
-                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-              }}
-            >
-              ⏮
-            </button>
-            <button
+              type="button"
               onClick={() => onPageChange(currentPage - 1)}
               disabled={currentPage === 1}
-              style={{
-                padding: '0.25rem 0.55rem',
-                borderRadius: '6px',
-                border: '1px solid #1e293b',
-                background: '#131b2e',
-                color: currentPage === 1 ? '#475569' : '#cbd5e1',
-                fontSize: '0.72rem',
-                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-              }}
+              className="btn btn--outline btn--icon-sm"
+              aria-label="Halaman sebelumnya"
             >
-              ◀ Prev
+              <ChevronLeft size={14} strokeWidth={1.5} />
             </button>
 
-            <span style={{ fontSize: '0.75rem', color: '#94a3b8', padding: '0 0.4rem' }}>
-              Hal <strong style={{ color: '#fff' }}>{currentPage}</strong> / {totalPages}
+            <span className="type-data" style={{ fontSize: '12px', padding: '0 4px' }}>
+              Hal {currentPage} / {totalPages}
             </span>
 
             <button
+              type="button"
               onClick={() => onPageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
-              style={{
-                padding: '0.25rem 0.55rem',
-                borderRadius: '6px',
-                border: '1px solid #1e293b',
-                background: '#131b2e',
-                color: currentPage === totalPages ? '#475569' : '#cbd5e1',
-                fontSize: '0.72rem',
-                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-              }}
+              className="btn btn--outline btn--icon-sm"
+              aria-label="Halaman berikutnya"
             >
-              Next ▶
-            </button>
-            <button
-              onClick={() => onPageChange(totalPages)}
-              disabled={currentPage === totalPages}
-              style={{
-                padding: '0.25rem 0.55rem',
-                borderRadius: '6px',
-                border: '1px solid #1e293b',
-                background: '#131b2e',
-                color: currentPage === totalPages ? '#475569' : '#cbd5e1',
-                fontSize: '0.72rem',
-                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-              }}
-            >
-              ⏭
+              <ChevronRight size={14} strokeWidth={1.5} />
             </button>
           </div>
         )}
@@ -342,441 +334,236 @@ export default function KnowledgeRepresentation({
   };
 
   return (
-    <div
+    <section
       style={{
-        borderRadius: '14px',
-        border: '1px solid #1e293b',
-        background: '#090d16',
-        color: '#f8fafc',
+        border: '1px solid var(--color-hairline)',
+        borderRadius: 'var(--radius-md)',
         padding: '1.5rem',
-        boxShadow: '0 8px 30px rgba(0,0,0,0.45)',
-        marginTop: '1.5rem',
-        fontFamily: 'inherit',
+        backgroundColor: 'var(--color-paper)',
       }}
     >
-      {/* Header Bar */}
+      {/* ── Header ─────────────────────────────────────────── */}
       <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           flexWrap: 'wrap',
-          gap: '1rem',
-          borderBottom: '1px solid #1e293b',
-          paddingBottom: '1.25rem',
+          gap: '12px',
           marginBottom: '1.25rem',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-          <span style={{ fontSize: '1.25rem', color: '#f43f5e' }}>💬</span>
-          <h2
-            style={{
-              fontSize: '1rem',
-              fontWeight: 800,
-              letterSpacing: '0.05em',
-              textTransform: 'uppercase',
-              color: '#f8fafc',
-              margin: 0,
-            }}
-          >
-            REPRESENTASI PENGETAHUAN
-          </h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <h2 className="type-section-title">Representasi pengetahuan</h2>
+          <span className="type-data" style={{ fontSize: '13px' }}>
+            ({totalChunksCount} chunks)
+          </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
-            {totalChunksCount} chunks
-          </span>
-
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <a
             href={`/api/documents/${batchId}/export`}
             download
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-              padding: '0.4rem 0.85rem',
-              borderRadius: '7px',
-              border: '1px solid #2563eb',
-              background: '#1e3a8a22',
-              color: '#60a5fa',
-              fontSize: '0.78rem',
-              fontWeight: 600,
-              textDecoration: 'none',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-            }}
+            className="btn btn--outline btn--sm"
+            aria-label="Export representasi pengetahuan"
           >
-            📥 Export
+            <ArrowDownToLine size={14} strokeWidth={1.5} />
+            Export
           </a>
 
           <button
+            type="button"
             onClick={() => alert('Fitur impor representasi data siap dikonfigurasi.')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-              padding: '0.4rem 0.85rem',
-              borderRadius: '7px',
-              border: '1px solid #059669',
-              background: '#064e3b22',
-              color: '#34d399',
-              fontSize: '0.78rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
+            className="btn btn--outline btn--sm"
+            aria-label="Import representasi pengetahuan"
           >
-            📤 Import
+            <ArrowUpFromLine size={14} strokeWidth={1.5} />
+            Import
           </button>
 
           {rawChunks.length > 0 && (
             <button
+              type="button"
               onClick={handleRunAiCuration}
               disabled={isCurating}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                padding: '0.4rem 0.95rem',
-                borderRadius: '7px',
-                border: '1px solid #a855f7',
-                background: isCurating ? '#581c87' : 'linear-gradient(135deg, #7e22ce, #9333ea)',
-                color: '#fff',
-                fontSize: '0.78rem',
-                fontWeight: 700,
-                cursor: isCurating ? 'not-allowed' : 'pointer',
-                boxShadow: '0 0 15px rgba(168, 85, 247, 0.3)',
-              }}
+              className="btn btn--solid btn--sm"
+              aria-label="Jalankan kurasi AI"
             >
-              {isCurating
-                ? '⏳ Mengurasi (+25 Chunks)...'
-                : curatedInsights.length === 0
-                ? '✨ Jalankan Kurasi AI (+25 Chunks)'
-                : '✨ Kurasi Lagi (+25 Chunks)'}
+              {isCurating ? (
+                <>
+                  <div
+                    className="spinner"
+                    style={{
+                      width: '14px',
+                      height: '14px',
+                      border: '2px solid rgba(255,255,255,0.3)',
+                      borderTopColor: '#fff',
+                      borderRadius: '50%',
+                    }}
+                  />
+                  Mengurasi (+25 chunks)...
+                </>
+              ) : curatedInsights.length === 0 ? (
+                'Jalankan kurasi AI (+25 chunks)'
+              ) : (
+                'Kurasi lagi (+25 chunks)'
+              )}
             </button>
           )}
         </div>
       </div>
 
-      {/* Live Auto-Curation Progress Banner */}
+      {/* ── Progress status banner ─────────────────────────── */}
       {isCurating && (
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '0.75rem 1.15rem',
+            gap: '10px',
+            padding: '10px 14px',
             marginBottom: '1rem',
-            borderRadius: '8px',
-            background: 'linear-gradient(90deg, rgba(88, 28, 135, 0.45), rgba(30, 58, 138, 0.35))',
-            border: '1px solid rgba(168, 85, 247, 0.45)',
-            color: '#e9d5ff',
-            fontSize: '0.82rem',
+            borderRadius: 'var(--radius-sm)',
+            backgroundColor: 'var(--color-mist)',
+            border: '1px solid var(--color-hairline)',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <span style={{ fontSize: '1.1rem' }}>⚡</span>
-            <span>
-              <strong>Kurasi AI Otomatis Berjalan (Llama 3.2):</strong>{' '}
-              {curatedInsights.length} dari {rawChunks.length} chunks terkurasi (
-              {rawChunks.length > 0
-                ? Math.round((curatedInsights.length / rawChunks.length) * 100)
-                : 0}
-              %). Kartu bertambah secara live.
+          <div
+            className="spinner"
+            style={{
+              width: '14px',
+              height: '14px',
+              border: '2px solid var(--color-hairline)',
+              borderTopColor: 'var(--color-accent)',
+              borderRadius: '50%',
+              flexShrink: 0,
+            }}
+          />
+          <div style={{ flex: 1, fontSize: '13px', lineHeight: '18px', color: 'var(--color-ink)' }}>
+            <strong>Kurasi AI berjalan (Llama 3.2):</strong>{' '}
+            <span className="type-data">
+              {curatedInsights.length}/{rawChunks.length} chunks
+            </span>{' '}
+            (
+            <span className="type-data">
+              {rawChunks.length > 0 ? Math.round((curatedInsights.length / rawChunks.length) * 100) : 0}%
             </span>
+            ) terkurasi. Data diperbarui otomatis.
           </div>
-          <span style={{ fontSize: '0.75rem', color: '#c084fc', fontWeight: 600 }}>
-            Sinkronisasi Langsung 🔄
-          </span>
         </div>
       )}
 
-      {/* 100% Curated Completion Banner */}
+      {/* ── 100% completion status (sesuai design.md: baris flex, ikon CheckCircle2, bukan kotak hijau) ── */}
       {!isCurating && rawChunks.length > 0 && curatedInsights.length >= rawChunks.length && (
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '0.6rem',
-            padding: '0.65rem 1.15rem',
+            gap: '8px',
             marginBottom: '1rem',
-            borderRadius: '8px',
-            background: 'rgba(6, 78, 59, 0.3)',
-            border: '1px solid rgba(52, 211, 153, 0.4)',
-            color: '#a7f3d0',
-            fontSize: '0.82rem',
           }}
         >
-          <span style={{ fontSize: '1.1rem' }}>✅</span>
-          <span>
-            <strong>Kurasi AI Selesai 100%:</strong> Seluruh {curatedInsights.length} dari{' '}
-            {rawChunks.length} chunks mentah telah berhasil dikurasi menjadi insight terstruktur.
+          <CheckCircle2 size={16} strokeWidth={1.5} color="var(--color-success)" style={{ flexShrink: 0 }} />
+          <span className="type-meta">
+            Kurasi AI selesai:{' '}
+            <span className="type-data">
+              {curatedInsights.length}/{rawChunks.length}
+            </span>{' '}
+            chunks mentah telah terkurasi menjadi insight terstruktur.
           </span>
         </div>
       )}
 
+      {/* ── Error message ──────────────────────────────────── */}
       {curationError && (
         <div
           style={{
-            padding: '0.75rem 1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 14px',
             marginBottom: '1rem',
-            borderRadius: '8px',
-            background: 'rgba(239, 68, 68, 0.15)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-            color: '#fca5a5',
-            fontSize: '0.8rem',
+            borderRadius: 'var(--radius-sm)',
+            backgroundColor: 'rgba(214, 69, 69, 0.06)',
+            border: '1px solid rgba(214, 69, 69, 0.2)',
+            color: 'var(--color-danger)',
+            fontSize: '13px',
+            lineHeight: '18px',
           }}
         >
-          ⚠️ {curationError}
+          <AlertCircle size={16} strokeWidth={1.5} style={{ flexShrink: 0 }} />
+          <span>{curationError}</span>
         </div>
       )}
 
-      {/* Segmented Tab Pills (Insight kurasi vs Konten mentah) */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '0.5rem',
-          marginBottom: '1rem',
-        }}
-      >
+      {/* ── Chunk tabs (sesuai design.md: dua tab underline) ─ */}
+      <div className="tab-bar" style={{ marginBottom: '1rem' }}>
         <button
+          type="button"
           onClick={() => setActiveTab('curated')}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.45rem',
-            padding: '0.55rem 1.1rem',
-            borderRadius: '8px',
-            border: activeTab === 'curated' ? '1px solid #38bdf8' : '1px solid #1e293b',
-            background: activeTab === 'curated' ? '#1e293b' : 'transparent',
-            color: activeTab === 'curated' ? '#38bdf8' : '#64748b',
-            fontSize: '0.85rem',
-            fontWeight: 700,
-            cursor: 'pointer',
-            transition: 'all 0.15s ease',
-          }}
+          className={`tab-item${activeTab === 'curated' ? ' tab-item--active' : ''}`}
         >
-          <span>📌</span>
-          <span>Insight kurasi ({curatedInsights.length})</span>
+          Insight kurasi{' '}
+          <span className="type-data" style={{ fontSize: '12px', marginLeft: '4px' }}>
+            ({curatedInsights.length})
+          </span>
         </button>
-
         <button
+          type="button"
           onClick={() => setActiveTab('raw')}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.45rem',
-            padding: '0.55rem 1.1rem',
-            borderRadius: '8px',
-            border: activeTab === 'raw' ? '1px solid #38bdf8' : '1px solid #1e293b',
-            background: activeTab === 'raw' ? '#1e293b' : 'transparent',
-            color: activeTab === 'raw' ? '#38bdf8' : '#64748b',
-            fontSize: '0.85rem',
-            fontWeight: 700,
-            cursor: 'pointer',
-            transition: 'all 0.15s ease',
-          }}
+          className={`tab-item${activeTab === 'raw' ? ' tab-item--active' : ''}`}
         >
-          <span>📄</span>
-          <span>Konten mentah ({rawChunks.length})</span>
+          Konten mentah{' '}
+          <span className="type-data" style={{ fontSize: '12px', marginLeft: '4px' }}>
+            ({rawChunks.length})
+          </span>
         </button>
       </div>
 
-      {/* Search Bar */}
-      <div style={{ marginBottom: '1.25rem' }}>
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Cari dalam chunks..."
-          style={{
-            width: '100%',
-            padding: '0.65rem 1rem',
-            borderRadius: '8px',
-            background: '#0b1120',
-            border: '1px solid #1e293b',
-            color: '#f8fafc',
-            fontSize: '0.85rem',
-            outline: 'none',
-          }}
-        />
+      {/* ── Search bar with Search icon ────────────────────── */}
+      <div style={{ marginBottom: '1rem' }}>
+        <div className="input-icon-wrap">
+          <Search size={16} strokeWidth={1.5} className="input-icon" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Cari dalam chunks..."
+            className="input-field"
+          />
+        </div>
       </div>
 
-      {/* TAB 1: KONTEN MENTAH (Images 1: Read-Only, diambil langsung dari halaman-halaman) */}
-      {activeTab === 'raw' && (
-        <div>
-          {filteredRaw.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#64748b' }}>
-              Tidak ada konten mentah yang cocok dengan pencarian.
-            </div>
-          ) : (
-            <>
-              {renderPaginationControls(rawPage, rawTotalPages, rawTotal, setRawPage)}
-
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(440px, 1fr))',
-                  gap: '1rem',
-                  marginTop: '1rem',
-                }}
-              >
-                {paginatedRaw.map((chunk) => {
-                  const pageLabel =
-                    chunk.source_page_start === chunk.source_page_end
-                      ? `Halaman ${chunk.source_page_start}`
-                      : `Halaman ${chunk.source_page_start}-${chunk.source_page_end}`;
-
-                  return (
-                    <div
-                      key={chunk.id}
-                      style={{
-                        borderRadius: '10px',
-                        border: '1px solid #1e293b',
-                        background: '#0d1322',
-                        padding: '1.1rem 1.25rem',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'space-between',
-                        transition: 'border-color 0.2s',
-                      }}
-                    >
-                      {/* Top Row: Page Title + Mentah & Low Badges */}
-                      <div>
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            marginBottom: '0.75rem',
-                          }}
-                        >
-                          <h4
-                            style={{
-                              margin: 0,
-                              fontSize: '0.92rem',
-                              fontWeight: 700,
-                              color: '#f8fafc',
-                            }}
-                          >
-                            {pageLabel}
-                          </h4>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                            <span
-                              style={{
-                                fontSize: '0.7rem',
-                                padding: '0.15rem 0.45rem',
-                                borderRadius: '4px',
-                                background: '#1e293b',
-                                border: '1px solid #334155',
-                                color: '#94a3b8',
-                                fontWeight: 600,
-                              }}
-                            >
-                              mentah
-                            </span>
-                            <span
-                              style={{
-                                fontSize: '0.7rem',
-                                padding: '0.15rem 0.45rem',
-                                borderRadius: '4px',
-                                background: '#27272a',
-                                border: '1px solid #3f3f46',
-                                color: '#a1a1aa',
-                                fontWeight: 600,
-                              }}
-                            >
-                              low
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Content Preview */}
-                        <p
-                          style={{
-                            margin: 0,
-                            fontSize: '0.8rem',
-                            color: '#cbd5e1',
-                            lineHeight: '1.55',
-                            maxHeight: '180px',
-                            overflowY: 'auto',
-                            wordBreak: 'break-word',
-                            whiteSpace: 'pre-line',
-                          }}
-                        >
-                          {chunk.content}
-                        </p>
-                      </div>
-
-                      {/* Bottom Row: Raw Tag */}
-                      <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid #172033' }}>
-                        <span
-                          style={{
-                            fontSize: '0.7rem',
-                            padding: '0.18rem 0.5rem',
-                            borderRadius: '4px',
-                            background: '#1e3a8a33',
-                            border: '1px solid #2563eb66',
-                            color: '#60a5fa',
-                            fontWeight: 700,
-                          }}
-                        >
-                          raw
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {renderPaginationControls(rawPage, rawTotalPages, rawTotal, setRawPage)}
-            </>
-          )}
-        </div>
-      )}
-
-      {/* TAB 2: INSIGHT KURASI (Images 2: Curated, structured data with titles, importance, category, tags, editable) */}
+      {/* ── TAB 1: Insight Kurasi ───────────────────────────── */}
       {activeTab === 'curated' && (
         <div>
           {curatedInsights.length === 0 ? (
             <div
               style={{
                 textAlign: 'center',
-                padding: '3.5rem 1rem',
-                border: '1px dashed #1e293b',
-                borderRadius: '10px',
-                color: '#94a3b8',
+                padding: '3rem 1rem',
+                border: '1px dashed var(--color-hairline)',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: 'var(--color-mist)',
               }}
             >
-              <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>✨</div>
-              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#f8fafc', marginBottom: '0.35rem' }}>
-                Belum Ada Insight Kurasi
-              </h3>
-              <p style={{ fontSize: '0.82rem', color: '#64748b', maxWidth: '460px', margin: '0 auto 1.25rem' }}>
-                Jalankan kurasi AI untuk mengubah teks mentah menjadi data valid, memperbaiki tata bahasa,
-                menentukan prioritas, dan mengekstrak tabel secara otomatis.
+              <p className="type-card-title" style={{ marginBottom: '4px' }}>
+                Belum ada insight kurasi
+              </p>
+              <p className="type-meta" style={{ maxWidth: '440px', margin: '0 auto 1rem' }}>
+                Jalankan kurasi AI untuk mengekstrak data penting, tabel, dan kategori prioritas secara terstruktur.
               </p>
               <button
+                type="button"
                 onClick={handleRunAiCuration}
                 disabled={isCurating || rawChunks.length === 0}
-                style={{
-                  padding: '0.55rem 1.25rem',
-                  borderRadius: '8px',
-                  background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
-                  border: 'none',
-                  color: '#fff',
-                  fontSize: '0.82rem',
-                  fontWeight: 700,
-                  cursor: isCurating || rawChunks.length === 0 ? 'not-allowed' : 'pointer',
-                }}
+                className="btn btn--solid btn--sm"
               >
-                {isCurating ? '⏳ Sedang Mengurasi 25 Chunks Pertama...' : '🚀 Mulai Kurasi AI (25 Chunk Pertama)'}
+                {isCurating ? 'Sedang memproses kurasi...' : 'Mulai kurasi AI (+25 chunk pertama)'}
               </button>
             </div>
           ) : filteredCurated.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#64748b' }}>
-              Tidak ada insight kurasi yang cocok dengan pencarian.
+            <div style={{ textAlign: 'center', padding: '2.5rem 1rem' }}>
+              <p className="type-meta">Tidak ada insight kurasi yang cocok dengan pencarian.</p>
             </div>
           ) : (
             <>
@@ -785,103 +572,80 @@ export default function KnowledgeRepresentation({
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(440px, 1fr))',
-                  gap: '1rem',
-                  marginTop: '1rem',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                  gap: '12px',
+                  marginTop: '0.75rem',
                 }}
               >
                 {paginatedCurated.map((item) => {
-                  const importanceBadgeStyle =
-                    item.importance === 'high'
-                      ? { bg: '#7f1d1d44', border: '#ef444466', text: '#f87171' }
-                      : item.importance === 'medium'
-                      ? { bg: '#78350f44', border: '#f59e0b66', text: '#fbbf24' }
-                      : { bg: '#1e293b', border: '#334155', text: '#94a3b8' };
-
                   return (
                     <div
                       key={item.id}
                       style={{
-                        borderRadius: '10px',
-                        border: '1px solid #1e293b',
-                        background: '#0d1322',
-                        padding: '1.1rem 1.25rem',
+                        border: '1px solid var(--color-hairline)',
+                        borderRadius: 'var(--radius-md)',
+                        backgroundColor: 'var(--color-paper)',
+                        padding: '14px 16px',
                         display: 'flex',
                         flexDirection: 'column',
                         justifyContent: 'space-between',
-                        transition: 'border-color 0.2s',
                       }}
                     >
                       <div>
-                        {/* Top Row: Title + Importance Badge + Edit Icon ✏️ */}
+                        {/* Top: Title, Importance, Edit button */}
                         <div
                           style={{
                             display: 'flex',
                             justifyContent: 'space-between',
                             alignItems: 'flex-start',
-                            gap: '0.75rem',
-                            marginBottom: '0.75rem',
+                            gap: '8px',
+                            marginBottom: '6px',
                           }}
                         >
-                          <h4
-                            style={{
-                              margin: 0,
-                              fontSize: '0.95rem',
-                              fontWeight: 700,
-                              color: '#f8fafc',
-                              lineHeight: '1.4',
-                            }}
-                          >
+                          <h3 className="type-card-title" style={{ margin: 0, lineHeight: '20px' }}>
                             {item.title}
-                          </h4>
+                          </h3>
 
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexShrink: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
                             <span
+                              className="stat-chip"
                               style={{
-                                fontSize: '0.7rem',
-                                padding: '0.15rem 0.5rem',
-                                borderRadius: '4px',
-                                background: importanceBadgeStyle.bg,
-                                border: `1px solid ${importanceBadgeStyle.border}`,
-                                color: importanceBadgeStyle.text,
-                                fontWeight: 700,
-                                textTransform: 'uppercase',
+                                color:
+                                  item.importance === 'high'
+                                    ? 'var(--color-danger)'
+                                    : item.importance === 'medium'
+                                    ? 'var(--color-warning)'
+                                    : 'var(--color-slate)',
+                                borderColor:
+                                  item.importance === 'high'
+                                    ? 'rgba(214, 69, 69, 0.3)'
+                                    : item.importance === 'medium'
+                                    ? 'rgba(183, 121, 31, 0.3)'
+                                    : 'var(--color-hairline)',
                               }}
                             >
                               {item.importance}
                             </span>
 
-                            {/* Tombol Edit ✏️ (HANYA untuk Insight Kurasi sesuai instruksi pengguna) */}
                             <button
+                              type="button"
                               onClick={() => openEditModal(item)}
-                              title="Edit Insight Kurasi ini"
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                padding: '0.25rem 0.45rem',
-                                borderRadius: '5px',
-                                background: 'rgba(255, 255, 255, 0.08)',
-                                border: '1px solid rgba(255, 255, 255, 0.15)',
-                                color: '#f8fafc',
-                                cursor: 'pointer',
-                                fontSize: '0.8rem',
-                                transition: 'all 0.15s ease',
-                              }}
+                              className="btn btn--ghost btn--icon-sm"
+                              aria-label="Edit insight kurasi"
+                              title="Edit insight kurasi"
                             >
-                              ✏️
+                              <Pencil size={14} strokeWidth={1.5} />
                             </button>
                           </div>
                         </div>
 
-                        {/* Middle Row: Content with clean styling */}
+                        {/* Content */}
                         <div
+                          className="type-body"
                           style={{
-                            margin: 0,
-                            fontSize: '0.82rem',
-                            color: '#cbd5e1',
-                            lineHeight: '1.6',
-                            maxHeight: '220px',
+                            fontSize: '13px',
+                            lineHeight: '20px',
+                            maxHeight: '180px',
                             overflowY: 'auto',
                             wordBreak: 'break-word',
                             whiteSpace: 'pre-line',
@@ -891,69 +655,33 @@ export default function KnowledgeRepresentation({
                         </div>
                       </div>
 
-                      {/* Bottom Row: Collection Badge + AI Source + Tags */}
+                      {/* Bottom meta row */}
                       <div
                         style={{
-                          marginTop: '1.25rem',
-                          paddingTop: '0.85rem',
-                          borderTop: '1px solid #172033',
+                          marginTop: '12px',
+                          paddingTop: '8px',
+                          borderTop: '1px solid var(--color-hairline)',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '0.4rem',
+                          gap: '6px',
                           flexWrap: 'wrap',
                         }}
                       >
-                        {/* Collection Category Badge (e.g., [📁 track1_financial]) */}
-                        <span
-                          style={{
-                            fontSize: '0.7rem',
-                            padding: '0.18rem 0.5rem',
-                            borderRadius: '4px',
-                            background: '#1e3a8a33',
-                            border: '1px solid #2563eb66',
-                            color: '#60a5fa',
-                            fontWeight: 600,
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.25rem',
-                          }}
-                        >
-                          📁 {item.category || 'track1_financial'}
-                        </span>
+                        {item.category && (
+                          <span className="stat-chip">
+                            {item.category}
+                          </span>
+                        )}
 
-                        {/* AI Source Badge (e.g., [🤖 AI]) */}
-                        <span
-                          style={{
-                            fontSize: '0.7rem',
-                            padding: '0.18rem 0.45rem',
-                            borderRadius: '4px',
-                            background: '#064e3b33',
-                            border: '1px solid #05966966',
-                            color: '#34d399',
-                            fontWeight: 700,
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.2rem',
-                          }}
-                        >
-                          🤖 AI
-                        </span>
+                        {item.source_pages && (
+                          <span className="stat-chip">
+                            hal. {item.source_pages}
+                          </span>
+                        )}
 
-                        {/* Topic Tags */}
                         {Array.isArray(item.tags) &&
                           item.tags.map((tag, idx) => (
-                            <span
-                              key={idx}
-                              style={{
-                                fontSize: '0.68rem',
-                                padding: '0.15rem 0.45rem',
-                                borderRadius: '4px',
-                                background: '#1e293b',
-                                border: '1px solid #334155',
-                                color: '#cbd5e1',
-                                fontWeight: 500,
-                              }}
-                            >
+                            <span key={idx} className="stat-chip">
                               {tag}
                             </span>
                           ))}
@@ -969,189 +697,251 @@ export default function KnowledgeRepresentation({
         </div>
       )}
 
-      {/* MODAL EDIT INSIGHT KURASI (Hanya untuk Insight Kurasi) */}
+      {/* ── TAB 2: Konten Mentah ────────────────────────────── */}
+      {activeTab === 'raw' && (
+        <div>
+          {filteredRaw.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '2.5rem 1rem' }}>
+              <p className="type-meta">Tidak ada konten mentah yang cocok dengan pencarian.</p>
+            </div>
+          ) : (
+            <>
+              {renderPaginationControls(rawPage, rawTotalPages, rawTotal, setRawPage)}
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                  gap: '12px',
+                  marginTop: '0.75rem',
+                }}
+              >
+                {paginatedRaw.map((chunk) => {
+                  const pageLabel =
+                    chunk.source_page_start === chunk.source_page_end
+                      ? `Halaman ${chunk.source_page_start}`
+                      : `Halaman ${chunk.source_page_start}–${chunk.source_page_end}`;
+
+                  return (
+                    <div
+                      key={chunk.id}
+                      style={{
+                        border: '1px solid var(--color-hairline)',
+                        borderRadius: 'var(--radius-md)',
+                        backgroundColor: 'var(--color-paper)',
+                        padding: '14px 16px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <div>
+                        {/* Top: page label + chunk chip */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '6px',
+                          }}
+                        >
+                          <h3 className="type-card-title" style={{ margin: 0 }}>
+                            {pageLabel}
+                          </h3>
+                          <span className="stat-chip">
+                            chunk #{chunk.chunk_index + 1}
+                          </span>
+                        </div>
+
+                        {/* Content */}
+                        <div
+                          className="type-body"
+                          style={{
+                            fontSize: '13px',
+                            lineHeight: '20px',
+                            maxHeight: '180px',
+                            overflowY: 'auto',
+                            wordBreak: 'break-word',
+                            whiteSpace: 'pre-line',
+                          }}
+                        >
+                          {chunk.content}
+                        </div>
+                      </div>
+
+                      {/* Bottom meta row */}
+                      <div
+                        style={{
+                          marginTop: '12px',
+                          paddingTop: '8px',
+                          borderTop: '1px solid var(--color-hairline)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <span className="type-data" style={{ fontSize: '11px' }}>
+                          {chunk.content.length} karakter
+                        </span>
+                        <span className="stat-chip">mentah</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {renderPaginationControls(rawPage, rawTotalPages, rawTotal, setRawPage)}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── Edit Curated Insight Modal ─────────────────────── */}
       {editingInsight && (
         <div
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.75)',
-            backdropFilter: 'blur(4px)',
+            backgroundColor: 'rgba(20, 22, 27, 0.5)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 100,
+            zIndex: 10000,
             padding: '1rem',
           }}
+          onClick={() => setEditingInsight(null)}
         >
           <div
             style={{
               width: '100%',
-              maxWidth: '560px',
-              borderRadius: '12px',
-              border: '1px solid #334155',
-              background: '#0f172a',
+              maxWidth: '520px',
+              borderRadius: 'var(--radius-md)',
+              backgroundColor: 'var(--color-paper)',
+              border: '1px solid var(--color-hairline)',
               padding: '1.5rem',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
+              boxShadow: '0 20px 40px rgba(20, 22, 27, 0.15)',
             }}
+            onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#f8fafc' }}>
-                ✏️ Edit Insight Kurasi
-              </h3>
+            {/* Modal Header */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '1rem',
+              }}
+            >
+              <h3 className="type-card-title">Edit insight kurasi</h3>
               <button
+                type="button"
                 onClick={() => setEditingInsight(null)}
-                style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '1.1rem', cursor: 'pointer' }}
+                className="btn btn--ghost btn--icon-sm"
+                aria-label="Tutup modal"
               >
-                ✕
+                <X size={16} strokeWidth={2} />
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+            {/* Modal Body Form */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
-                <label style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>
-                  Judul Insight:
+                <label className="type-meta" style={{ display: 'block', marginBottom: '4px' }}>
+                  Judul insight
                 </label>
                 <input
                   type="text"
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem 0.75rem',
-                    borderRadius: '6px',
-                    background: '#0b1120',
-                    border: '1px solid #334155',
-                    color: '#f8fafc',
-                    fontSize: '0.85rem',
-                  }}
+                  className="input-field"
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>
-                    Tingkat Kepentingan:
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label className="type-meta" style={{ display: 'block', marginBottom: '4px' }}>
+                    Tingkat kepentingan
                   </label>
                   <select
                     value={editImportance}
                     onChange={(e) => setEditImportance(e.target.value as any)}
-                    style={{
-                      width: '100%',
-                      padding: '0.5rem 0.75rem',
-                      borderRadius: '6px',
-                      background: '#0b1120',
-                      border: '1px solid #334155',
-                      color: '#f8fafc',
-                      fontSize: '0.85rem',
-                    }}
+                    className="input-field"
+                    style={{ cursor: 'pointer' }}
                   >
-                    <option value="high">high (Tinggi/Kritis)</option>
-                    <option value="medium">medium (Sedang)</option>
-                    <option value="low">low (Rendah/Umum)</option>
+                    <option value="high">High (Tinggi / Kritis)</option>
+                    <option value="medium">Medium (Sedang)</option>
+                    <option value="low">Low (Rendah / Umum)</option>
                   </select>
                 </div>
 
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>
-                    Kategori / Koleksi:
+                <div>
+                  <label className="type-meta" style={{ display: 'block', marginBottom: '4px' }}>
+                    Kategori
                   </label>
                   <input
                     type="text"
                     value={editCategory}
                     onChange={(e) => setEditCategory(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '0.5rem 0.75rem',
-                      borderRadius: '6px',
-                      background: '#0b1120',
-                      border: '1px solid #334155',
-                      color: '#f8fafc',
-                      fontSize: '0.85rem',
-                    }}
+                    className="input-field"
                   />
                 </div>
               </div>
 
               <div>
-                <label style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>
-                  Tags (Pisahkan dengan koma):
+                <label className="type-meta" style={{ display: 'block', marginBottom: '4px' }}>
+                  Tags (pisahkan dengan koma)
                 </label>
                 <input
                   type="text"
                   value={editTagsString}
                   onChange={(e) => setEditTagsString(e.target.value)}
-                  placeholder="Contoh: CSR, Dana Hibah, Keuangan"
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem 0.75rem',
-                    borderRadius: '6px',
-                    background: '#0b1120',
-                    border: '1px solid #334155',
-                    color: '#f8fafc',
-                    fontSize: '0.85rem',
-                  }}
+                  placeholder="Contoh: Finansial, Regulasi, 2024"
+                  className="input-field"
                 />
               </div>
 
               <div>
-                <label style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>
-                  Isi Konten Kurasi:
+                <label className="type-meta" style={{ display: 'block', marginBottom: '4px' }}>
+                  Isi konten
                 </label>
                 <textarea
                   rows={5}
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem 0.75rem',
-                    borderRadius: '6px',
-                    background: '#0b1120',
-                    border: '1px solid #334155',
-                    color: '#f8fafc',
-                    fontSize: '0.85rem',
-                    fontFamily: 'inherit',
-                    lineHeight: '1.5',
-                  }}
+                  className="input-field"
+                  style={{ resize: 'vertical' }}
                 />
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1.25rem' }}>
+            {/* Modal Footer */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '8px',
+                marginTop: '1.25rem',
+              }}
+            >
               <button
+                type="button"
                 onClick={() => setEditingInsight(null)}
-                style={{
-                  padding: '0.5rem 1rem',
-                  borderRadius: '6px',
-                  background: 'transparent',
-                  border: '1px solid #334155',
-                  color: '#94a3b8',
-                  fontSize: '0.8rem',
-                  cursor: 'pointer',
-                }}
+                className="btn btn--outline btn--sm"
               >
                 Batal
               </button>
               <button
+                type="button"
                 onClick={handleSaveEdit}
-                disabled={isSavingEdit}
-                style={{
-                  padding: '0.5rem 1.25rem',
-                  borderRadius: '6px',
-                  background: 'var(--accent-primary, #6366f1)',
-                  border: 'none',
-                  color: '#fff',
-                  fontSize: '0.8rem',
-                  fontWeight: 700,
-                  cursor: isSavingEdit ? 'not-allowed' : 'pointer',
-                }}
+                disabled={isSavingEdit || !editTitle.trim()}
+                className="btn btn--solid btn--sm"
               >
-                {isSavingEdit ? 'Menyimpan...' : 'Simpan Perubahan'}
+                {isSavingEdit ? 'Menyimpan...' : 'Simpan perubahan'}
               </button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }

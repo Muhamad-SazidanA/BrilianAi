@@ -2,8 +2,9 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'BrilianAI - PDF Ingestion AI Vision',
-  description: 'Sistem Ingestion PDF via AI Vision menggunakan Next.js dan LangChain',
+  title: 'BrilianAI — Platform Analisis Dokumen',
+  description:
+    'Sistem ingestion dokumen PDF berbasis AI Vision dengan RAG, pgvector, dan chatbot lokal yang menjaga privasi data Anda.',
 };
 
 export default function RootLayout({
@@ -12,8 +13,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="id">
+      <body
+        style={{
+          fontFamily: 'var(--font-sans)',
+          backgroundColor: 'var(--color-paper)',
+          color: 'var(--color-ink)',
+          WebkitFontSmoothing: 'antialiased',
+          MozOsxFontSmoothing: 'grayscale',
+        }}
+      >
+        {children}
+      </body>
     </html>
   );
 }

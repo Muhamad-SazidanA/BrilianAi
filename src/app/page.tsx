@@ -1,9 +1,19 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import {
+  UploadCloud,
+  FileText,
+  RefreshCw,
+  CheckCircle2,
+  Pencil,
+  Trash2,
+  X,
+} from 'lucide-react';
 import KnowledgeRepresentation, { CuratedInsightItem } from '@/components/KnowledgeRepresentation';
 import ChatbotWidget from '@/components/ChatbotWidget';
 
+/* ── Types ──────────────────────────────────────────────── */
 interface UploadBatch {
   id: string;
   original_filename: string;
@@ -30,6 +40,33 @@ interface IngestionResult {
   chunk_count: number;
 }
 
+/* ── Pipeline steps data ──────────────────────────────────── */
+const PIPELINE_STEPS = [
+  {
+    number: '1',
+    title: 'In-memory render',
+    description: 'PDF → gambar, tanpa simpan ke disk',
+  },
+  {
+    number: '2',
+    title: 'Vision OCR',
+    description: 'Qwen 2.5 VL ekstrak teks tiap halaman',
+  },
+  {
+    number: '3',
+    title: 'Sliding window',
+    description: 'Chunking 800 karakter, overlap 150',
+  },
+  {
+    number: '4',
+    title: 'Dense embedding',
+    description: 'BGE-M3 → vector 1024-dim ke pgvector',
+  },
+];
+
+/* ═══════════════════════════════════════════════════════════
+   Main Page Component
+   ═══════════════════════════════════════════════════════════ */
 export default function DashboardPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState<boolean>(false);
@@ -51,12 +88,10 @@ export default function DashboardPage() {
   const [chunks, setChunks] = useState<DocumentChunk[]>([]);
   const [curatedInsights, setCuratedInsights] = useState<CuratedInsightItem[]>([]);
   const [isLoadingChunks, setIsLoadingChunks] = useState<boolean>(false);
-  const [chunkSearchQuery, setChunkSearchQuery] = useState<string>('');
-  const [copiedChunkId, setCopiedChunkId] = useState<string | number | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Load batches on mount
+  // ── Data fetching ──────────────────────────────────────────
   useEffect(() => {
     fetchBatches();
   }, []);
@@ -76,28 +111,23 @@ export default function DashboardPage() {
     }
   };
 
+  // ── Document CRUD ─────────────────────────────────────────
   const handleDeleteBatch = async (batchId: string, filename: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm(`Hapus dokumen "${filename}" beserta seluruh chunks dan insight-nya?`)) {
-      return;
-    }
+    if (!confirm(`Hapus dokumen "${filename}" beserta seluruh chunks dan insight-nya?`)) return;
 
     setIsDeleting(true);
     try {
-      const res = await fetch(`/api/documents/${batchId}`, {
-        method: 'DELETE',
-      });
+      const res = await fetch(`/api/documents/${batchId}`, { method: 'DELETE' });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || 'Gagal menghapus dokumen');
       }
-
       if (activeBatch?.id === batchId) {
         setActiveBatch(null);
         setChunks([]);
         setCuratedInsights([]);
       }
-
       await fetchBatches();
     } catch (err: any) {
       alert(err.message || 'Gagal menghapus dokumen');
@@ -114,7 +144,6 @@ export default function DashboardPage() {
 
   const handleSaveRename = async () => {
     if (!editingBatch || !newBatchName.trim()) return;
-
     try {
       const res = await fetch(`/api/documents/${editingBatch.id}`, {
         method: 'PATCH',
@@ -125,11 +154,9 @@ export default function DashboardPage() {
         const data = await res.json();
         throw new Error(data.error || 'Gagal mengubah nama dokumen');
       }
-
       if (activeBatch?.id === editingBatch.id) {
         setActiveBatch((prev) => (prev ? { ...prev, original_filename: newBatchName.trim() } : null));
       }
-
       setEditingBatch(null);
       await fetchBatches();
     } catch (err: any) {
@@ -137,21 +164,14 @@ export default function DashboardPage() {
     }
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
+  // ── Drag & Drop ───────────────────────────────────────────
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
+  const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     setUploadError(null);
-
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const file = e.dataTransfer.files[0];
       if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
@@ -174,9 +194,9 @@ export default function DashboardPage() {
     }
   };
 
+  // ── Upload submit ─────────────────────────────────────────
   const handleUploadSubmit = async () => {
     if (!selectedFile) return;
-
     setIsUploading(true);
     setUploadError(null);
     setUploadStep('Mengunggah & merender halaman PDF via AI Vision...');
@@ -185,37 +205,20 @@ export default function DashboardPage() {
       const formData = new FormData();
       formData.append('file', selectedFile);
 
-      // Simulate status message progress updates for good UX
-      const statusTimer1 = setTimeout(() => {
-        setUploadStep('AI Vision (Qwen 2.5 VL) mengekstrak teks tiap halaman...');
-      }, 3500);
+      const t1 = setTimeout(() => setUploadStep('AI Vision (Qwen 2.5 VL) mengekstrak teks tiap halaman...'), 3500);
+      const t2 = setTimeout(() => setUploadStep('Memotong chunks (Sliding Window) & Embedding 1024-dim (BGE-M3)...'), 7000);
 
-      const statusTimer2 = setTimeout(() => {
-        setUploadStep('Memotong chunks (Sliding Window) & Embedding 1024-dim (BGE-M3)...');
-      }, 7000);
-
-      const res = await fetch('/api/documents/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      clearTimeout(statusTimer1);
-      clearTimeout(statusTimer2);
+      const res = await fetch('/api/documents/upload', { method: 'POST', body: formData });
+      clearTimeout(t1);
+      clearTimeout(t2);
 
       const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Gagal memproses dokumen PDF');
-      }
+      if (!res.ok) throw new Error(data.error || 'Gagal memproses dokumen PDF');
 
       setLastResult(data);
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
-      
-      // Refresh documents list
       await fetchBatches();
-
-      // Automatically inspect the newly uploaded batch
       inspectBatch({
         id: data.upload_batch_id,
         original_filename: data.original_filename,
@@ -231,6 +234,7 @@ export default function DashboardPage() {
     }
   };
 
+  // ── Curated insights ──────────────────────────────────────
   const fetchCuratedInsights = async (batchId: string) => {
     try {
       const res = await fetch(`/api/documents/${batchId}/curate`);
@@ -248,23 +252,14 @@ export default function DashboardPage() {
     setIsLoadingChunks(true);
     setChunks([]);
     setCuratedInsights([]);
-    setChunkSearchQuery('');
 
     try {
       const [chunksRes, curatedRes] = await Promise.all([
         fetch(`/api/documents/${batch.id}/chunks`),
         fetch(`/api/documents/${batch.id}/curate`),
       ]);
-
-      if (chunksRes.ok) {
-        const data: DocumentChunk[] = await chunksRes.json();
-        setChunks(data);
-      }
-
-      if (curatedRes.ok) {
-        const data: CuratedInsightItem[] = await curatedRes.json();
-        setCuratedInsights(data);
-      }
+      if (chunksRes.ok) setChunks(await chunksRes.json());
+      if (curatedRes.ok) setCuratedInsights(await curatedRes.json());
     } catch (err) {
       console.error('Gagal mengambil data batch:', err);
     } finally {
@@ -272,149 +267,127 @@ export default function DashboardPage() {
     }
   };
 
-  const copyToClipboard = (text: string, id: string | number) => {
-    navigator.clipboard.writeText(text);
-    setCopiedChunkId(id);
-    setTimeout(() => setCopiedChunkId(null), 2000);
-  };
-
-  const filteredChunks = chunks.filter((c) =>
-    c.content.toLowerCase().includes(chunkSearchQuery.toLowerCase())
-  );
-
+  /* ═════════════════════════════════════════════════════════
+     Render
+     ═════════════════════════════════════════════════════════ */
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Top Navbar */}
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-paper)' }}>
+
+      {/* ── Navbar ──────────────────────────────────────────── */}
       <header
         style={{
-          borderBottom: '1px solid var(--border-subtle)',
-          padding: '1rem 2rem',
+          borderBottom: '1px solid var(--color-hairline)',
+          padding: '0 2rem',
+          height: '60px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          backgroundColor: 'rgba(10, 13, 20, 0.8)',
-          backdropFilter: 'blur(12px)',
+          backgroundColor: 'var(--color-paper)',
           position: 'sticky',
           top: 0,
           zIndex: 40,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+        {/* Logo + name */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div
             style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '10px',
-              background: 'var(--gradient-brand)',
+              width: '36px',
+              height: '36px',
+              borderRadius: '8px',
+              backgroundColor: 'var(--color-accent)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 0 15px rgba(99, 102, 241, 0.4)',
-              fontWeight: 800,
-              fontSize: '1.25rem',
+              fontWeight: 700,
+              fontSize: '18px',
               color: '#fff',
+              flexShrink: 0,
+              letterSpacing: '-0.02em',
             }}
           >
             B
           </div>
           <div>
-            <h1 style={{ fontSize: '1.15rem', fontWeight: 700, letterSpacing: '-0.02em', color: '#fff' }}>
-              BrilianAI <span style={{ color: 'var(--accent-cyan)', fontSize: '0.9rem', fontWeight: 500 }}>Vision Ingestion</span>
-            </h1>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              In-Memory PDF Vision OCR + Sliding Window + pgvector
-            </p>
+            <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-ink)', letterSpacing: '-0.01em', lineHeight: '20px' }}>
+              BrilianAI
+            </div>
+            <div className="type-data" style={{ fontSize: '12px', lineHeight: '16px' }}>
+              Vision Ingestion · pgvector RAG
+            </div>
           </div>
         </div>
 
-        {/* Tech Badges */}
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <span
-            style={{
-              fontSize: '0.75rem',
-              padding: '0.35rem 0.75rem',
-              borderRadius: '20px',
-              background: 'rgba(99, 102, 241, 0.15)',
-              border: '1px solid rgba(99, 102, 241, 0.3)',
-              color: '#a5b4fc',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-            }}
-          >
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#6366f1' }} />
-            Qwen 2.5 VL (Vision)
-          </span>
-          <span
-            style={{
-              fontSize: '0.75rem',
-              padding: '0.35rem 0.75rem',
-              borderRadius: '20px',
-              background: 'rgba(6, 182, 212, 0.15)',
-              border: '1px solid rgba(6, 182, 212, 0.3)',
-              color: '#67e8f9',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-            }}
-          >
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#06b6d4' }} />
-            BGE-M3 (1024d)
-          </span>
-          <span
-            style={{
-              fontSize: '0.75rem',
-              padding: '0.35rem 0.75rem',
-              borderRadius: '20px',
-              background: 'rgba(16, 185, 129, 0.15)',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
-              color: '#6ee7b7',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-            }}
-          >
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} />
-            pgvector Active
-          </span>
+        {/* Engine status badges */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          {[
+            { label: 'Qwen 2.5 VL' },
+            { label: 'BGE-M3 1024d' },
+            { label: 'pgvector' },
+          ].map(({ label }) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span className="status-dot status-dot--active" />
+              <span className="type-meta">{label}</span>
+            </div>
+          ))}
         </div>
       </header>
 
-      {/* Main Container */}
-      <main style={{ flex: 1, padding: '2rem', maxWidth: '1400px', width: '100%', margin: '0 auto' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 460px) 1fr', gap: '2rem', alignItems: 'start' }}>
-          
-          {/* Left Column: Upload Area & Pipeline Status */}
+      {/* ── Main ────────────────────────────────────────────── */}
+      <main
+        style={{
+          flex: 1,
+          padding: '2rem',
+          maxWidth: '1440px',
+          width: '100%',
+          margin: '0 auto',
+        }}
+      >
+        <div
+          className="grid-2col"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(320px, 440px) 1fr',
+            gap: '2rem',
+            alignItems: 'start',
+          }}
+        >
+          {/* ══════════════════════════════════
+              Left Column
+              ══════════════════════════════════ */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            {/* Upload Card */}
-            <div className="glass-panel" style={{ padding: '1.75rem' }}>
-              <div style={{ marginBottom: '1.25rem' }}>
-                <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#fff', marginBottom: '0.25rem' }}>
-                  Upload Dokumen PDF
-                </h2>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                  Setiap halaman akan dirender ke gambar dan dipindai secara utuh oleh AI Vision.
-                </p>
-              </div>
 
-              {/* Drag & Drop Box */}
+            {/* ── Upload card ───────────────── */}
+            <section
+              style={{
+                border: '1px solid var(--color-hairline)',
+                borderRadius: 'var(--radius-md)',
+                padding: '1.5rem',
+                backgroundColor: 'var(--color-paper)',
+              }}
+            >
+              <h2 className="type-section-title" style={{ marginBottom: '4px' }}>
+                Upload dokumen PDF
+              </h2>
+              <p className="type-meta" style={{ marginBottom: '1.25rem' }}>
+                Setiap halaman dirender ke gambar dan dipindai oleh AI Vision.
+              </p>
+
+              {/* Dropzone */}
               <div
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
                 style={{
-                  border: `2px dashed ${isDragging ? 'var(--accent-cyan)' : 'var(--border-glow)'}`,
-                  backgroundColor: isDragging ? 'rgba(6, 182, 212, 0.08)' : 'rgba(15, 23, 42, 0.5)',
-                  borderRadius: '12px',
+                  border: `1px dashed ${isDragging ? 'var(--color-accent)' : 'var(--color-hairline)'}`,
+                  backgroundColor: isDragging ? 'rgba(47, 93, 255, 0.04)' : 'var(--color-mist)',
+                  borderRadius: 'var(--radius-md)',
                   padding: '2.5rem 1.5rem',
                   textAlign: 'center',
                   cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  position: 'relative',
+                  transition: 'border-color 0.15s, background-color 0.15s',
+                  userSelect: 'none',
                 }}
               >
                 <input
@@ -424,70 +397,62 @@ export default function DashboardPage() {
                   accept="application/pdf"
                   style={{ display: 'none' }}
                 />
-
-                <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>
-                  📄
-                </div>
-
+                <UploadCloud
+                  size={28}
+                  strokeWidth={1.5}
+                  color="var(--color-slate)"
+                  style={{ margin: '0 auto 10px' }}
+                />
                 {selectedFile ? (
                   <div>
-                    <p style={{ fontWeight: 600, color: 'var(--accent-cyan)', fontSize: '0.95rem', wordBreak: 'break-all' }}>
+                    <p style={{ fontWeight: 600, color: 'var(--color-accent)', fontSize: '14px', wordBreak: 'break-all', lineHeight: '20px' }}>
                       {selectedFile.name}
                     </p>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                      {(selectedFile.size / 1024 / 1024).toFixed(2)} MB • Klik untuk ganti file
+                    <p className="type-meta" style={{ marginTop: '4px' }}>
+                      {(selectedFile.size / 1024 / 1024).toFixed(2)} MB · Klik untuk ganti file
                     </p>
                   </div>
                 ) : (
                   <div>
-                    <p style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
-                      Tarik & lepas file PDF di sini
-                    </p>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
+                    <p className="type-body" style={{ fontWeight: 600 }}>Tarik & lepas file PDF di sini</p>
+                    <p className="type-meta" style={{ marginTop: '4px' }}>
                       atau klik untuk memilih dari perangkat Anda
                     </p>
                   </div>
                 )}
               </div>
 
-              {/* Error Message */}
+              {/* Error */}
               {uploadError && (
                 <div
                   style={{
-                    marginTop: '1rem',
-                    padding: '0.75rem 1rem',
-                    borderRadius: '8px',
-                    backgroundColor: 'rgba(244, 63, 94, 0.15)',
-                    border: '1px solid rgba(244, 63, 94, 0.3)',
-                    color: '#fca5a5',
-                    fontSize: '0.85rem',
+                    marginTop: '12px',
+                    padding: '10px 12px',
+                    borderRadius: 'var(--radius-sm)',
+                    backgroundColor: 'rgba(214, 69, 69, 0.06)',
+                    border: '1px solid rgba(214, 69, 69, 0.2)',
+                    color: 'var(--color-danger)',
+                    fontSize: '13px',
+                    lineHeight: '18px',
                   }}
                 >
-                  ⚠️ {uploadError}
+                  {uploadError}
                 </div>
               )}
 
-              {/* Submit Button & Progress */}
-              <div style={{ marginTop: '1.25rem' }}>
+              {/* Submit button */}
+              <div style={{ marginTop: '14px' }}>
                 <button
                   disabled={!selectedFile || isUploading}
                   onClick={handleUploadSubmit}
+                  className="btn btn--solid"
                   style={{
                     width: '100%',
-                    padding: '0.85rem 1.5rem',
-                    borderRadius: '10px',
-                    border: 'none',
-                    background: selectedFile && !isUploading ? 'var(--gradient-brand)' : 'var(--bg-tertiary)',
-                    color: selectedFile && !isUploading ? '#ffffff' : 'var(--text-muted)',
-                    fontWeight: 700,
-                    fontSize: '0.95rem',
-                    cursor: selectedFile && !isUploading ? 'pointer' : 'not-allowed',
-                    display: 'flex',
-                    alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '0.5rem',
-                    boxShadow: selectedFile && !isUploading ? '0 4px 20px rgba(99, 102, 241, 0.4)' : 'none',
-                    transition: 'all 0.2s ease',
+                    padding: '10px 16px',
+                    fontSize: '14px',
+                    opacity: !selectedFile || isUploading ? 0.45 : 1,
+                    cursor: !selectedFile || isUploading ? 'not-allowed' : 'pointer',
                   }}
                 >
                   {isUploading ? (
@@ -495,84 +460,141 @@ export default function DashboardPage() {
                       <div
                         className="spinner"
                         style={{
-                          width: '18px',
-                          height: '18px',
+                          width: '16px',
+                          height: '16px',
                           border: '2px solid rgba(255,255,255,0.3)',
                           borderTopColor: '#fff',
                           borderRadius: '50%',
+                          flexShrink: 0,
                         }}
                       />
-                      <span>Memproses Ingestion...</span>
+                      Memproses ingestion...
                     </>
                   ) : (
-                    <span>🚀 Jalankan Ingestion AI Vision</span>
+                    <>
+                      <UploadCloud size={16} strokeWidth={2} />
+                      Jalankan ingestion AI Vision
+                    </>
                   )}
                 </button>
               </div>
 
-              {/* Live Processing Indicator */}
+              {/* Live processing status */}
               {isUploading && (
                 <div
                   style={{
-                    marginTop: '1rem',
-                    padding: '1rem',
-                    borderRadius: '10px',
-                    background: 'rgba(99, 102, 241, 0.1)',
-                    border: '1px solid rgba(99, 102, 241, 0.25)',
+                    marginTop: '12px',
+                    padding: '12px',
+                    borderRadius: 'var(--radius-sm)',
+                    backgroundColor: 'var(--color-mist)',
+                    border: '1px solid var(--color-hairline)',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                    <span className="pulse-animation" style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#6366f1' }} />
-                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#c7d2fe' }}>
-                      Status Eksekusi Pipeline:
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <span className="pulse-dot" style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: 'var(--color-accent)', flexShrink: 0 }} />
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-ink)' }}>
+                      Status eksekusi pipeline
                     </span>
                   </div>
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    {uploadStep}
-                  </p>
+                  <p className="type-meta" style={{ paddingLeft: '15px' }}>{uploadStep}</p>
                 </div>
               )}
-            </div>
+            </section>
 
-            {/* Architecture Info Box */}
-            <div className="glass-panel" style={{ padding: '1.5rem' }}>
-              <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff', marginBottom: '0.75rem' }}>
-                ⚙️ Prinsip Pipeline Ingestion
-              </h3>
-              <ul style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.6rem', paddingLeft: '1.2rem' }}>
-                <li><strong>100% In-Memory:</strong> File PDF & gambar tidak disimpan di disk.</li>
-                <li><strong>Ollama Vision OCR:</strong> Menggunakan <code>qwen2.5vl:7b</code> untuk ekstraksi teks layout akurat.</li>
-                <li><strong>Sliding Window:</strong> Chunking (800 chars, 150 overlap) dengan pelacakan rentang halaman awal/akhir.</li>
-                <li><strong>Dense Embedding:</strong> <code>bge-m3</code> menghasilkan vector 1024-dimensi ke PostgreSQL pgvector.</li>
-              </ul>
-            </div>
-          </div>
-
-          {/* Right Column: Ingestion Results / Document Explorer */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            
-            {/* Last Result Notification Banner */}
-            {lastResult && (
+            {/* ── Pipeline steps ────────────── */}
+            <section
+              style={{
+                border: '1px solid var(--color-hairline)',
+                borderRadius: 'var(--radius-md)',
+                padding: '1.5rem',
+                backgroundColor: 'var(--color-paper)',
+              }}
+            >
+              <h2 className="type-section-title" style={{ marginBottom: '1.25rem' }}>
+                Prinsip pipeline ingestion
+              </h2>
               <div
-                className="glass-panel"
+                className="pipeline-grid"
                 style={{
-                  padding: '1.25rem 1.5rem',
-                  border: '1px solid rgba(16, 185, 129, 0.4)',
-                  backgroundColor: 'rgba(16, 185, 129, 0.08)',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(4, 1fr)',
+                  gap: '12px',
+                  position: 'relative',
                 }}
               >
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span style={{ color: '#10b981', fontSize: '1.2rem' }}>✓</span>
-                    <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>
-                      Ingestion Berhasil: {lastResult.original_filename}
-                    </h3>
+                {/* Connector line */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '11px',
+                    left: '12%',
+                    right: '12%',
+                    height: '1px',
+                    backgroundColor: 'var(--color-hairline)',
+                    zIndex: 0,
+                  }}
+                />
+                {PIPELINE_STEPS.map((step) => (
+                  <div key={step.number} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', position: 'relative', zIndex: 1, gap: '8px' }}>
+                    <div
+                      style={{
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        border: '1px solid var(--color-hairline)',
+                        backgroundColor: 'var(--color-paper)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '11px',
+                        color: 'var(--color-slate)',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {step.number}
+                    </div>
+                    <div>
+                      <div className="type-card-title" style={{ fontSize: '12px', lineHeight: '16px', textAlign: 'center' }}>
+                        {step.title}
+                      </div>
+                      <div className="type-meta" style={{ fontSize: '11px', lineHeight: '16px', marginTop: '2px', textAlign: 'center' }}>
+                        {step.description}
+                      </div>
+                    </div>
                   </div>
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-                    Berhasil mengekstrak <strong>{lastResult.page_count} Halaman</strong> menjadi <strong>{lastResult.chunk_count} Chunks</strong> dengan embedding pgvector.
+                ))}
+              </div>
+            </section>
+          </div>
+
+          {/* ══════════════════════════════════
+              Right Column
+              ══════════════════════════════════ */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+
+            {/* ── Success notification ──────── */}
+            {lastResult && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '12px 16px',
+                  border: '1px solid var(--color-hairline)',
+                  borderRadius: 'var(--radius-md)',
+                  backgroundColor: 'var(--color-paper)',
+                }}
+              >
+                <CheckCircle2 size={18} strokeWidth={1.5} color="var(--color-success)" style={{ flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)' }}>
+                    Ingestion berhasil: {lastResult.original_filename}
+                  </span>
+                  <p className="type-meta" style={{ marginTop: '2px' }}>
+                    Berhasil mengekstrak{' '}
+                    <span className="type-data">{lastResult.page_count} halaman</span> menjadi{' '}
+                    <span className="type-data">{lastResult.chunk_count} chunks</span> dengan embedding pgvector.
                   </p>
                 </div>
                 <button
@@ -583,69 +605,79 @@ export default function DashboardPage() {
                     page_count: lastResult.page_count,
                     uploaded_at: new Date().toISOString(),
                   })}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    background: 'var(--accent-emerald)',
-                    border: 'none',
-                    borderRadius: '8px',
-                    color: '#000',
-                    fontWeight: 700,
-                    fontSize: '0.8rem',
-                    cursor: 'pointer',
-                  }}
+                  className="btn btn--outline btn--sm"
+                  style={{ flexShrink: 0 }}
                 >
-                  Lihat Chunks
+                  Lihat chunks
                 </button>
               </div>
             )}
 
-            {/* Document Batches List */}
-            <div className="glass-panel" style={{ padding: '1.75rem' }}>
+            {/* ── Document list ─────────────── */}
+            <section
+              style={{
+                border: '1px solid var(--color-hairline)',
+                borderRadius: 'var(--radius-md)',
+                padding: '1.5rem',
+                backgroundColor: 'var(--color-paper)',
+              }}
+            >
+              {/* Header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
                 <div>
-                  <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#fff' }}>
-                    Daftar Dokumen Tersimpan ({batches.length})
+                  <h2 className="type-section-title">
+                    Dokumen tersimpan
+                    <span className="type-data" style={{ fontWeight: 400, marginLeft: '8px', fontSize: '14px' }}>
+                      ({batches.length})
+                    </span>
                   </h2>
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    Data batch yang sudah tersimpan di database PostgreSQL & pgvector.
+                  <p className="type-meta" style={{ marginTop: '2px' }}>
+                    Data batch tersimpan di PostgreSQL &amp; pgvector.
                   </p>
                 </div>
                 <button
                   onClick={fetchBatches}
                   disabled={isLoadingBatches}
-                  style={{
-                    padding: '0.45rem 0.85rem',
-                    background: 'var(--bg-tertiary)',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: '8px',
-                    color: 'var(--text-secondary)',
-                    fontSize: '0.8rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.35rem',
-                  }}
+                  className="btn btn--outline btn--sm"
+                  aria-label="Refresh daftar dokumen"
                 >
-                  🔄 Refresh
+                  <RefreshCw
+                    size={14}
+                    strokeWidth={2}
+                    className={isLoadingBatches ? 'spinner' : ''}
+                  />
+                  Refresh
                 </button>
               </div>
 
+              {/* Body */}
               {isLoadingBatches ? (
-                <div style={{ textAlign: 'center', padding: '3rem 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                  Memuat daftar dokumen...
+                <div style={{ padding: '3rem 0', textAlign: 'center' }}>
+                  <div
+                    className="spinner"
+                    style={{
+                      width: '20px',
+                      height: '20px',
+                      border: '2px solid var(--color-hairline)',
+                      borderTopColor: 'var(--color-accent)',
+                      borderRadius: '50%',
+                      margin: '0 auto 12px',
+                    }}
+                  />
+                  <p className="type-meta">Memuat daftar dokumen...</p>
                 </div>
               ) : batches.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
-                  <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📭</div>
-                  <p style={{ fontWeight: 600, fontSize: '0.95rem' }}>Belum ada dokumen yang di-upload</p>
-                  <p style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
+                <div style={{ padding: '3rem 0', textAlign: 'center' }}>
+                  <FileText size={32} strokeWidth={1} color="var(--color-hairline)" style={{ margin: '0 auto 12px' }} />
+                  <p className="type-body" style={{ fontWeight: 600 }}>Belum ada dokumen yang di-upload</p>
+                  <p className="type-meta" style={{ marginTop: '4px' }}>
                     Unggah file PDF pertama Anda di panel sebelah kiri untuk memulai.
                   </p>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '420px', overflowY: 'auto' }}>
+                <div style={{ maxHeight: '480px', overflowY: 'auto', marginRight: '-4px', paddingRight: '4px' }}>
                   {batches.map((batch) => {
-                    const isSelected = activeBatch?.id === batch.id;
+                    const isActive = activeBatch?.id === batch.id;
                     const dateFormatted = new Date(batch.uploaded_at).toLocaleString('id-ID', {
                       dateStyle: 'medium',
                       timeStyle: 'short',
@@ -655,191 +687,59 @@ export default function DashboardPage() {
                       <div
                         key={batch.id}
                         onClick={() => inspectBatch(batch)}
-                        style={{
-                          padding: '1rem 1.25rem',
-                          borderRadius: '10px',
-                          border: isSelected ? '1px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
-                          backgroundColor: isSelected ? 'rgba(99, 102, 241, 0.12)' : 'rgba(15, 23, 42, 0.4)',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          transition: 'all 0.15s ease',
-                        }}
+                        className={`doc-row${isActive ? ' doc-row--active' : ''}`}
                       >
-                        <div style={{ minWidth: 0, paddingRight: '1rem' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span style={{ fontSize: '1.1rem' }}>📑</span>
-                            <span style={{ fontWeight: 600, color: '#fff', fontSize: '0.9rem', wordBreak: 'break-all' }}>
+                        {/* Left: name + meta */}
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', minWidth: 0, flex: 1 }}>
+                          <FileText
+                            size={18}
+                            strokeWidth={1.5}
+                            color={isActive ? 'var(--color-accent)' : 'var(--color-slate)'}
+                            style={{ flexShrink: 0, marginTop: '1px' }}
+                          />
+                          <div style={{ minWidth: 0 }}>
+                            <div className="type-card-title" style={{ wordBreak: 'break-all' }}>
                               {batch.original_filename}
-                            </span>
+                            </div>
+                            <div className="type-data" style={{ marginTop: '2px', fontSize: '12px' }}>
+                              {dateFormatted} &nbsp;·&nbsp; ID:&nbsp;{batch.id.substring(0, 8)}…
+                            </div>
                           </div>
-                          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                            Diunggah: {dateFormatted} • ID: <code style={{ fontSize: '0.7rem' }}>{batch.id.substring(0, 8)}...</code>
-                          </p>
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexShrink: 0 }}>
-                          <span
-                            style={{
-                              fontSize: '0.75rem',
-                              padding: '0.25rem 0.6rem',
-                              borderRadius: '6px',
-                              background: 'rgba(6, 182, 212, 0.12)',
-                              color: 'var(--accent-cyan)',
-                              border: '1px solid rgba(6, 182, 212, 0.25)',
-                              fontWeight: 600,
-                            }}
-                          >
-                            {batch.page_count} Hal
-                          </span>
-                          <span
-                            style={{
-                              fontSize: '0.75rem',
-                              padding: '0.25rem 0.6rem',
-                              borderRadius: '6px',
-                              background: 'rgba(99, 102, 241, 0.15)',
-                              color: '#a5b4fc',
-                              border: '1px solid rgba(99, 102, 241, 0.3)',
-                              fontWeight: 600,
-                            }}
-                          >
-                            {batch.chunk_count} Chunks
-                          </span>
+                        {/* Right: chips + actions */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                          <span className="stat-chip">{batch.page_count} hal</span>
+                          <span className="stat-chip">{batch.chunk_count} chunks</span>
 
-                          {/* Action Buttons: Rename ✏️ & Delete 🗑️ */}
-                          <button
-                            onClick={(e) => handleOpenRename(batch, e)}
-                            title="Ubah Nama Dokumen"
-                            style={{
-                              padding: '0.3rem 0.55rem',
-                              borderRadius: '6px',
-                              background: 'rgba(251, 191, 36, 0.12)',
-                              border: '1px solid rgba(251, 191, 36, 0.3)',
-                              color: '#fbbf24',
-                              fontSize: '0.75rem',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                            }}
-                          >
-                            ✏️
-                          </button>
-
-                          <button
-                            onClick={(e) => handleDeleteBatch(batch.id, batch.original_filename, e)}
-                            title="Hapus Dokumen Beserta Seluruh Chunks & Insights"
-                            disabled={isDeleting}
-                            style={{
-                              padding: '0.3rem 0.55rem',
-                              borderRadius: '6px',
-                              background: 'rgba(239, 68, 68, 0.12)',
-                              border: '1px solid rgba(239, 68, 68, 0.3)',
-                              color: '#f87171',
-                              fontSize: '0.75rem',
-                              cursor: isDeleting ? 'not-allowed' : 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                            }}
-                          >
-                            🗑️
-                          </button>
+                          <div className="doc-row-actions">
+                            <button
+                              onClick={(e) => handleOpenRename(batch, e)}
+                              className="btn btn--ghost btn--icon-sm"
+                              aria-label="Ubah nama dokumen"
+                              title="Ubah nama dokumen"
+                            >
+                              <Pencil size={14} strokeWidth={2} />
+                            </button>
+                            <button
+                              onClick={(e) => handleDeleteBatch(batch.id, batch.original_filename, e)}
+                              disabled={isDeleting}
+                              className="btn btn--ghost btn--ghost-danger btn--icon-sm"
+                              aria-label="Hapus dokumen"
+                              title="Hapus dokumen beserta seluruh chunks & insights"
+                            >
+                              <Trash2 size={14} strokeWidth={2} />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );
                   })}
                 </div>
               )}
-            </div>
+            </section>
 
-            {/* Rename Document Modal */}
-            {editingBatch && (
-              <div
-                style={{
-                  position: 'fixed',
-                  inset: 0,
-                  background: 'rgba(0, 0, 0, 0.75)',
-                  backdropFilter: 'blur(4px)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 10000,
-                  padding: '1rem',
-                }}
-              >
-                <div
-                  style={{
-                    width: '100%',
-                    maxWidth: '440px',
-                    borderRadius: '12px',
-                    background: '#0f172a',
-                    border: '1px solid #334155',
-                    padding: '1.5rem',
-                    boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
-                  }}
-                >
-                  <h3 style={{ margin: '0 0 1rem 0', color: '#fff', fontSize: '1rem', fontWeight: 700 }}>
-                    ✏️ Ubah Nama Dokumen
-                  </h3>
-                  <label style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '0.35rem' }}>
-                    Nama File Baru:
-                  </label>
-                  <input
-                    type="text"
-                    value={newBatchName}
-                    onChange={(e) => setNewBatchName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleSaveRename();
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '0.6rem 0.8rem',
-                      borderRadius: '8px',
-                      background: '#0b1120',
-                      border: '1px solid #334155',
-                      color: '#fff',
-                      fontSize: '0.85rem',
-                      marginBottom: '1.25rem',
-                      outline: 'none',
-                    }}
-                  />
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                    <button
-                      onClick={() => setEditingBatch(null)}
-                      style={{
-                        padding: '0.45rem 0.95rem',
-                        borderRadius: '6px',
-                        background: 'transparent',
-                        border: '1px solid #334155',
-                        color: '#94a3b8',
-                        fontSize: '0.8rem',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Batal
-                    </button>
-                    <button
-                      onClick={handleSaveRename}
-                      disabled={!newBatchName.trim()}
-                      style={{
-                        padding: '0.45rem 1.1rem',
-                        borderRadius: '6px',
-                        background: 'var(--accent-primary, #6366f1)',
-                        border: 'none',
-                        color: '#fff',
-                        fontSize: '0.8rem',
-                        fontWeight: 700,
-                        cursor: !newBatchName.trim() ? 'not-allowed' : 'pointer',
-                      }}
-                    >
-                      Simpan
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Knowledge Representation Section (Dual-Chunk: Mentah & Insight Kurasi) */}
+            {/* ── Knowledge Representation ──── */}
             {activeBatch && (
               <KnowledgeRepresentation
                 batchId={activeBatch.id}
@@ -850,11 +750,77 @@ export default function DashboardPage() {
               />
             )}
           </div>
-
         </div>
       </main>
 
-      {/* Floating AI Chatbot Widget (Gemma 2 2B) */}
+      {/* ── Rename Modal ────────────────────────────────────── */}
+      {editingBatch && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(20, 22, 27, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: '1rem',
+          }}
+          onClick={() => setEditingBatch(null)}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '440px',
+              borderRadius: 'var(--radius-md)',
+              backgroundColor: 'var(--color-paper)',
+              border: '1px solid var(--color-hairline)',
+              padding: '1.5rem',
+              boxShadow: '0 20px 40px rgba(20,22,27,0.15)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <h3 className="type-card-title">Ubah nama dokumen</h3>
+              <button
+                onClick={() => setEditingBatch(null)}
+                className="btn btn--ghost btn--icon-sm"
+                aria-label="Tutup modal"
+              >
+                <X size={16} strokeWidth={2} />
+              </button>
+            </div>
+
+            <label className="type-meta" style={{ display: 'block', marginBottom: '6px' }}>
+              Nama file baru
+            </label>
+            <input
+              type="text"
+              value={newBatchName}
+              onChange={(e) => setNewBatchName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSaveRename(); }}
+              className="input-field"
+              style={{ marginBottom: '1.25rem' }}
+              autoFocus
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button onClick={() => setEditingBatch(null)} className="btn btn--outline btn--sm">
+                Batal
+              </button>
+              <button
+                onClick={handleSaveRename}
+                disabled={!newBatchName.trim()}
+                className="btn btn--solid btn--sm"
+              >
+                Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Floating Chatbot ────────────────────────────────── */}
       <ChatbotWidget
         documentId={activeBatch?.id}
         documentName={activeBatch?.original_filename}
