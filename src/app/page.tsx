@@ -337,19 +337,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Engine status badges */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          {[
-            { label: 'Qwen 2.5 VL' },
-            { label: 'BGE-M3 1024d' },
-            { label: 'pgvector' },
-          ].map(({ label }) => (
-            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span className="status-dot status-dot--active" />
-              <span className="type-meta">{label}</span>
-            </div>
-          ))}
-        </div>
       </header>
 
       {/* ── Main ────────────────────────────────────────────── */}

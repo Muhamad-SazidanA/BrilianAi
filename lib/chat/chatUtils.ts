@@ -256,6 +256,7 @@ export function formatInstructionPrompt(inst: FormattingInstruction): string {
     lines.push('• KESIMPULAN: Tambahkan bagian ringkasan/kesimpulan singkat di baris paling akhir jawaban.');
   }
 
+  lines.push('• BEBAS TANDA BINTANG: DILARANG KERAS menggunakan tanda bintang ganda (**) pada teks atau label. Tulis label secara alami (contoh: • Label: Penjelasan, JANGAN tulis **Label**:).');
   lines.push('• PRIORITAS: Aturan format khusus di atas WAJIB MENGGANTIKAN (OVERRIDE) struktur sub-bagian standar.');
   lines.push('• ATURAN ANTI-HALUSINASI TETAP BERLAKU: Jika informasi tidak ditemukan di dokumen, JANGAN mengarang poin palsu! Tetap nyatakan jujur bahwa data tidak ditemukan.');
   lines.push('===============================================================================================');
