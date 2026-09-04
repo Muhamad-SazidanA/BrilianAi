@@ -5,8 +5,9 @@ import {
   insertCuratedInsights,
   listCuratedInsights,
   updateCuratedInsight,
+  deduplicateCuratedInsights,
 } from '../lib/db/vectorStore';
-import { curateBatch } from '../lib/curation/curationService';
+import { curateBatch, isBatchCurating } from '../lib/curation/curationService';
 import { GET as handleGetCurated, POST as handlePostCurate } from '../src/app/api/documents/[id]/curate/route';
 import { PUT as handlePutCuratedItem } from '../src/app/api/documents/[id]/curate/[insightId]/route';
 import { GET as handleExport } from '../src/app/api/documents/[id]/export/route';
@@ -65,7 +66,50 @@ describe('Dual-Chunk & Curation Service (Konten Mentah vs Insight Kurasi)', () =
       expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
     });
 
-    it('listCuratedInsights should fetch records ordered by importance', async () => {
+    it('insertCuratedInsights should update existing record if sourceChunkId already exists', async () => {
+      const mockBatchId = 'b1111111-2222-3333-4444-555555555555';
+      const existingRecord = { id: 10, upload_batch_id: mockBatchId, source_chunk_id: 42 };
+      const updatedRecord = {
+        id: 10,
+        upload_batch_id: mockBatchId,
+        title: 'Updated Title',
+        content: 'Updated Content',
+        source_chunk_id: 42,
+      };
+
+      mockClient.query
+        .mockResolvedValueOnce({ rows: [] }) // BEGIN
+        .mockResolvedValueOnce({ rows: [existingRecord], rowCount: 1 }) // SELECT existing
+        .mockResolvedValueOnce({ rows: [updatedRecord], rowCount: 1 }) // UPDATE
+        .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+      const results = await insertCuratedInsights(mockBatchId, [
+        {
+          title: 'Updated Title',
+          content: 'Updated Content',
+          sourceChunkId: 42,
+        },
+      ]);
+
+      expect(results).toHaveLength(1);
+      expect(results[0].title).toBe('Updated Title');
+      const updateCall = mockClient.query.mock.calls.find(([sql]) => sql && sql.includes('UPDATE curated_insights'));
+      expect(updateCall).toBeDefined();
+    });
+
+    it('deduplicateCuratedInsights should execute DELETE query for duplicate chunk entries', async () => {
+      mockPool.query.mockResolvedValueOnce({ rowCount: 19 });
+
+      const deletedCount = await deduplicateCuratedInsights('b1');
+      expect(deletedCount).toBe(19);
+      expect(mockPool.query).toHaveBeenCalledTimes(1);
+      const [sql, params] = mockPool.query.mock.calls[0];
+      expect(sql).toContain('DELETE FROM curated_insights');
+      expect(sql).toContain('PARTITION BY upload_batch_id, source_chunk_id');
+      expect(params).toEqual(['b1']);
+    });
+
+    it('listCuratedInsights should fetch records ordered by importance with deduplication', async () => {
       mockPool.query.mockResolvedValueOnce({
         rows: [
           {
@@ -81,6 +125,8 @@ describe('Dual-Chunk & Curation Service (Konten Mentah vs Insight Kurasi)', () =
       expect(list).toHaveLength(1);
       expect(list[0].title).toBe('Hasil Kinerja');
       expect(mockPool.query).toHaveBeenCalledTimes(1);
+      const [sql] = mockPool.query.mock.calls[0];
+      expect(sql).toContain('WITH ranked_insights AS');
     });
 
     it('updateCuratedInsight should update fields and return updated insight', async () => {

@@ -2,6 +2,7 @@ import { embedTexts } from '../ai/embeddingClient';
 import {
   searchSimilarChunks,
   searchSimilarCuratedInsights,
+  getBatchById,
   SimilarChunkResult,
   SimilarCuratedResult,
 } from '../db/vectorStore';
@@ -54,6 +55,23 @@ export async function askDocumentChat(
   const topK = options?.topK ?? 8;
   const minSimilarity = options?.minSimilarity ?? (allowPublicKnowledge ? 0.2 : 0.25);
 
+  // Jika dokumen spesifik ditargetkan, pastikan dokumen telah aktif sebagai Basis Pengetahuan AI
+  if (options?.documentId) {
+    try {
+      const batch = await getBatchById(options.documentId);
+      if (batch && !batch.is_active_knowledge) {
+        return {
+          answer: `Dokumen "${batch.original_filename}" belum diaktifkan sebagai basis pengetahuan AI Chatbot. Dokumen baru dapat dibaca dan ditanyakan setelah proses Kurasi Insight mencapai 100% dan diaktifkan melalui tombol "Aktifkan sebagai Basis Pengetahuan AI".`,
+          sources: [],
+          allowPublicKnowledge,
+          retrievedCount: 0,
+        };
+      }
+    } catch (err) {
+      console.warn('[ChatService] getBatchById check warning:', err);
+    }
+  }
+
   // 1. Generate query embedding with BGE-M3 (1024-dim)
   const [queryEmbedding] = await embedTexts([trimmedQuery]);
 
@@ -66,6 +84,7 @@ export async function askDocumentChat(
       batchId: options?.documentId,
       limit: topK,
       minSimilarity,
+      onlyActiveKnowledge: true,
     });
 
     try {
@@ -73,6 +92,7 @@ export async function askDocumentChat(
         batchId: options?.documentId,
         limit: 5,
         minSimilarity,
+        onlyActiveKnowledge: true,
       });
     } catch {
       // Fallback gracefully if curated insights table is not yet populated

@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { deleteUploadBatch, updateUploadBatchFilename } from '@lib/db/vectorStore';
+import {
+  deleteUploadBatch,
+  updateUploadBatchFilename,
+  toggleBatchKnowledgeBase,
+  listChunks,
+  listCuratedInsights,
+} from '@lib/db/vectorStore';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,11 +45,37 @@ export async function PATCH(
   try {
     const { id } = params;
     const body = await request.json();
-    const { filename } = body;
+    const { filename, isActiveKnowledge } = body;
 
+    // 1. Aktivasi / Nonaktifkan dokumen sebagai Basis Pengetahuan AI Chatbot
+    if (typeof isActiveKnowledge === 'boolean') {
+      if (isActiveKnowledge) {
+        const rawChunks = await listChunks(id);
+        const curated = await listCuratedInsights(id);
+        if (rawChunks.length === 0 || curated.length < rawChunks.length) {
+          return NextResponse.json(
+            { error: 'Dokumen hanya dapat diaktifkan sebagai Basis Pengetahuan AI jika Kurasi Insight telah 100% selesai.' },
+            { status: 400 }
+          );
+        }
+      }
+
+      const updated = await toggleBatchKnowledgeBase(id, isActiveKnowledge);
+      return NextResponse.json(
+        {
+          message: isActiveKnowledge
+            ? 'Dokumen berhasil diaktifkan sebagai Basis Pengetahuan AI Chatbot.'
+            : 'Dokumen dinonaktifkan dari Basis Pengetahuan AI Chatbot.',
+          data: updated,
+        },
+        { status: 200 }
+      );
+    }
+
+    // 2. Rename nama dokumen
     if (!filename || typeof filename !== 'string' || filename.trim().length === 0) {
       return NextResponse.json(
-        { error: 'Field "filename" tidak boleh kosong.' },
+        { error: 'Field "filename" atau "isActiveKnowledge" diperlukan.' },
         { status: 400 }
       );
     }
@@ -57,7 +89,7 @@ export async function PATCH(
     console.error('[API /api/documents/[id] PATCH] Error:', error);
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: `Gagal memperbarui nama dokumen: ${message}` },
+      { error: `Gagal memperbarui status dokumen: ${message}` },
       { status: 500 }
     );
   }

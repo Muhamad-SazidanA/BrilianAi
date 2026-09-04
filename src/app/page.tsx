@@ -20,6 +20,7 @@ interface UploadBatch {
   chunk_count: number;
   page_count: number;
   uploaded_at: string;
+  is_active_knowledge?: boolean;
 }
 
 interface DocumentChunk {
@@ -161,6 +162,24 @@ export default function DashboardPage() {
       await fetchBatches();
     } catch (err: any) {
       alert(err.message || 'Gagal mengubah nama dokumen');
+    }
+  };
+
+  const handleToggleKnowledgeBase = async (batchId: string, active: boolean) => {
+    try {
+      const res = await fetch(`/api/documents/${batchId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActiveKnowledge: active }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Gagal mengubah status basis pengetahuan');
+      }
+      setActiveBatch((prev) => (prev && prev.id === batchId ? { ...prev, is_active_knowledge: active } : prev));
+      await fetchBatches();
+    } catch (err: any) {
+      alert(err.message || 'Terjadi kesalahan saat mengubah status basis pengetahuan');
     }
   };
 
@@ -711,6 +730,19 @@ export default function DashboardPage() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                           <span className="stat-chip">{batch.page_count} hal</span>
                           <span className="stat-chip">{batch.chunk_count} chunks</span>
+                          {batch.is_active_knowledge && (
+                            <span
+                              className="stat-chip"
+                              style={{
+                                color: '#16a34a',
+                                borderColor: 'rgba(34, 197, 94, 0.4)',
+                                backgroundColor: 'rgba(34, 197, 94, 0.08)',
+                                fontWeight: 600,
+                              }}
+                            >
+                              AI Aktif
+                            </span>
+                          )}
 
                           <div className="doc-row-actions">
                             <button
@@ -747,6 +779,8 @@ export default function DashboardPage() {
                 rawChunks={chunks}
                 curatedInsights={curatedInsights}
                 onRefreshCurated={() => fetchCuratedInsights(activeBatch.id)}
+                isActiveKnowledge={activeBatch.is_active_knowledge}
+                onToggleKnowledgeBase={(active) => handleToggleKnowledgeBase(activeBatch.id, active)}
               />
             )}
           </div>
@@ -824,6 +858,7 @@ export default function DashboardPage() {
       <ChatbotWidget
         documentId={activeBatch?.id}
         documentName={activeBatch?.original_filename}
+        isActiveKnowledge={activeBatch?.is_active_knowledge}
       />
     </div>
   );

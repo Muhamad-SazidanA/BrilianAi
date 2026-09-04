@@ -25,6 +25,7 @@ interface Message {
 interface ChatbotWidgetProps {
   documentId?: string;
   documentName?: string;
+  isActiveKnowledge?: boolean;
 }
 
 /* ── Quick suggestion questions ───────────────────── */
@@ -37,7 +38,11 @@ const QUICK_QUESTIONS = [
 /* ═════════════════════════════════════════════════════
    ChatbotWidget Component
    ═════════════════════════════════════════════════════ */
-export default function ChatbotWidget({ documentId, documentName }: ChatbotWidgetProps) {
+export default function ChatbotWidget({
+  documentId,
+  documentName,
+  isActiveKnowledge = false,
+}: ChatbotWidgetProps) {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [inputQuery, setInputQuery] = useState<string>('');
   const [allowPublicKnowledge, setAllowPublicKnowledge] = useState<boolean>(false);
@@ -46,9 +51,7 @@ export default function ChatbotWidget({ documentId, documentName }: ChatbotWidge
     {
       id: 'welcome-1',
       sender: 'ai',
-      text: documentName
-        ? `Halo! Saya siap menjawab pertanyaan Anda berdasarkan isi dokumen **"${documentName}"**.`
-        : 'Halo! Saya BrilianAI Chatbot. Silakan pilih dokumen atau tanyakan isi dokumen yang telah tersimpan di sistem.',
+      text: 'Halo! Saya BrilianAI Chatbot. Tanyakan seputar dokumen yang telah aktif sebagai basis pengetahuan terkurasi di sistem.',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -62,21 +65,6 @@ export default function ChatbotWidget({ documentId, documentName }: ChatbotWidge
     }
   }, [messages, isOpen]);
 
-  // Append notification when active document changes
-  useEffect(() => {
-    if (documentName) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `doc-switch-${Date.now()}`,
-          sender: 'ai',
-          text: `Dokumen aktif berganti ke: **${documentName}**. Silakan ajukan pertanyaan seputar dokumen ini.`,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
-    }
-  }, [documentId, documentName]); // eslint-disable-line react-hooks/exhaustive-deps
-
   /* ── Send message ─────────────────────────────────── */
   const handleSendMessage = async (queryText?: string) => {
     const textToSend = (queryText || inputQuery).trim();
@@ -88,6 +76,19 @@ export default function ChatbotWidget({ documentId, documentName }: ChatbotWidge
       text: textToSend,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
+
+    // Jika dokumen spesifik dipilih tapi belum aktif sebagai basis pengetahuan AI
+    if (documentId && !isActiveKnowledge) {
+      const refusalMessage: Message = {
+        id: `refusal-${Date.now()}`,
+        sender: 'ai',
+        text: `Dokumen **"${documentName || 'terpilih'}"** belum diaktifkan sebagai basis pengetahuan AI Chatbot. Dokumen baru dapat dibaca setelah proses Kurasi Insight mencapai 100% dan diaktifkan melalui tombol **"Aktifkan sebagai Basis Pengetahuan AI"**.`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      setMessages((prev) => [...prev, userMessage, refusalMessage]);
+      setInputQuery('');
+      return;
+    }
 
     setMessages((prev) => [...prev, userMessage]);
     setInputQuery('');
@@ -330,13 +331,22 @@ export default function ChatbotWidget({ documentId, documentName }: ChatbotWidge
                   <span className="type-data" style={{ fontSize: '11px' }}>llama3.2:3b</span>
                 </div>
               </div>
-              {/* Active document */}
+              {/* Active document & Knowledge Base status */}
               {documentName && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                   <FileText size={12} strokeWidth={1.5} color="var(--color-slate)" />
-                  <span className="type-meta" style={{ fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '280px' }}>
+                  <span className="type-meta" style={{ fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '180px' }}>
                     {documentName}
                   </span>
+                  {isActiveKnowledge ? (
+                    <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', backgroundColor: 'rgba(34, 197, 94, 0.12)', color: '#16a34a', border: '1px solid rgba(34, 197, 94, 0.3)', fontWeight: 600 }}>
+                      Basis AI: Aktif
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', backgroundColor: 'rgba(156, 163, 175, 0.1)', color: 'var(--color-slate)', border: '1px solid var(--color-hairline)' }}>
+                      Belum Aktif (AI tidak baca)
+                    </span>
+                  )}
                 </div>
               )}
             </div>

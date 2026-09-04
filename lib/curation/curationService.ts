@@ -106,11 +106,20 @@ Ubah menjadi JSON Insight Kurasi sesuai format yang telah ditentukan.`;
   };
 }
 
+// Track active batches being curated to prevent parallel race conditions
+const activeCurationBatches = new Set<string>();
+
 /**
- * Curates raw chunks incrementally for a given upload batch ID (default limit: 25)
- * and saves each insight immediately to avoid HTTP timeout and memory overload.
+ * Checks whether a batch is currently being curated.
  */
-export async function curateBatch(batchId: string, limit: number = 25): Promise<CuratedInsight[]> {
+export function isBatchCurating(batchId: string): boolean {
+  return activeCurationBatches.has(batchId);
+}
+
+/**
+ * Internal logic to curate raw chunks incrementally for a batch.
+ */
+async function curateBatchInternal(batchId: string, limit: number = 25): Promise<CuratedInsight[]> {
   const rawChunks = await listChunks(batchId);
   if (rawChunks.length === 0) {
     return [];
@@ -175,6 +184,24 @@ export async function curateBatch(batchId: string, limit: number = 25): Promise<
 }
 
 /**
+ * Curates raw chunks incrementally for a given upload batch ID (default limit: 25).
+ * Uses batch lock to prevent parallel duplicate execution.
+ */
+export async function curateBatch(batchId: string, limit: number = 25): Promise<CuratedInsight[]> {
+  if (activeCurationBatches.has(batchId)) {
+    console.log(`[CurationService] Batch ${batchId} sedang dalam proses kurasi aktif. Mengabaikan pemicu duplikat.`);
+    return [];
+  }
+
+  activeCurationBatches.add(batchId);
+  try {
+    return await curateBatchInternal(batchId, limit);
+  } finally {
+    activeCurationBatches.delete(batchId);
+  }
+}
+
+/**
  * Continuously curates ALL raw chunks for a batch in iterative safe micro-batches (default: 20)
  * until 100% of chunks are converted into curated insights.
  */
@@ -182,18 +209,28 @@ export async function curateAllChunks(
   batchId: string,
   microBatchSize: number = 20
 ): Promise<number> {
+  if (activeCurationBatches.has(batchId)) {
+    console.log(`[CurationService] Batch ${batchId} sedang dalam proses kurasi aktif. Mengabaikan pemicu duplikat.`);
+    return 0;
+  }
+
+  activeCurationBatches.add(batchId);
   let totalCurated = 0;
   console.log(`[CurationService] Memulai kurasi AI otomatis menyeluruh untuk batch ${batchId}...`);
 
-  while (true) {
-    const newlyCurated = await curateBatch(batchId, microBatchSize);
-    if (newlyCurated.length === 0) {
-      break;
+  try {
+    while (true) {
+      const newlyCurated = await curateBatchInternal(batchId, microBatchSize);
+      if (newlyCurated.length === 0) {
+        break;
+      }
+      totalCurated += newlyCurated.length;
+      console.log(
+        `[CurationService] Progres batch ${batchId}: +${newlyCurated.length} chunks baru (total terkurasi: ${totalCurated})`
+      );
     }
-    totalCurated += newlyCurated.length;
-    console.log(
-      `[CurationService] Progres batch ${batchId}: +${newlyCurated.length} chunks baru (total terkurasi: ${totalCurated})`
-    );
+  } finally {
+    activeCurationBatches.delete(batchId);
   }
 
   console.log(

@@ -12,6 +12,7 @@ import {
   X,
   FileText,
   AlertCircle,
+  Lock,
 } from 'lucide-react';
 
 /* ── Types ──────────────────────────────────────────────── */
@@ -43,6 +44,8 @@ interface KnowledgeRepresentationProps {
   rawChunks: RawChunkItem[];
   curatedInsights: CuratedInsightItem[];
   onRefreshCurated: () => Promise<void>;
+  isActiveKnowledge?: boolean;
+  onToggleKnowledgeBase?: (active: boolean) => Promise<void>;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -54,6 +57,8 @@ export default function KnowledgeRepresentation({
   rawChunks,
   curatedInsights,
   onRefreshCurated,
+  isActiveKnowledge = false,
+  onToggleKnowledgeBase,
 }: KnowledgeRepresentationProps) {
   const [activeTab, setActiveTab] = useState<'curated' | 'raw'>('curated');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -68,11 +73,44 @@ export default function KnowledgeRepresentation({
   const [editCategory, setEditCategory] = useState<string>('');
   const [editTagsString, setEditTagsString] = useState<string>('');
   const [isSavingEdit, setIsSavingEdit] = useState<boolean>(false);
+  const [isTogglingKnowledge, setIsTogglingKnowledge] = useState<boolean>(false);
+
+  const handleToggleKnowledge = async () => {
+    if (!onToggleKnowledgeBase || isTogglingKnowledge) return;
+    setIsTogglingKnowledge(true);
+    try {
+      await onToggleKnowledgeBase(!isActiveKnowledge);
+    } finally {
+      setIsTogglingKnowledge(false);
+    }
+  };
 
   // Pagination State
   const [pageSize, setPageSize] = useState<number | 'all'>(10);
   const [rawPage, setRawPage] = useState<number>(1);
   const [curatedPage, setCuratedPage] = useState<number>(1);
+
+  // Pastikan data insight kurasi selalu unik berdasarkan source_chunk_id (mencegah duplikasi tampilan)
+  const cleanCuratedInsights = React.useMemo(() => {
+    const seen = new Set<string>();
+    return curatedInsights.filter((item) => {
+      const key =
+        item.source_chunk_id !== null && item.source_chunk_id !== undefined
+          ? `chunk-${item.source_chunk_id}`
+          : `item-${item.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [curatedInsights]);
+
+  const curatedCount = Math.min(cleanCuratedInsights.length, rawChunks.length);
+  const curationPercent =
+    rawChunks.length > 0
+      ? Math.min(100, Math.round((curatedCount / rawChunks.length) * 100))
+      : 0;
+  const isCurationComplete =
+    rawChunks.length > 0 && cleanCuratedInsights.length >= rawChunks.length;
 
   // Trigger AI Curation for this batch
   const handleRunAiCuration = async () => {
@@ -102,15 +140,15 @@ export default function KnowledgeRepresentation({
     if (
       batchId &&
       rawChunks.length > 0 &&
-      curatedInsights.length < rawChunks.length &&
+      !isCurationComplete &&
       !isCurating
     ) {
       const timer = setTimeout(() => {
         handleRunAiCuration();
-      }, 1200);
+      }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [batchId, rawChunks.length, curatedInsights.length, isCurating]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [batchId, rawChunks.length, isCurationComplete, isCurating]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Live auto-refresh polling saat kurasi AI sedang berlangsung
   useEffect(() => {
@@ -127,10 +165,10 @@ export default function KnowledgeRepresentation({
 
   // Beralih ke tab 'curated' secara otomatis saat insight kurasi sudah siap
   useEffect(() => {
-    if (curatedInsights.length > 0 && activeTab === 'raw') {
+    if (cleanCuratedInsights.length > 0 && activeTab === 'raw') {
       setActiveTab('curated');
     }
-  }, [curatedInsights.length, activeTab]);
+  }, [cleanCuratedInsights.length, activeTab]);
 
   // Open Edit Modal for Curated Insight
   const openEditModal = (insight: CuratedInsightItem) => {
@@ -192,7 +230,7 @@ export default function KnowledgeRepresentation({
       `halaman ${c.source_page_start}-${c.source_page_end}`.includes(searchQuery.toLowerCase())
   );
 
-  const filteredCurated = curatedInsights.filter((i) => {
+  const filteredCurated = cleanCuratedInsights.filter((i) => {
     const q = searchQuery.toLowerCase();
     return (
       i.title.toLowerCase().includes(q) ||
@@ -219,7 +257,7 @@ export default function KnowledgeRepresentation({
       ? filteredCurated
       : filteredCurated.slice((curatedPage - 1) * (pageSize as number), curatedPage * (pageSize as number));
 
-  const totalChunksCount = rawChunks.length + curatedInsights.length;
+  const totalChunksCount = rawChunks.length + cleanCuratedInsights.length;
 
   // Pagination Controls Renderer (sesuai design.md §5)
   const renderPaginationControls = (
@@ -381,7 +419,7 @@ export default function KnowledgeRepresentation({
             Import
           </button>
 
-          {rawChunks.length > 0 && (
+          {rawChunks.length > 0 && !isCurationComplete && (
             <button
               type="button"
               onClick={handleRunAiCuration}
@@ -403,10 +441,55 @@ export default function KnowledgeRepresentation({
                   />
                   Mengurasi (+25 chunks)...
                 </>
-              ) : curatedInsights.length === 0 ? (
+              ) : cleanCuratedInsights.length === 0 ? (
                 'Jalankan kurasi AI (+25 chunks)'
               ) : (
                 'Kurasi lagi (+25 chunks)'
+              )}
+            </button>
+          )}
+
+          {/* Tombol Aktivasi Basis Pengetahuan AI Chatbot */}
+          {onToggleKnowledgeBase && (
+            <button
+              type="button"
+              onClick={handleToggleKnowledge}
+              disabled={!isCurationComplete || isTogglingKnowledge}
+              className={`btn btn--sm ${
+                isActiveKnowledge
+                  ? 'btn--outline'
+                  : isCurationComplete
+                  ? 'btn--solid'
+                  : 'btn--outline'
+              }`}
+              title={
+                !isCurationComplete
+                  ? 'Kurasi insight harus 100% selesai sebelum dokumen dapat diaktifkan untuk AI Chatbot.'
+                  : isActiveKnowledge
+                  ? 'Klik untuk menonaktifkan dokumen dari basis pengetahuan AI Chatbot.'
+                  : 'Klik untuk mengaktifkan dokumen sebagai basis pengetahuan AI Chatbot.'
+              }
+              style={{
+                borderColor: isActiveKnowledge ? '#16a34a' : undefined,
+                color: isActiveKnowledge ? '#16a34a' : undefined,
+                opacity: !isCurationComplete ? 0.6 : 1,
+                cursor: !isCurationComplete ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {isTogglingKnowledge ? (
+                'Memperbarui...'
+              ) : !isCurationComplete ? (
+                <>
+                  <Lock size={14} strokeWidth={1.5} />
+                  Basis AI (Terkunci)
+                </>
+              ) : isActiveKnowledge ? (
+                <>
+                  <CheckCircle2 size={14} strokeWidth={2} color="#16a34a" />
+                  Basis AI: Aktif
+                </>
+              ) : (
+                'Aktifkan Basis AI'
               )}
             </button>
           )}
@@ -441,11 +524,11 @@ export default function KnowledgeRepresentation({
           <div style={{ flex: 1, fontSize: '13px', lineHeight: '18px', color: 'var(--color-ink)' }}>
             <strong>Kurasi AI berjalan (Llama 3.2):</strong>{' '}
             <span className="type-data">
-              {curatedInsights.length}/{rawChunks.length} chunks
+              {curatedCount}/{rawChunks.length} chunks
             </span>{' '}
             (
             <span className="type-data">
-              {rawChunks.length > 0 ? Math.round((curatedInsights.length / rawChunks.length) * 100) : 0}%
+              {curationPercent}%
             </span>
             ) terkurasi. Data diperbarui otomatis.
           </div>
@@ -453,23 +536,55 @@ export default function KnowledgeRepresentation({
       )}
 
       {/* ── 100% completion status (sesuai design.md: baris flex, ikon CheckCircle2, bukan kotak hijau) ── */}
-      {!isCurating && rawChunks.length > 0 && curatedInsights.length >= rawChunks.length && (
+      {!isCurating && isCurationComplete && (
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
             gap: '8px',
             marginBottom: '1rem',
+            padding: '10px 14px',
+            borderRadius: 'var(--radius-sm)',
+            backgroundColor: isActiveKnowledge ? 'rgba(34, 197, 94, 0.08)' : 'var(--color-mist)',
+            border: `1px solid ${isActiveKnowledge ? 'rgba(34, 197, 94, 0.3)' : 'var(--color-hairline)'}`,
           }}
         >
-          <CheckCircle2 size={16} strokeWidth={1.5} color="var(--color-success)" style={{ flexShrink: 0 }} />
-          <span className="type-meta">
-            Kurasi AI selesai:{' '}
-            <span className="type-data">
-              {curatedInsights.length}/{rawChunks.length}
-            </span>{' '}
-            chunks mentah telah terkurasi menjadi insight terstruktur.
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <CheckCircle2 size={16} strokeWidth={1.5} color="var(--color-success)" style={{ flexShrink: 0 }} />
+            <span className="type-meta">
+              Kurasi AI selesai:{' '}
+              <span className="type-data">
+                {curatedCount}/{rawChunks.length}
+              </span>{' '}
+              chunks mentah telah terkurasi menjadi insight terstruktur (100%).
+              {isActiveKnowledge && (
+                <strong style={{ color: '#16a34a', marginLeft: '6px' }}>· Aktif di AI Chatbot</strong>
+              )}
+            </span>
+          </div>
+
+          {onToggleKnowledgeBase && (
+            <button
+              type="button"
+              onClick={handleToggleKnowledge}
+              disabled={isTogglingKnowledge}
+              className={`btn btn--sm ${isActiveKnowledge ? 'btn--outline' : 'btn--solid'}`}
+              style={{
+                fontSize: '12px',
+                padding: '4px 10px',
+                borderColor: isActiveKnowledge ? '#16a34a' : undefined,
+                color: isActiveKnowledge ? '#16a34a' : undefined,
+              }}
+            >
+              {isTogglingKnowledge
+                ? 'Memproses...'
+                : isActiveKnowledge
+                ? 'Nonaktifkan dari Chatbot'
+                : 'Aktifkan untuk Chatbot'}
+            </button>
+          )}
         </div>
       )}
 
@@ -504,7 +619,7 @@ export default function KnowledgeRepresentation({
         >
           Insight kurasi{' '}
           <span className="type-data" style={{ fontSize: '12px', marginLeft: '4px' }}>
-            ({curatedInsights.length})
+            ({cleanCuratedInsights.length})
           </span>
         </button>
         <button
@@ -536,7 +651,7 @@ export default function KnowledgeRepresentation({
       {/* ── TAB 1: Insight Kurasi ───────────────────────────── */}
       {activeTab === 'curated' && (
         <div>
-          {curatedInsights.length === 0 ? (
+          {cleanCuratedInsights.length === 0 ? (
             <div
               style={{
                 textAlign: 'center',

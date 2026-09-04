@@ -6,6 +6,7 @@ export interface UploadBatch {
   chunk_count: number;
   page_count: number;
   uploaded_at: Date | string;
+  is_active_knowledge?: boolean;
 }
 
 export interface ChunkInput {
@@ -133,13 +134,76 @@ export async function insertChunks(
  */
 export async function listBatches(): Promise<UploadBatch[]> {
   const pool = getPool();
+  try {
+    const sql = `
+      SELECT id, original_filename, chunk_count, page_count, uploaded_at, COALESCE(is_active_knowledge, false) AS is_active_knowledge
+      FROM upload_batches
+      ORDER BY uploaded_at DESC;
+    `;
+    const result = await pool.query<UploadBatch>(sql);
+    return result.rows;
+  } catch {
+    const fallbackSql = `
+      SELECT id, original_filename, chunk_count, page_count, uploaded_at
+      FROM upload_batches
+      ORDER BY uploaded_at DESC;
+    `;
+    const result = await pool.query<UploadBatch>(fallbackSql);
+    return result.rows.map((b) => ({ ...b, is_active_knowledge: false }));
+  }
+}
+
+/**
+ * Gets a single upload batch by ID.
+ */
+export async function getBatchById(batchId: string): Promise<UploadBatch | null> {
+  const pool = getPool();
+  try {
+    const sql = `
+      SELECT id, original_filename, chunk_count, page_count, uploaded_at, COALESCE(is_active_knowledge, false) AS is_active_knowledge
+      FROM upload_batches
+      WHERE id = $1;
+    `;
+    const result = await pool.query<UploadBatch>(sql, [batchId]);
+    return result.rows[0] || null;
+  } catch {
+    const fallbackSql = `
+      SELECT id, original_filename, chunk_count, page_count, uploaded_at
+      FROM upload_batches
+      WHERE id = $1;
+    `;
+    const result = await pool.query<UploadBatch>(fallbackSql, [batchId]);
+    return result.rows[0] ? { ...result.rows[0], is_active_knowledge: false } : null;
+  }
+}
+
+/**
+ * Toggles a batch's is_active_knowledge status for Chatbot grounding.
+ */
+export async function toggleBatchKnowledgeBase(
+  batchId: string,
+  isActive: boolean
+): Promise<UploadBatch> {
+  const pool = getPool();
+  try {
+    await pool.query(
+      `ALTER TABLE upload_batches ADD COLUMN IF NOT EXISTS is_active_knowledge BOOLEAN NOT NULL DEFAULT false;`
+    );
+  } catch (err) {
+    console.warn('[VectorStore] ALTER TABLE ensure is_active_knowledge warning:', err);
+  }
+
   const sql = `
-    SELECT id, original_filename, chunk_count, page_count, uploaded_at
-    FROM upload_batches
-    ORDER BY uploaded_at DESC;
+    UPDATE upload_batches
+    SET is_active_knowledge = $1
+    WHERE id = $2
+    RETURNING id, original_filename, chunk_count, page_count, uploaded_at, is_active_knowledge;
   `;
-  const result = await pool.query<UploadBatch>(sql);
-  return result.rows;
+  const result = await pool.query<UploadBatch>(sql, [isActive, batchId]);
+  if (result.rowCount === 0) {
+    throw new Error(`Upload batch with ID ${batchId} not found.`);
+  }
+  return result.rows[0];
 }
 
 /**
@@ -224,13 +288,14 @@ export interface SearchOptions {
   batchId?: string;
   limit?: number;
   minSimilarity?: number;
+  onlyActiveKnowledge?: boolean;
 }
 
 /**
  * Searches for the most relevant document chunks based on cosine distance of embeddings.
  *
  * @param queryEmbedding - 1024-dimensional embedding vector of the search query
- * @param options - Optional filters (batchId, limit, minSimilarity)
+ * @param options - Optional filters (batchId, limit, minSimilarity, onlyActiveKnowledge)
  * @returns Promise<SimilarChunkResult[]> - Top matched chunks sorted by similarity desc
  */
 export async function searchSimilarChunks(
@@ -245,6 +310,9 @@ export async function searchSimilarChunks(
   const limit = options?.limit ?? 5;
   const batchId = options?.batchId || null;
   const vectorString = `[${queryEmbedding.join(',')}]`;
+  const activeCondition = options?.onlyActiveKnowledge
+    ? 'AND COALESCE(b.is_active_knowledge, false) = true'
+    : '';
 
   const sql = `
     SELECT
@@ -259,6 +327,7 @@ export async function searchSimilarChunks(
     FROM document_chunks c
     JOIN upload_batches b ON b.id = c.upload_batch_id
     WHERE ($2::uuid IS NULL OR c.upload_batch_id = $2)
+      ${activeCondition}
     ORDER BY c.embedding <=> $1::vector ASC
     LIMIT $3;
   `;
@@ -300,6 +369,9 @@ export async function searchSimilarCuratedInsights(
   const limit = options?.limit ?? 5;
   const batchId = options?.batchId || null;
   const vectorString = `[${queryEmbedding.join(',')}]`;
+  const activeCondition = options?.onlyActiveKnowledge
+    ? 'AND COALESCE(b.is_active_knowledge, false) = true'
+    : '';
 
   const sql = `
     SELECT
@@ -316,6 +388,7 @@ export async function searchSimilarCuratedInsights(
     FROM curated_insights ci
     JOIN upload_batches b ON b.id = ci.upload_batch_id
     WHERE ($2::uuid IS NULL OR ci.upload_batch_id = $2)
+      ${activeCondition}
       AND ci.embedding IS NOT NULL
     ORDER BY ci.embedding <=> $1::vector ASC
     LIMIT $3;
@@ -363,6 +436,8 @@ export interface CuratedInsight {
 
 /**
  * Inserts one or more curated insights for a batch into curated_insights table.
+ * If an insight with the same (upload_batch_id, source_chunk_id) already exists,
+ * it updates the existing record instead of creating a duplicate.
  */
 export async function insertCuratedInsights(
   batchId: string,
@@ -386,6 +461,34 @@ export async function insertCuratedInsights(
       const sourcePages = item.sourcePages || '';
       const sourceChunkId = item.sourceChunkId || null;
       const embedding = item.embedding ? `[${item.embedding.join(',')}]` : null;
+
+      // Upsert check: prevent race condition duplicates for the same source chunk
+      if (sourceChunkId !== null && sourceChunkId !== undefined) {
+        const existing = await client.query<CuratedInsight>(
+          `SELECT id FROM curated_insights WHERE upload_batch_id = $1 AND source_chunk_id = $2 ORDER BY id DESC LIMIT 1`,
+          [batchId, sourceChunkId]
+        );
+        if (existing.rows.length > 0) {
+          const updateSql = `
+            UPDATE curated_insights
+            SET title = $1, content = $2, importance = $3, category = $4, tags = $5, source_pages = $6, embedding = COALESCE($7::vector, embedding)
+            WHERE id = $8
+            RETURNING *;
+          `;
+          const updatedRes = await client.query<CuratedInsight>(updateSql, [
+            item.title,
+            item.content,
+            importance,
+            category,
+            tags,
+            sourcePages,
+            embedding,
+            existing.rows[0].id,
+          ]);
+          inserted.push(updatedRes.rows[0]);
+          continue;
+        }
+      }
 
       const sql = `
         INSERT INTO curated_insights (
@@ -428,11 +531,61 @@ export async function insertCuratedInsights(
 }
 
 /**
+ * Deduplicates curated_insights in database by removing duplicate rows for the same source_chunk_id,
+ * keeping the newest record per chunk.
+ */
+export async function deduplicateCuratedInsights(batchId?: string): Promise<number> {
+  const pool = getPool();
+  try {
+    const sql = `
+      DELETE FROM curated_insights
+      WHERE id IN (
+        SELECT id FROM (
+          SELECT id, ROW_NUMBER() OVER (
+            PARTITION BY upload_batch_id, source_chunk_id 
+            ORDER BY id DESC
+          ) as rnum
+          FROM curated_insights
+          WHERE source_chunk_id IS NOT NULL
+            ${batchId ? 'AND upload_batch_id = $1' : ''}
+        ) t
+        WHERE t.rnum > 1
+      );
+    `;
+    const res = await pool.query(sql, batchId ? [batchId] : []);
+    return res.rowCount || 0;
+  } catch (err) {
+    console.warn('[VectorStore] deduplicateCuratedInsights warning:', err);
+    return 0;
+  }
+}
+
+/**
  * Lists all curated insights for a specific batch ID, ordered by importance and created_at.
+ * Guarantees that at most 1 insight is returned per source_chunk_id even if duplicate rows exist.
  */
 export async function listCuratedInsights(batchId: string): Promise<CuratedInsight[]> {
   const pool = getPool();
   const sql = `
+    WITH ranked_insights AS (
+      SELECT
+        id,
+        upload_batch_id,
+        title,
+        content,
+        importance,
+        category,
+        tags,
+        source_pages,
+        source_chunk_id,
+        created_at,
+        ROW_NUMBER() OVER (
+          PARTITION BY upload_batch_id, source_chunk_id 
+          ORDER BY id DESC
+        ) as rn
+      FROM curated_insights
+      WHERE upload_batch_id = $1
+    )
     SELECT
       id,
       upload_batch_id,
@@ -444,8 +597,8 @@ export async function listCuratedInsights(batchId: string): Promise<CuratedInsig
       source_pages,
       source_chunk_id,
       created_at
-    FROM curated_insights
-    WHERE upload_batch_id = $1
+    FROM ranked_insights
+    WHERE source_chunk_id IS NULL OR rn = 1
     ORDER BY
       CASE importance
         WHEN 'high' THEN 1

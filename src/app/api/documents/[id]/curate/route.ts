@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { listCuratedInsights } from '@lib/db/vectorStore';
+import { listCuratedInsights, deduplicateCuratedInsights } from '@lib/db/vectorStore';
 import { curateBatch } from '@lib/curation/curationService';
 
 export const dynamic = 'force-dynamic';
@@ -32,6 +32,8 @@ export async function POST(
     const limitParam = searchParams.get('limit');
     const limit = limitParam ? parseInt(limitParam, 10) : 25;
 
+    // Bersihkan duplikat bila ada
+    await deduplicateCuratedInsights(id);
     const curated = await curateBatch(id, limit);
     return NextResponse.json(
       {
