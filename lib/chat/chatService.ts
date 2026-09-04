@@ -52,8 +52,8 @@ export async function askDocumentChat(
   }
 
   const allowPublicKnowledge = Boolean(options?.allowPublicKnowledge);
-  const topK = options?.topK ?? 4;
-  const minSimilarity = options?.minSimilarity ?? (allowPublicKnowledge ? 0.2 : 0.25);
+  const topK = options?.topK ?? 6;
+  const minSimilarity = options?.minSimilarity ?? (allowPublicKnowledge ? 0.15 : 0.18);
 
   // Jika dokumen spesifik ditargetkan, pastikan dokumen telah aktif sebagai Basis Pengetahuan AI
   if (options?.documentId) {
@@ -90,7 +90,7 @@ export async function askDocumentChat(
     try {
       similarCurated = await searchSimilarCuratedInsights(queryEmbedding, {
         batchId: options?.documentId,
-        limit: 3,
+        limit: 4,
         minSimilarity,
         onlyActiveKnowledge: true,
       });
