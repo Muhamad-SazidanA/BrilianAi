@@ -172,13 +172,36 @@ export async function askDocumentChat(
   const contextText = contextSections.join('\n\n====================\n\n');
 
   // 4. Generate comprehensive structured answer via LLM
-  const answer = await generateChatResponse(trimmedQuery, contextText, allowPublicKnowledge);
+  const rawAnswer = await generateChatResponse(trimmedQuery, contextText, allowPublicKnowledge);
 
-  // 5. Build sources list
-  // HANYA sertakan referensi jika data benar-benar ditemukan di dalam dokumen.
-  // Jika AI menyatakan informasi tidak ditemukan, DILARANG menampilkan referensi halaman
-  // karena halaman tersebut tidak memuat jawaban yang dicari (bukan data riil).
-  const isNotFound = isDataNotFoundAnswer(answer);
+  // 5. Build sources list & format canonical source line
+  // Format yang diwajibkan: "Sumber: NamaPDF.pdf | Halaman Brp"
+  const isNotFound = isDataNotFoundAnswer(rawAnswer);
+
+  let formattedAnswer = rawAnswer.trim();
+  if (isNotFound) {
+    formattedAnswer = formattedAnswer.replace(/\n*Sumber:\s*.*$/i, '').trim();
+  } else if (similarChunks.length > 0) {
+    const topChunk = similarChunks[0];
+    const sameFileChunks = similarChunks.filter(
+      (c) => c.originalFilename === topChunk.originalFilename
+    );
+    const pages = Array.from(
+      new Set(sameFileChunks.flatMap((c) => [c.sourcePageStart, c.sourcePageEnd]))
+    ).sort((a, b) => a - b);
+
+    const minP = pages[0];
+    const maxP = pages[pages.length - 1];
+    const pageLabel = minP === maxP ? `Halaman ${minP}` : `Halaman ${minP}-${maxP}`;
+    const canonicalSource = `Sumber: ${topChunk.originalFilename} | ${pageLabel}`;
+
+    if (/Sumber:\s*.*$/i.test(formattedAnswer)) {
+      formattedAnswer = formattedAnswer.replace(/Sumber:\s*.*$/i, canonicalSource).trim();
+    } else {
+      formattedAnswer = `${formattedAnswer}\n\n${canonicalSource}`;
+    }
+  }
+
   const sources: ChatSource[] = isNotFound
     ? []
     : similarChunks.map((c) => ({
@@ -192,7 +215,7 @@ export async function askDocumentChat(
       }));
 
   const result: ChatResponseResult = {
-    answer,
+    answer: formattedAnswer,
     sources,
     allowPublicKnowledge,
     retrievedCount: sources.length,

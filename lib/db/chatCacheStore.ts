@@ -20,7 +20,7 @@ Spektrum Pelayanan Fisioterapi:
 
 Fisioterapis modern adalah profesional kesehatan yang melakukan clinical reasoning, memimpin edukasi, pencegahan, dan rehabilitasi untuk mengoptimalkan kualitas hidup individu melalui gerak.
 
-Sumber: TM 1. Sejarah FT.pdf`;
+Sumber: TM 1. Sejarah FT.pdf | Halaman 1-3`;
 
 // In-memory cache for deterministic responses & zero-latency retrieval
 const memoryCache = new Map<string, ChatResponseResult>();

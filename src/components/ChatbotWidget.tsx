@@ -284,11 +284,13 @@ export default function ChatbotWidget({
           <div
             key={`src-${i}`}
             style={{
-              marginTop: '6px',
+              marginTop: '8px',
+              paddingTop: '6px',
+              borderTop: '1px solid var(--color-hairline)',
               fontSize: '12px',
               lineHeight: '18px',
               color: 'var(--color-slate)',
-              fontStyle: 'italic',
+              fontWeight: 500,
             }}
           >
             {clean}
@@ -634,48 +636,6 @@ export default function ChatbotWidget({
                     ? <span>{msg.text}</span>
                     : renderMessageContent(msg.text)
                   }
-
-                  {/* Source page chips - Hanya tampilkan jika data riil benar-benar ditemukan */}
-                  {msg.sources && msg.sources.length > 0 && !isDataNotFoundAnswer(msg.text) && (
-                    <div
-                      style={{
-                        marginTop: '8px',
-                        paddingTop: '8px',
-                        borderTop: '1px solid var(--color-hairline)',
-                      }}
-                    >
-                      <span className="type-meta" style={{ fontSize: '11px', display: 'block', marginBottom: '5px' }}>
-                        Referensi halaman dokumen
-                      </span>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                        {msg.sources.map((src, idx) => {
-                          const isTop = idx === 0;
-                          return (
-                            <span
-                              key={idx}
-                              title={src.content.substring(0, 120) + '...'}
-                              style={{
-                                fontSize: '11px',
-                                padding: '2px 7px',
-                                borderRadius: 'var(--radius-sm)',
-                                border: `1px solid ${isTop ? 'var(--color-accent)' : 'var(--color-hairline)'}`,
-                                color: isTop ? 'var(--color-accent)' : 'var(--color-slate)',
-                                fontFamily: 'var(--font-mono)',
-                                fontWeight: 500,
-                                backgroundColor: isTop ? 'rgba(47,93,255,0.05)' : 'transparent',
-                              }}
-                            >
-                              Hal {src.pageStart === src.pageEnd ? src.pageStart : `${src.pageStart}–${src.pageEnd}`}
-                              &nbsp;
-                              <span style={{ opacity: 0.7 }}>
-                                {Math.round(src.similarity * 100)}%
-                              </span>
-                            </span>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 {/* Timestamp */}

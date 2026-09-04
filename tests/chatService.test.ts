@@ -219,7 +219,8 @@ describe('AI Chatbot Service (Llama 3.2 3B & pgvector RAG)', () => {
       const data = await res.json();
 
       expect(res.status).toBe(200);
-      expect(data.answer).toBe('Jawaban dari Llama 3.2');
+      expect(data.answer).toContain('Jawaban dari Llama 3.2');
+      expect(data.answer).toContain('Sumber: doc.pdf | Halaman 1');
       expect(data.sources).toHaveLength(1);
     });
   });
