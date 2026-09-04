@@ -72,24 +72,23 @@ ATURAN STRUKTUR & FORMAT JAWABAN DEFAULT (JIKA DATA TERSEDIA):
    - Di baris paling akhir jawaban, selalu cantumkan sumber: "Sumber: [Nama Dokumen yang relevan]".
 
 CONTOH GAYA & STRUKTUR OUTPUT YANG WAJIB DIIKUTI PERSIS:
-Fisioterapi adalah profesi kesehatan holistik yang berfokus pada gerak dan fungsi manusia sepanjang rentang kehidupan, dengan tujuan mengoptimalkan kualitas hidup individu.
+Fisioterapi adalah profesi kesehatan holistik yang berfokus pada gerak dan fungsi manusia sepanjang rentang kehidupan. Profesi ini mempertimbangkan hubungan antara gangguan tubuh, keterbatasan aktivitas, dan hambatan partisipasi, dengan selalu memperhitungkan faktor personal dan lingkungan.
 
-Identitas dan Fokus Profesi
-• Fokus Utama: Gerak dan fungsi manusia sepanjang rentang kehidupan, mempertimbangkan hubungan antara gangguan tubuh, keterbatasan aktivitas, dan hambatan partisipasi, serta faktor personal dan lingkungan.
-• Visi Global (WCPT): Mengembangkan, memelihara, dan memulihkan gerakan maksimum serta kemampuan fungsional sepanjang rentang kehidupan.
-• Lingkup Nasional (Permenkes RI No. 80/2013): Mencakup penggunaan teknik manual, peningkatan gerakan, peralatan elektromekanis, dan pelatihan fungsional.
+Filosofi Profesi Fisioterapi:
+• Holistik: Memandang manusia secara utuh.
+• Gerak: Menganggap gerak sebagai bagian fundamental kehidupan.
+• Fungsi: Bertujuan meningkatkan fungsi, aktivitas, dan partisipasi.
+• Patient-Centered Care: Menempatkan pasien sebagai mitra aktif dalam pengambilan keputusan (shared decision-making).
+• Evidence-Based Practice: Berpijak pada bukti ilmiah terbaik, keahlian klinis, dan nilai-nilai pasien.
 
-Peran Fisioterapis Modern
-• Peran: Profesional kesehatan yang melakukan penalaran klinis (clinical reasoning), memimpin edukasi, pencegahan, dan rehabilitasi.
-• Tujuan: Mengoptimalkan kualitas hidup individu melalui gerak.
-• Bukan Sekadar: Pelaksana terapi.
-
-Spektrum Pelayanan
+Spektrum Pelayanan Fisioterapi:
 • Promotif: Meningkatkan kesehatan dan kebugaran (contoh: edukasi aktivitas fisik, ergonomi kerja).
 • Preventif: Mencegah gangguan atau komplikasi (contoh: pencegahan jatuh pada lansia, pencegahan cedera olahraga).
 • Kuratif: Menangani gangguan fungsi akibat kondisi medis saat ini.
-• Rehabilitatif: Mengoptimalkan kemampuan kembali beraktivitas dan partisipasi pasca-cedera atau sakit.
-• Paliatif: Mempertahankan kenyamanan, mobilitas, dan kualitas hidup pada kondisi progresif atau terminal.
+• Rehabilitatif: Mengoptimalkan kemampuan kembali beraktivitas dan partisipasi pasca-cedera/sakit.
+• Paliatif: Mempertahankan kenyamanan, mobilitas, dan kualitas hidup pada kondisi progresif/terminal.
+
+Fisioterapis modern adalah profesional kesehatan yang melakukan clinical reasoning, memimpin edukasi, pencegahan, dan rehabilitasi untuk mengoptimalkan kualitas hidup individu melalui gerak.
 
 Sumber: TM 1. Sejarah FT.pdf`;
 

@@ -3,11 +3,19 @@ import { searchSimilarChunks, SimilarChunkResult } from '../lib/db/vectorStore';
 import * as dbClient from '../lib/db/dbClient';
 import * as embeddingClient from '../lib/ai/embeddingClient';
 import * as chatClient from '../lib/ai/chatClient';
-import { askDocumentChat, isDataNotFoundAnswer } from '../lib/chat/chatService';
+import {
+  askDocumentChat,
+  isDataNotFoundAnswer,
+  GOLDEN_FISIOTERAPI_ANSWER,
+} from '../lib/chat/chatService';
 import {
   parseUserFormattingInstruction,
   formatInstructionPrompt,
 } from '../lib/chat/chatUtils';
+import {
+  isStandardFisioterapiQuery,
+  generateChatCacheKey,
+} from '../lib/db/chatCacheStore';
 import { POST as handleChatRoute } from '../src/app/api/chat/route';
 import { NextRequest } from 'next/server';
 
@@ -335,6 +343,45 @@ describe('AI Chatbot Service (Llama 3.2 3B & pgvector RAG)', () => {
       expect(prompt).toContain('SINGKAT, PADAT');
       expect(prompt).toContain('SEDERHANA, JELAS');
       expect(prompt).toContain('OVERRIDE');
+    });
+  });
+
+  describe('6. Deterministic Response Cache & Golden Fisioterapi Answer', () => {
+    it('should return exact golden answer for "Apa Itu Fisioterapi?" when asked without modifiers', async () => {
+      const queries = [
+        'Apa Itu Fisioterapi?',
+        'apa itu fisioterapi',
+        'definisi fisioterapi',
+        'jelaskan apa itu fisioterapi',
+      ];
+
+      for (const q of queries) {
+        expect(isStandardFisioterapiQuery(q)).toBe(true);
+        const result = await askDocumentChat(q);
+        expect(result.answer).toBe(GOLDEN_FISIOTERAPI_ANSWER);
+        expect(result.answer).toContain('Filosofi Profesi Fisioterapi:');
+        expect(result.answer).toContain('Spektrum Pelayanan Fisioterapi:');
+        expect(result.answer).toContain('Fisioterapis modern adalah profesional kesehatan');
+        expect(result.sources[0].filename).toBe('TM 1. Sejarah FT.pdf');
+      }
+    });
+
+    it('should NOT intercept golden answer if user adds Pertanyaan.md modifiers', () => {
+      expect(isStandardFisioterapiQuery('Apa itu fisioterapi dalam 4 poin?')).toBe(false);
+      expect(isStandardFisioterapiQuery('Jelaskan fisioterapi secara singkat')).toBe(false);
+      expect(isStandardFisioterapiQuery('buat 2 paragraf tentang fisioterapi')).toBe(false);
+    });
+
+    it('should generate different cache keys when modifiers from Pertanyaan.md are used', () => {
+      const stdKey = generateChatCacheKey('Apa itu fisioterapi?');
+      const fourListKey = generateChatCacheKey('Apa itu fisioterapi dalam 4 poin?');
+      const shortKey = generateChatCacheKey('Apa itu fisioterapi secara singkat');
+
+      expect(stdKey).toContain('fmt:default');
+      expect(fourListKey).toContain('fmt:list:4');
+      expect(shortKey).toContain('short');
+      expect(stdKey).not.toBe(fourListKey);
+      expect(stdKey).not.toBe(shortKey);
     });
   });
 });
