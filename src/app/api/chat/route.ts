@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { askDocumentChat } from '@lib/chat/chatService';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 300; // 5 menit batas eksekusi untuk CPU inference di VPS
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,7 +26,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
     console.error('[API /api/chat] Error generating chat response:', error);
-    const message = error instanceof Error ? error.message : 'Internal server error';
+    const causeMsg = error instanceof Error && (error as any).cause ? ` (${(error as any).cause})` : '';
+    const message = error instanceof Error ? `${error.message}${causeMsg}` : 'Internal server error';
     return NextResponse.json(
       { error: `Gagal memproses pesan chat: ${message}` },
       { status: 500 }

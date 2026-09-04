@@ -41,11 +41,36 @@ export async function embedTexts(
     process.env.OLLAMA_BASE_URL ||
     'http://localhost:11434';
 
-  const client = new OllamaEmbeddings({
-    model,
-    baseUrl,
-  });
+  const maxRetries = 2;
+  let attempt = 0;
+  let delay = 1000;
 
-  const embeddings = await client.embedDocuments(texts);
-  return embeddings;
+  while (attempt <= maxRetries) {
+    try {
+      const client = new OllamaEmbeddings({
+        model,
+        baseUrl,
+      });
+
+      const embeddings = await client.embedDocuments(texts);
+      return embeddings;
+    } catch (error) {
+      attempt++;
+      const cause = error instanceof Error && (error as any).cause ? ` (Detail: ${(error as any).cause})` : '';
+      const errorMessage = `${error instanceof Error ? error.message : String(error)}${cause}`;
+
+      if (attempt <= maxRetries) {
+        console.warn(
+          `[EmbeddingClient] Percobaan ${attempt}/${maxRetries} gagal: ${errorMessage}. Menunggu ${delay}ms sebelum mencoba lagi...`
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        delay *= 2;
+      } else {
+        console.error(`[EmbeddingClient] Gagal setelah ${maxRetries} kali percobaan: ${errorMessage}`);
+        throw error;
+      }
+    }
+  }
+
+  return [];
 }

@@ -112,14 +112,44 @@ ${query}`;
     new HumanMessage(userMessageContent),
   ];
 
-  const client = new ChatOllama({
-    model,
-    baseUrl,
-    temperature,
-  });
+  const maxRetries = 3;
+  let attempt = 0;
+  let delay = 1500;
 
-  const response = await client.invoke(messages);
-  return typeof response.content === 'string'
-    ? response.content
-    : JSON.stringify(response.content);
+  while (attempt <= maxRetries) {
+    try {
+      const client = new ChatOllama({
+        model,
+        baseUrl,
+        temperature,
+        numCtx: 4096,
+        keepAlive: '1h',
+      });
+
+      const response = await client.invoke(messages, {
+        signal: AbortSignal.timeout(300000), // 5 menit timeout per request untuk VPS CPU
+      });
+
+      return typeof response.content === 'string'
+        ? response.content
+        : JSON.stringify(response.content);
+    } catch (error) {
+      attempt++;
+      const cause = error instanceof Error && (error as any).cause ? ` (Detail: ${(error as any).cause})` : '';
+      const errorMessage = `${error instanceof Error ? error.message : String(error)}${cause}`;
+
+      if (attempt <= maxRetries) {
+        console.warn(
+          `[ChatClient] Percobaan ${attempt}/${maxRetries} gagal: ${errorMessage}. Menunggu ${delay}ms sebelum mencoba lagi...`
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        delay *= 2;
+      } else {
+        console.error(`[ChatClient] Gagal setelah ${maxRetries} kali percobaan: ${errorMessage}`);
+        throw new Error(`Koneksi AI Ollama terputus: ${errorMessage}`);
+      }
+    }
+  }
+
+  throw new Error('Gagal memproses respons AI setelah beberapa kali percobaan.');
 }
