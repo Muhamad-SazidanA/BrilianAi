@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, FileText, Send } from 'lucide-react';
+import { isDataNotFoundAnswer } from '../../lib/chat/chatUtils';
 
 /* ── Types ──────────────────────────────────────────── */
 interface ChatSource {
@@ -428,8 +429,8 @@ export default function ChatbotWidget({
                     : renderMessageContent(msg.text)
                   }
 
-                  {/* Source page chips */}
-                  {msg.sources && msg.sources.length > 0 && (
+                  {/* Source page chips - Hanya tampilkan jika data riil benar-benar ditemukan */}
+                  {msg.sources && msg.sources.length > 0 && !isDataNotFoundAnswer(msg.text) && (
                     <div
                       style={{
                         marginTop: '8px',

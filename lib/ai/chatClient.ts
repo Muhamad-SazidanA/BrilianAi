@@ -1,5 +1,6 @@
 import { ChatOllama } from '@langchain/ollama';
 import { HumanMessage, SystemMessage, BaseMessage } from '@langchain/core/messages';
+import { parseUserFormattingInstruction, formatInstructionPrompt } from '../chat/chatUtils';
 
 // Configure Node.js undici dispatcher timeout to allow long AI/LLM inferences
 try {
@@ -33,9 +34,29 @@ PRINSIP ANTI-HALUSINASI & JIKA DATA TIDAK DITEMUKAN (SANGAT KETAT):
      "Data tidak ditemukan di dalam dokumen."
      atau
      "Informasi mengenai [topik yang ditanyakan] tidak ditemukan di dalam dokumen yang tersedia."
-2. HANYA tampilkan sub-bagian dan format poin peluru jika data yang ditanyakan BENAR-BENAR ada dan relevan di dalam konteks dokumen!
+2. HANYA tampilkan format jawaban jika data yang ditanyakan BENAR-BENAR ada dan relevan di dalam konteks dokumen!
 
-ATURAN STRUKTUR & FORMAT JAWABAN (JIKA DATA TERSEDIA):
+ATURAN DETEKSI POLA FORMAT JAWABAN (DARI PERMINTAAN USER):
+Jika user meminta format, jumlah, atau kepadatan tertentu, ikuti aturan prioritas berikut:
+1. ANGKA SPESIFIK (PRIORITAS TERTINGGI):
+   - Jika user meminta angka tertentu (contoh: "4 list", "empat poin", "2 paragraf", "dua paragraf", "5 langkah", "tiga hal", baik dalam bentuk digit angka 1, 2, 3, 4, 5 maupun ejaan kata satu, dua, tiga, empat, lima dst - KEDUANYA DIPERLAKUKAN PERSIS SAMA), jumlah poin atau paragraf WAJIB TEPAT sesuai angka tersebut (tidak boleh kurang dan tidak boleh lebih).
+2. FORMAT EKSPLISIT:
+   - "buat list" / "poin-poin" / "bullet points": Buat dalam format list.
+   - "buat paragraf" / "narasikan" / "tulis biasa tanpa bullet": Buat dalam format narasi paragraf tanpa bullet.
+   - "tabel": Buat dalam bentuk tabel markdown.
+   - "step by step" / "langkah-langkah": Buat numbered steps berurutan (1., 2., 3.).
+   - "perbandingan": Buat format perbandingan (tabel atau komparasi poin).
+   - "kesimpulan di akhir": Tambahkan ringkasan/kesimpulan di baris akhir.
+3. INSTRUKSI KEPADATAN / PANJANG / KEJELASAN (MODIFIER):
+   - "singkat" / "padat" / "ringkas" / "to the point": Potong bagian non-esensial, hilangkan pembuka basa-basi, langsung ke inti.
+   - "lebih panjang" / "detail" / "lengkap" / "elaborasi": Tambahkan kedalaman penjelasan dan konteks dokumen.
+   - "jelas" / "mudah dipahami" / "bahasa awam": Gunakan bahasa sederhana, hindari istilah rumit.
+4. PRIORITAS OVERRIDE:
+   - Permintaan format dari user SELALU MENGGANTIKAN (OVERRIDE) gaya default AI.
+5. ATURAN DEFAULT (FALLBACK - JIKA TIDAK ADA TRIGGER DARI USER):
+   - Jika user TIDAK memberikan instruksi format sama sekali, gunakan GAYA DEFAULT AI di bawah ini:
+
+ATURAN STRUKTUR & FORMAT JAWABAN DEFAULT (JIKA DATA TERSEDIA):
 1. PARAGRAF PEMBUKA (DEFINISI UTUH):
    - Mulai LANGSUNG dengan 1-2 kalimat esensi/definisi topik tanpa judul sub-bagian (DILARANG memberi judul seperti "Definisi..." atau "Paragraf Pembuatan Jawaban" di awal).
    - JANGAN menggunakan kalimat pembuka klise seperti "Berikut adalah..." atau "Berdasarkan dokumen...".
@@ -113,10 +134,14 @@ export async function generateChatResponse(
 
   const systemPrompt = allowPublicKnowledge ? SYSTEM_PUBLIC_PROMPT : SYSTEM_STRICT_PROMPT;
 
+  // Deteksi jika user meminta format, jumlah, atau kepadatan khusus (Sesuai Pertanyaan.md)
+  const formatInstruction = parseUserFormattingInstruction(query);
+  const formatDirective = formatInstruction ? formatInstructionPrompt(formatInstruction) : '';
+
   const userMessageContent = `--- KONTEKS DOKUMEN ---
 ${contextText || '(Tidak ada konteks dokumen yang ditemukan)'}
 -----------------------
-
+${formatDirective ? `\n${formatDirective}\n` : ''}
 PERTANYAAN PENGGUNA:
 ${query}`;
 

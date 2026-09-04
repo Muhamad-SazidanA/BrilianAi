@@ -3,7 +3,11 @@ import { searchSimilarChunks, SimilarChunkResult } from '../lib/db/vectorStore';
 import * as dbClient from '../lib/db/dbClient';
 import * as embeddingClient from '../lib/ai/embeddingClient';
 import * as chatClient from '../lib/ai/chatClient';
-import { askDocumentChat } from '../lib/chat/chatService';
+import { askDocumentChat, isDataNotFoundAnswer } from '../lib/chat/chatService';
+import {
+  parseUserFormattingInstruction,
+  formatInstructionPrompt,
+} from '../lib/chat/chatUtils';
 import { POST as handleChatRoute } from '../src/app/api/chat/route';
 import { NextRequest } from 'next/server';
 
@@ -122,6 +126,40 @@ describe('AI Chatbot Service (Llama 3.2 3B & pgvector RAG)', () => {
       );
     });
 
+    it('should return empty sources when LLM response indicates data was not found in the documents', async () => {
+      const mockVector = new Array(1024).fill(0.05);
+      vi.spyOn(embeddingClient, 'embedTexts').mockResolvedValueOnce([mockVector]);
+
+      // Mock pgvector finding a chunk with weak similarity
+      const mockChunks: SimilarChunkResult[] = [
+        {
+          id: 20,
+          uploadBatchId: 'batch-999',
+          originalFilename: '6.b.-SPO.pdf',
+          chunkIndex: 2,
+          content: 'SOP Pelaksanaan Kegiatan Lapangan...',
+          sourcePageStart: 2,
+          sourcePageEnd: 2,
+          similarity: 0.35,
+        },
+      ];
+
+      mockPool.query.mockResolvedValueOnce({ rows: mockChunks, rowCount: 1 });
+
+      vi.spyOn(chatClient, 'generateChatResponse').mockResolvedValueOnce(
+        'Maaf, saya tidak dapat menemukan informasi tentang lokasi gedung PT UTI di dalam dokumen yang disediakan. Dokumen tersebut tidak menyebutkan lokasi atau alamat gedung PT UTI.'
+      );
+
+      const result = await askDocumentChat('dimana lokasi gedung PT UTI?', {
+        allowPublicKnowledge: false,
+      });
+
+      expect(result.answer).toContain('tidak dapat menemukan informasi');
+      // sources WAJIB kosong karena halaman 2 tidak memuat informasi lokasi PT UTI
+      expect(result.sources).toEqual([]);
+      expect(result.retrievedCount).toBe(0);
+    });
+
     it('should throw error if query is empty or whitespace', async () => {
       await expect(askDocumentChat('   ')).rejects.toThrow('Pertanyaan tidak boleh kosong.');
     });
@@ -175,6 +213,128 @@ describe('AI Chatbot Service (Llama 3.2 3B & pgvector RAG)', () => {
       expect(res.status).toBe(200);
       expect(data.answer).toBe('Jawaban dari Llama 3.2');
       expect(data.sources).toHaveLength(1);
+    });
+  });
+
+  describe('4. isDataNotFoundAnswer() helper', () => {
+    it('should return true for negative / not-found statements', () => {
+      const negativeCases = [
+        'Maaf, saya tidak dapat menemukan informasi tentang lokasi gedung PT UTI di dalam dokumen yang disediakan. Dokumen tersebut tidak menyebutkan lokasi atau alamat gedung PT UTI.',
+        'Data tidak ditemukan di dalam dokumen.',
+        'Informasi mengenai lokasi gedung PT UTI tidak ditemukan di dalam dokumen yang tersedia.',
+        'Dokumen tidak menyebutkan lokasi PT UTI.',
+        'Tidak terdapat informasi mengenai hal tersebut di dalam dokumen.',
+        'Maaf, saya tidak memiliki data mengenai topik tersebut.',
+      ];
+
+      for (const text of negativeCases) {
+        expect(isDataNotFoundAnswer(text)).toBe(true);
+      }
+    });
+
+    it('should return false for valid informative answers', () => {
+      const positiveCases = [
+        'Fisioterapi adalah profesi kesehatan holistik yang berfokus pada gerak dan fungsi manusia sepanjang rentang kehidupan.\n\nTujuan dan Fokus:\n• Pelayanan: Meningkatkan gerak tubuh manusia\n• Regulasi: Didasarkan pada Permenkes RI',
+        'PT UTI berlokasi di Jalan Kebayoran Baru, Jakarta Selatan.',
+      ];
+
+      for (const text of positiveCases) {
+        expect(isDataNotFoundAnswer(text)).toBe(false);
+      }
+    });
+  });
+
+  describe('5. parseUserFormattingInstruction() & formatInstructionPrompt() (Pertanyaan.md)', () => {
+    it('1. Deteksi Format Dasar (List vs Paragraf)', () => {
+      const listReq = parseUserFormattingInstruction('buat dalam bentuk list mengenai tujuan yayasan');
+      expect(listReq?.format).toBe('list');
+      expect(listReq?.count).toBeNull();
+
+      const paraReq = parseUserFormattingInstruction('jelaskan dalam paragraf mengenai sejarah berdirinya');
+      expect(paraReq?.format).toBe('paragraph');
+      expect(paraReq?.count).toBeNull();
+
+      // Fallback: tidak ada trigger
+      const noTrigger = parseUserFormattingInstruction('Apa itu fisioterapi?');
+      expect(noTrigger).toBeNull();
+    });
+
+    it('2. Deteksi Format + Jumlah Spesifik (Digit 1/2/3/4/5 maupun Kata satu/dua/tiga/empat/lima)', () => {
+      // Menguji digit angka (1, 2, 3, 4, 5)
+      const fourList = parseUserFormattingInstruction('buat dalam 4 list fungsi fisioterapi');
+      expect(fourList?.format).toBe('list');
+      expect(fourList?.count).toBe(4);
+
+      const twoParas = parseUserFormattingInstruction('jelaskan dalam 2 paragraf saja');
+      expect(twoParas?.format).toBe('paragraph');
+      expect(twoParas?.count).toBe(2);
+
+      const threeListShort = parseUserFormattingInstruction('buat 3 list singkat');
+      expect(threeListShort?.format).toBe('list');
+      expect(threeListShort?.count).toBe(3);
+      expect(threeListShort?.lengthModifier).toBe('short');
+
+      const fiveReasons = parseUserFormattingInstruction('kasih 5 alasan dalam bentuk list');
+      expect(fiveReasons?.format).toBe('list');
+      expect(fiveReasons?.count).toBe(5);
+
+      // Menguji kata ejaan angka (satu, dua, tiga, empat, lima, dst) - Hasilnya harus sama persis
+      const empatPoin = parseUserFormattingInstruction('buat dalam empat poin fungsi fisioterapi');
+      expect(empatPoin?.format).toBe('list');
+      expect(empatPoin?.count).toBe(4);
+
+      const duaParagraf = parseUserFormattingInstruction('jelaskan dalam dua paragraf saja');
+      expect(duaParagraf?.format).toBe('paragraph');
+      expect(duaParagraf?.count).toBe(2);
+
+      const tigaListSingkat = parseUserFormattingInstruction('buat tiga list singkat');
+      expect(tigaListSingkat?.format).toBe('list');
+      expect(tigaListSingkat?.count).toBe(3);
+      expect(tigaListSingkat?.lengthModifier).toBe('short');
+
+      const limaAlasan = parseUserFormattingInstruction('kasih lima alasan dalam bentuk list');
+      expect(limaAlasan?.format).toBe('list');
+      expect(limaAlasan?.count).toBe(5);
+
+      const tigaHal = parseUserFormattingInstruction('sebutkan tiga hal utama');
+      expect(tigaHal?.format).toBe('list');
+      expect(tigaHal?.count).toBe(3);
+    });
+
+    it('3. Deteksi Instruksi Panjang/Kepadatan & Kejelasan Jawaban', () => {
+      const shortReq = parseUserFormattingInstruction('jawab secara singkat dan padat to the point');
+      expect(shortReq?.lengthModifier).toBe('short');
+
+      const longReq = parseUserFormattingInstruction('jelaskan lebih detail dan elaborasi sejarahnya');
+      expect(longReq?.lengthModifier).toBe('long');
+
+      const clearReq = parseUserFormattingInstruction('jelaskan dengan bahasa awam yang gampang dipahami');
+      expect(clearReq?.clarityModifier).toBe(true);
+    });
+
+    it('4. Deteksi Instruksi Format Lain (Tabel, Steps, No Bullets, Summary)', () => {
+      const tableReq = parseUserFormattingInstruction('tampilkan dalam bentuk tabel');
+      expect(tableReq?.format).toBe('table');
+
+      const stepsReq = parseUserFormattingInstruction('jelaskan langkah-langkah pendaftaran step by step');
+      expect(stepsReq?.format).toBe('steps');
+
+      const noBulletsReq = parseUserFormattingInstruction('jangan pakai bullet, tulis biasa aja');
+      expect(noBulletsReq?.noBullets).toBe(true);
+      expect(noBulletsReq?.format).toBe('paragraph');
+
+      const summaryReq = parseUserFormattingInstruction('jelaskan isi SOP dan buat kesimpulan di akhir');
+      expect(summaryReq?.summaryAtEnd).toBe(true);
+    });
+
+    it('5. formatInstructionPrompt menghasilkan direktif presisi untuk LLM', () => {
+      const inst = parseUserFormattingInstruction('buat 4 poin singkat dan jelas')!;
+      expect(inst).not.toBeNull();
+      const prompt = formatInstructionPrompt(inst);
+      expect(prompt).toContain('TEPAT 4 POIN LIST');
+      expect(prompt).toContain('SINGKAT, PADAT');
+      expect(prompt).toContain('SEDERHANA, JELAS');
+      expect(prompt).toContain('OVERRIDE');
     });
   });
 });

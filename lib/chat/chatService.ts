@@ -7,6 +7,9 @@ import {
   SimilarCuratedResult,
 } from '../db/vectorStore';
 import { generateChatResponse } from '../ai/chatClient';
+import { isDataNotFoundAnswer } from './chatUtils';
+
+export { isDataNotFoundAnswer };
 
 export interface ChatSource {
   chunkId: number | string;
@@ -138,15 +141,21 @@ export async function askDocumentChat(
   const answer = await generateChatResponse(trimmedQuery, contextText, allowPublicKnowledge);
 
   // 5. Build sources list
-  const sources: ChatSource[] = similarChunks.map((c) => ({
-    chunkId: c.id,
-    uploadBatchId: c.uploadBatchId,
-    filename: c.originalFilename,
-    pageStart: c.sourcePageStart,
-    pageEnd: c.sourcePageEnd,
-    content: c.content,
-    similarity: Number(c.similarity.toFixed(4)),
-  }));
+  // HANYA sertakan referensi jika data benar-benar ditemukan di dalam dokumen.
+  // Jika AI menyatakan informasi tidak ditemukan, DILARANG menampilkan referensi halaman
+  // karena halaman tersebut tidak memuat jawaban yang dicari (bukan data riil).
+  const isNotFound = isDataNotFoundAnswer(answer);
+  const sources: ChatSource[] = isNotFound
+    ? []
+    : similarChunks.map((c) => ({
+        chunkId: c.id,
+        uploadBatchId: c.uploadBatchId,
+        filename: c.originalFilename,
+        pageStart: c.sourcePageStart,
+        pageEnd: c.sourcePageEnd,
+        content: c.content,
+        similarity: Number(c.similarity.toFixed(4)),
+      }));
 
   return {
     answer,
