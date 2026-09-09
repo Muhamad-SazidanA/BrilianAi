@@ -33,3 +33,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# temp/dev helper scripts
+*.ps1
+
+# internal dev docs (tidak perlu di repo publik)
+Penjelasan.md
+SPESIFIKASI-HARDWARE-GPU.md
+"Specialized Agents.md"

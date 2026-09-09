@@ -1,4 +1,4 @@
-# BrilianAI — Sistem Ingestion PDF via AI Vision
+  # BrilianAI — Sistem Ingestion PDF via AI Vision
 
 Repositori ini memuat fondasi infrastruktur dan pipeline lengkap ingestion PDF via AI Vision berbasis Next.js (App Router, TypeScript), LangChain.js, PostgreSQL 16 (pgvector), Redis (BullMQ), dan Ollama.
 

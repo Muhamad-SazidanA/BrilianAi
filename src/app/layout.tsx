@@ -1,29 +1,28 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { LanguageProvider } from '@/context/LanguageContext';
+import ToastProvider from '@/components/providers/ToastProvider';
 
 export const metadata: Metadata = {
-  title: 'BrilianAI — Platform Analisis Dokumen',
-  description:
-    'Sistem ingestion dokumen PDF berbasis AI Vision dengan RAG, pgvector, dan chatbot lokal yang menjaga privasi data Anda.',
+  title: 'Brilian.Ai — AI Ingestion & pgvector Knowledge Base',
+  description: 'Sistem Ingestion PDF dan Basis Pengetahuan Enterprise Brilian.Ai dengan pgvector.',
+  icons: {
+    icon: '/icon.svg',
+  },
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="id">
-      <body
-        style={{
-          fontFamily: 'var(--font-sans)',
-          backgroundColor: 'var(--color-paper)',
-          color: 'var(--color-ink)',
-          WebkitFontSmoothing: 'antialiased',
-          MozOsxFontSmoothing: 'grayscale',
-        }}
-      >
-        {children}
+      <body>
+        <LanguageProvider>
+          {children}
+          <ToastProvider />
+        </LanguageProvider>
       </body>
     </html>
   );

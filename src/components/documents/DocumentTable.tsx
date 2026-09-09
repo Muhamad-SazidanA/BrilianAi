@@ -1,0 +1,337 @@
+'use client';
+
+import React, { useState } from 'react';
+import Link from 'next/link';
+import {
+  FileText,
+  Search,
+  CheckCircle2,
+  XCircle,
+  Pencil,
+  Trash2,
+  ExternalLink,
+  RefreshCw,
+  Layers,
+} from 'lucide-react';
+import { UploadBatch } from '@/types/document';
+import RenameModal from './RenameModal';
+import { useLanguage } from '@/context/LanguageContext';
+
+interface DocumentTableProps {
+  batches: UploadBatch[];
+  isLoading: boolean;
+  onRefresh: () => Promise<void>;
+  onDelete: (batchId: string, filename: string) => Promise<void>;
+  onRename: (batchId: string, newFilename: string) => Promise<void>;
+  onToggleActive: (batchId: string, active: boolean) => Promise<void>;
+}
+
+export default function DocumentTable({
+  batches,
+  isLoading,
+  onRefresh,
+  onDelete,
+  onRename,
+  onToggleActive,
+}: DocumentTableProps) {
+  const { language, t } = useLanguage();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterActive, setFilterActive] = useState<'all' | 'active' | 'inactive'>('all');
+  const [selectedForRename, setSelectedForRename] = useState<UploadBatch | null>(null);
+
+  // Filter batches
+  const filteredBatches = batches.filter((batch) => {
+    const matchesSearch = batch.original_filename.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!matchesSearch) return false;
+    if (filterActive === 'active') return !!batch.is_active_knowledge;
+    if (filterActive === 'inactive') return !batch.is_active_knowledge;
+    return true;
+  });
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      {/* Controls Bar: Search, Filter Tabs, Refresh Button */}
+      <div className="ui-card" style={{ padding: '1rem 1.25rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+          {/* Search box */}
+          <div style={{ position: 'relative', flex: 1, minWidth: '260px' }}>
+            <Search
+              size={16}
+              color="var(--text-muted)"
+              style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }}
+            />
+            <input
+              type="text"
+              placeholder={t('table.search_placeholder')}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="input-text"
+              style={{ paddingLeft: '38px', borderRadius: 'var(--radius-sm)' }}
+            />
+          </div>
+
+          {/* Filter Pills */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              backgroundColor: 'var(--bg-app)',
+              padding: '4px',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--border-default)',
+              gap: '2px',
+            }}
+          >
+            <button
+              onClick={() => setFilterActive('all')}
+              className={`btn btn-sm ${filterActive === 'all' ? 'btn-primary' : 'btn-ghost'}`}
+              style={{
+                borderRadius: 'var(--radius-xs)',
+                padding: '5px 12px',
+                fontSize: '12.5px',
+                fontWeight: 600,
+              }}
+            >
+              {t('table.filter_all')} ({batches.length})
+            </button>
+            <button
+              onClick={() => setFilterActive('active')}
+              className={`btn btn-sm ${filterActive === 'active' ? 'btn-primary' : 'btn-ghost'}`}
+              style={{
+                borderRadius: 'var(--radius-xs)',
+                padding: '5px 12px',
+                fontSize: '12.5px',
+                fontWeight: 600,
+              }}
+            >
+              {t('table.filter_active')} ({batches.filter((b) => b.is_active_knowledge).length})
+            </button>
+            <button
+              onClick={() => setFilterActive('inactive')}
+              className={`btn btn-sm ${filterActive === 'inactive' ? 'btn-primary' : 'btn-ghost'}`}
+              style={{
+                borderRadius: 'var(--radius-xs)',
+                padding: '5px 12px',
+                fontSize: '12.5px',
+                fontWeight: 600,
+              }}
+            >
+              {t('table.filter_inactive')} ({batches.filter((b) => !b.is_active_knowledge).length})
+            </button>
+          </div>
+
+          {/* Refresh Action */}
+          <button onClick={onRefresh} disabled={isLoading} className="btn btn-outline btn-sm">
+            <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
+            <span>{t('table.refresh')}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Table Card (Brilian.Ai Clean Look) */}
+      <div className="ui-card" style={{ padding: 0, overflow: 'hidden' }}>
+        {isLoading ? (
+          <div style={{ padding: '4rem 0', textAlign: 'center', color: 'var(--text-secondary)' }}>
+            <div
+              className="animate-spin"
+              style={{
+                width: '26px',
+                height: '26px',
+                border: '2px solid var(--border-default)',
+                borderTopColor: 'var(--color-primary)',
+                borderRadius: '50%',
+                margin: '0 auto 12px',
+              }}
+            />
+            <p style={{ fontSize: '13.5px', fontWeight: 500 }}>{t('table.loading')}</p>
+          </div>
+        ) : filteredBatches.length === 0 ? (
+          <div style={{ padding: '4rem 0', textAlign: 'center', color: 'var(--text-secondary)' }}>
+            <div
+              style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '50%',
+                backgroundColor: 'var(--bg-subtle)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 12px',
+                color: 'var(--text-muted)',
+              }}
+            >
+              <FileText size={24} />
+            </div>
+            <p style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary)' }}>
+              {searchQuery ? t('table.empty_search_title') : t('table.empty_title')}
+            </p>
+            <p style={{ fontSize: '13px', marginTop: '4px', maxWidth: '340px', margin: '4px auto 0' }}>
+              {searchQuery ? t('table.empty_search_desc') : t('table.empty_desc')}
+            </p>
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13.5px' }}>
+              <thead>
+                <tr
+                  style={{
+                    backgroundColor: 'var(--bg-app)',
+                    borderBottom: '1px solid var(--border-default)',
+                    color: 'var(--text-secondary)',
+                    fontSize: '11.5px',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}
+                >
+                  <th style={{ padding: '14px 1.5rem' }}>{t('table.col_doc')}</th>
+                  <th style={{ padding: '14px 1rem' }}>{t('table.col_pages')}</th>
+                  <th style={{ padding: '14px 1rem' }}>{t('table.col_chunks')}</th>
+                  <th style={{ padding: '14px 1rem' }}>{t('table.col_time')}</th>
+                  <th style={{ padding: '14px 1rem' }}>{t('table.col_status')}</th>
+                  <th style={{ padding: '14px 1.5rem', textAlign: 'right' }}>{t('table.col_actions')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredBatches.map((batch) => {
+                  const formattedDate = new Date(batch.uploaded_at).toLocaleDateString(
+                    language === 'en' ? 'en-US' : 'id-ID',
+                    {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    }
+                  );
+
+                  return (
+                    <tr
+                      key={batch.id}
+                      style={{
+                        borderBottom: '1px solid var(--border-subtle)',
+                        transition: 'background-color 0.15s ease',
+                      }}
+                      className="hover:bg-subtle"
+                    >
+                      {/* Name & ID */}
+                      <td style={{ padding: '14px 1.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div
+                            style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: 'var(--radius-sm)',
+                              backgroundColor: 'var(--color-primary-subtle)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: 'var(--color-primary)',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <FileText size={18} />
+                          </div>
+                          <div>
+                            <Link
+                              href={`/documents/${batch.id}`}
+                              style={{ fontWeight: 600, color: 'var(--text-primary)' }}
+                              className="hover:text-primary hover:underline"
+                            >
+                              {batch.original_filename}
+                            </Link>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>
+                              ID: {batch.id.substring(0, 14)}...
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Pages */}
+                      <td style={{ padding: '14px 1rem' }}>
+                        <span className="badge badge-neutral font-mono">
+                          {batch.page_count} {language === 'en' ? 'pgs' : 'hal'}
+                        </span>
+                      </td>
+
+                      {/* Chunks */}
+                      <td style={{ padding: '14px 1rem' }}>
+                        <span className="badge badge-accent font-mono">{batch.chunk_count} chunks</span>
+                      </td>
+
+                      {/* Upload Date */}
+                      <td style={{ padding: '14px 1rem', color: 'var(--text-secondary)', fontSize: '12.5px' }}>
+                        {formattedDate}
+                      </td>
+
+                      {/* AI Knowledge toggle */}
+                      <td style={{ padding: '14px 1rem' }}>
+                        <button
+                          onClick={() => onToggleActive(batch.id, !batch.is_active_knowledge)}
+                          className={`badge ${batch.is_active_knowledge ? 'badge-success' : 'badge-neutral'}`}
+                          style={{
+                            cursor: 'pointer',
+                            padding: '4px 10px',
+                            transition: 'all 0.15s ease',
+                          }}
+                          title={t('table.toggle_tooltip')}
+                        >
+                          {batch.is_active_knowledge ? (
+                            <>
+                              <CheckCircle2 size={12} />
+                              <span>{t('table.status_active')}</span>
+                            </>
+                          ) : (
+                            <>
+                              <XCircle size={12} />
+                              <span>{t('table.status_inactive')}</span>
+                            </>
+                          )}
+                        </button>
+                      </td>
+
+                      {/* Actions */}
+                      <td style={{ padding: '14px 1.5rem', textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <Link
+                            href={`/documents/${batch.id}`}
+                            className="btn btn-ghost btn-sm"
+                            title={t('table.open_studio_tooltip')}
+                          >
+                            <ExternalLink size={15} />
+                          </Link>
+                          <button
+                            onClick={() => setSelectedForRename(batch)}
+                            className="btn btn-ghost btn-sm"
+                            title={t('table.rename_tooltip')}
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            onClick={() => onDelete(batch.id, batch.original_filename)}
+                            className="btn btn-ghost-danger btn-sm"
+                            title={t('table.delete_tooltip')}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Rename Modal */}
+      <RenameModal
+        batch={selectedForRename}
+        isOpen={!!selectedForRename}
+        onClose={() => setSelectedForRename(null)}
+        onSave={onRename}
+      />
+    </div>
+  );
+}
