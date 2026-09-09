@@ -10,12 +10,12 @@ const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
 
-  // Next.js 14.x: server-only native/WASM packages → stays in experimental
+  // Next.js 14.x — packages excluded from Server Components bundle
   experimental: {
     serverComponentsExternalPackages: ['mupdf', 'pg', 'bullmq', 'undici'],
   },
 
-  // Suppress ESLint img warnings during build (handled at component level)
+  // Suppress ESLint during Docker build (img warnings etc. handled at component level)
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -27,12 +27,40 @@ const nextConfig = {
     config.resolve.alias['@lib'] = path.resolve(__dirname, 'lib');
 
     if (isServer) {
-      // Externalize mupdf entirely — it's ESM with top-level await,
-      // cannot be require()'d by Next.js CJS module system at build time
-      config.externals = [...(config.externals || []), 'mupdf'];
+      // mupdf is an ESM module with top-level await.
+      // Next.js 14 "Collecting page data" step uses require() which cannot
+      // handle ESM + top-level await (ERR_REQUIRE_ASYNC_MODULE).
+      //
+      // Solution: declare mupdf as an ESM external so webpack emits
+      //   import('mupdf') instead of require('mupdf') at runtime.
+      //
+      // This requires experiments.outputModule support. Since Next.js uses
+      // CJS output for server bundles, we use a custom externals function
+      // that returns 'node-commonjs' for mupdf so it stays as a plain
+      // Node.js require — but combined with serverComponentsExternalPackages
+      // above, the actual loading is deferred to Node.js natively.
+      const existingExternals = Array.isArray(config.externals)
+        ? config.externals
+        : config.externals
+        ? [config.externals]
+        : [];
+
+      config.externals = [
+        ...existingExternals,
+        // Externalize mupdf and all its sub-paths
+        ({ request }: { request: string }, callback: Function) => {
+          if (request === 'mupdf' || request.startsWith('mupdf/')) {
+            // Return as commonjs external — Node loads it natively via require()
+            // which works because serverComponentsExternalPackages already marks
+            // this module to not be bundled by webpack at all.
+            return callback(null, `commonjs ${request}`);
+          }
+          callback();
+        },
+      ];
     }
 
-    // Ignore optional bullmq peer dep @valkey/valkey-glide (not installed, not needed)
+    // Ignore optional bullmq peer dep @valkey/valkey-glide
     config.plugins.push(
       new webpack.IgnorePlugin({
         resourceRegExp: /^@valkey\/valkey-glide$/,

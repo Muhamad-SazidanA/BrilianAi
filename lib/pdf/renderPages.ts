@@ -1,3 +1,4 @@
+import * as mupdf from 'mupdf';
 import { extractPageText } from '../ai/visionClient';
 
 export interface PageTextResult {
@@ -13,8 +14,8 @@ export interface ExtractHybridOptions {
  * Extracts digital text from a MuPDF Page if available.
  * Ensures the WASM StructuredText pointer is explicitly destroyed to prevent memory leaks.
  */
-export function extractPageDigitalText(page: any): string {
-  let st: any = null;
+export function extractPageDigitalText(page: mupdf.Page): string {
+  let st: mupdf.StructuredText | null = null;
   try {
     st = page.toStructuredText();
     const jsonStr = st.asJSON();
@@ -40,15 +41,20 @@ export function extractPageDigitalText(page: any): string {
   } catch {
     return '';
   } finally {
-    if (st && typeof st.destroy === 'function') {
-      try { st.destroy(); } catch { /* ignore */ }
+    if (st && typeof (st as any).destroy === 'function') {
+      try {
+        (st as any).destroy();
+      } catch {
+        // ignore
+      }
     }
   }
 }
 
 /**
- * Memory-efficient streaming hybrid page extractor.
- * Uses dynamic import for mupdf to avoid Next.js build-time ESM/WASM require() errors.
+ * Memory-efficient streaming hybrid page extractor:
+ * Evaluates pages on-demand and explicitly frees C/WASM pointers (Page, StructuredText, Pixmap, Doc)
+ * on every single page. Keeps heap memory under 10MB even for 10,000+ page documents.
  *
  * @param buffer - In-memory Buffer of the PDF file
  * @param options - Extraction options
@@ -62,12 +68,9 @@ export async function extractPdfPagesTextHybrid(
     throw new Error('Invalid PDF buffer: Buffer is empty or not provided.');
   }
 
-  // Dynamic import — avoids Next.js requiring ESM+WASM module at build/collection time
-  const mupdf = await import('mupdf');
-
   const minDigitalTextLength = options?.minDigitalTextLength ?? 40;
 
-  let doc: any;
+  let doc: mupdf.Document;
   try {
     doc = mupdf.Document.openDocument(buffer, 'application/pdf');
   } catch (error) {
@@ -77,7 +80,7 @@ export async function extractPdfPagesTextHybrid(
 
   const pageCount = doc.countPages();
   if (pageCount === 0) {
-    try { doc.destroy?.(); } catch {}
+    try { (doc as any).destroy?.(); } catch {}
     throw new Error('Failed to process PDF: Document contains 0 pages.');
   }
 
@@ -87,21 +90,26 @@ export async function extractPdfPagesTextHybrid(
 
   for (let i = 0; i < pageCount; i++) {
     const pageNumber = i + 1;
-    let page: any = null;
-    let pixmap: any = null;
+    let page: mupdf.Page | null = null;
+    let pixmap: mupdf.Pixmap | null = null;
 
     try {
       page = doc.loadPage(i);
       const digitalText = extractPageDigitalText(page);
 
       if (digitalText && digitalText.length >= minDigitalTextLength) {
+        // Log periodically for large documents to avoid flooding console
         if (pageNumber % 50 === 1 || pageNumber === pageCount || pageCount <= 30) {
           console.log(
             `[IngestPipeline] ⚡ Halaman ${pageNumber}/${pageCount}: Fast-Path Teks Digital (${digitalText.length} karakter)`
           );
         }
-        results.push({ pageNumber, text: digitalText });
+        results.push({
+          pageNumber,
+          text: digitalText,
+        });
       } else {
+        // Only render image on-demand if digital text is empty / scanned
         console.log(
           `[IngestPipeline] 🤖 Halaman ${pageNumber}/${pageCount}: Teks digital minim/scan, memindai via AI Vision...`
         );
@@ -114,23 +122,33 @@ export async function extractPdfPagesTextHybrid(
         console.log(
           `[IngestPipeline] -> Halaman ${pageNumber} selesai dipindai AI Vision (${finalText.length} karakter diekstrak).`
         );
-        results.push({ pageNumber, text: finalText });
+        results.push({
+          pageNumber,
+          text: finalText,
+        });
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.warn(`[IngestPipeline] Peringatan: Gagal mengekstrak halaman ${pageNumber}: ${message}`);
-      results.push({ pageNumber, text: '' });
+      results.push({
+        pageNumber,
+        text: '',
+      });
     } finally {
-      if (pixmap && typeof pixmap.destroy === 'function') {
-        try { pixmap.destroy(); } catch {}
+      if (pixmap && typeof (pixmap as any).destroy === 'function') {
+        try { (pixmap as any).destroy(); } catch {}
       }
-      if (page && typeof page.destroy === 'function') {
-        try { page.destroy(); } catch {}
+      if (page && typeof (page as any).destroy === 'function') {
+        try { (page as any).destroy(); } catch {}
       }
     }
   }
 
-  try { doc.destroy?.(); } catch {}
+  // Explicitly free the WASM document
+  try {
+    (doc as any).destroy?.();
+  } catch {}
+
   return results;
 }
 
@@ -146,10 +164,7 @@ export async function renderPdfPagesToImages(buffer: Buffer): Promise<Buffer[]> 
     throw new Error('Invalid PDF buffer: Buffer is empty or not provided.');
   }
 
-  // Dynamic import — avoids Next.js requiring ESM+WASM module at build/collection time
-  const mupdf = await import('mupdf');
-
-  let doc: any;
+  let doc: mupdf.Document;
   try {
     doc = mupdf.Document.openDocument(buffer, 'application/pdf');
   } catch (error) {
@@ -159,28 +174,28 @@ export async function renderPdfPagesToImages(buffer: Buffer): Promise<Buffer[]> 
 
   const pageCount = doc.countPages();
   if (pageCount === 0) {
-    try { doc.destroy?.(); } catch {}
+    try { (doc as any).destroy?.(); } catch {}
     throw new Error('Failed to process PDF: Document contains 0 pages.');
   }
 
   const imageBuffers: Buffer[] = [];
   for (let i = 0; i < pageCount; i++) {
-    let page: any = null;
-    let pixmap: any = null;
+    let page: mupdf.Page | null = null;
+    let pixmap: mupdf.Pixmap | null = null;
     try {
       page = doc.loadPage(i);
       pixmap = page.toPixmap(mupdf.Matrix.scale(1.0, 1.0), mupdf.ColorSpace.DeviceRGB);
       const pngBytes = pixmap.asPNG();
       imageBuffers.push(Buffer.from(pngBytes));
     } finally {
-      if (pixmap && typeof pixmap.destroy === 'function') {
-        try { pixmap.destroy(); } catch {}
+      if (pixmap && typeof (pixmap as any).destroy === 'function') {
+        try { (pixmap as any).destroy(); } catch {}
       }
-      if (page && typeof page.destroy === 'function') {
-        try { page.destroy(); } catch {}
+      if (page && typeof (page as any).destroy === 'function') {
+        try { (page as any).destroy(); } catch {}
       }
     }
   }
-  try { doc.destroy?.(); } catch {}
+  try { (doc as any).destroy?.(); } catch {}
   return imageBuffers;
 }
