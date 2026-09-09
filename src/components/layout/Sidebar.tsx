@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
@@ -155,28 +156,20 @@ export default function Sidebar({
           title="Brilian.Ai Dashboard"
         >
           {isCollapsed ? (
-            <img
+            <Image
               src="/images/BrilianLogo-Close.svg"
               alt="Brilian.Ai"
-              style={{
-                width: '38px',
-                height: '38px',
-                aspectRatio: '1 / 1',
-                objectFit: 'contain',
-                display: 'block',
-              }}
+              width={38}
+              height={38}
+              style={{ objectFit: 'contain', display: 'block' }}
             />
           ) : (
-            <img
+            <Image
               src="/images/BrilianLogo-Open.svg"
               alt="Brilian.Ai"
-              style={{
-                width: '136px',
-                height: '68px',
-                aspectRatio: '2 / 1',
-                objectFit: 'contain',
-                display: 'block',
-              }}
+              width={136}
+              height={68}
+              style={{ objectFit: 'contain', display: 'block' }}
             />
           )}
         </Link>
