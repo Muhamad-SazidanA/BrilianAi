@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { POST as handleUpload } from '../src/app/api/documents/upload/route';
+import { POST as handleUpload, GET as handleUploadProgress } from '../src/app/api/documents/upload/route';
 import { GET as handleListBatches } from '../src/app/api/documents/route';
 import { GET as handleListChunks } from '../src/app/api/documents/[id]/chunks/route';
 import { NextRequest } from 'next/server';
 import * as queueModule from '../lib/queue/ingestQueue';
 import * as vectorStoreModule from '../lib/db/vectorStore';
+import { setIngestProgress } from '../lib/ingest/ingestProgress';
 
 describe('Next.js API Route Handlers', () => {
   beforeEach(() => {
@@ -75,6 +76,32 @@ describe('Next.js API Route Handlers', () => {
         page_count: 3,
         chunk_count: 5,
       });
+    });
+  });
+
+  describe('GET /api/documents/upload/progress', () => {
+    it('should return active ingestion progress including current step and chunk count', async () => {
+      setIngestProgress('progress-001', {
+        clientId: 'progress-001',
+        status: 'embedding',
+        message: 'Membuat embedding vector untuk chunks...',
+        totalChunks: 24,
+        processedChunks: 10,
+        currentPage: 5,
+        totalPages: 10,
+        progressPercent: 41.7,
+      });
+
+      const request = new NextRequest('http://localhost:3000/api/documents/upload/progress?clientId=progress-001');
+      const response = await handleUploadProgress(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.status).toBe('embedding');
+      expect(data.message).toContain('embedding');
+      expect(data.totalChunks).toBe(24);
+      expect(data.processedChunks).toBe(10);
+      expect(data.progressPercent).toBeCloseTo(41.7, 1);
     });
   });
 

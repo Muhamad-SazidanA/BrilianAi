@@ -2,6 +2,7 @@ import { extractPdfPagesTextHybrid } from '../pdf/renderPages';
 import { chunkWithPageOffsets } from '../chunking/splitWithPageTracking';
 import { embedTexts } from '../ai/embeddingClient';
 import { createUploadBatch, insertChunks } from '../db/vectorStore';
+import { setIngestProgress } from './ingestProgress';
 
 export interface UploadResult {
   uploadBatchId: string;
@@ -14,6 +15,10 @@ export interface IngestOptions {
   chunkSize?: number;
   chunkOverlap?: number;
   minDigitalTextLength?: number;
+}
+
+function resolveClientId(clientId?: string): string {
+  return clientId || `upload-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 /**
@@ -35,7 +40,8 @@ export interface IngestOptions {
 export async function ingestPdf(
   fileBuffer: Buffer,
   filename: string,
-  options?: IngestOptions
+  options?: IngestOptions,
+  clientId?: string
 ): Promise<UploadResult> {
   if (!fileBuffer || !Buffer.isBuffer(fileBuffer) || fileBuffer.length === 0) {
     throw new Error('Invalid PDF file buffer: Buffer is empty or not provided.');
@@ -44,13 +50,29 @@ export async function ingestPdf(
   const chunkSize = options?.chunkSize ?? 800;
   const chunkOverlap = options?.chunkOverlap ?? 150;
   const minDigitalTextLength = options?.minDigitalTextLength ?? 40;
+  const resolvedClientId = resolveClientId(clientId);
 
   console.log(`[IngestPipeline] Memulai ingestion file "${filename}" (${(fileBuffer.length / 1024).toFixed(1)} KB)...`);
+  setIngestProgress(resolvedClientId, {
+    clientId: resolvedClientId,
+    status: 'extracting',
+    message: 'Memulai ekstraksi teks halaman PDF...',
+    progressPercent: 0,
+  });
 
   // 1 & 2. Streaming Hybrid Text Extraction
   console.log(`[IngestPipeline] [1/4] Memproses ekstraksi teks (Streaming Hybrid Engine)...`);
   const pagesText = await extractPdfPagesTextHybrid(fileBuffer, { minDigitalTextLength });
   const pageCount = pagesText.length;
+
+  setIngestProgress(resolvedClientId, {
+    clientId: resolvedClientId,
+    status: 'extracting',
+    message: `Mengekstrak teks dari ${pageCount} halaman PDF...`,
+    totalPages: pageCount,
+    currentPage: pageCount,
+    progressPercent: 25,
+  });
 
   if (pageCount === 0) {
     throw new Error('PDF document contains 0 renderable pages.');
@@ -59,16 +81,44 @@ export async function ingestPdf(
 
   // 3. Sliding-window chunking with source page range tracking
   console.log(`[IngestPipeline] [2/4] Memotong teks menjadi Chunks dengan Sliding Window (size: ${chunkSize}, overlap: ${chunkOverlap})...`);
+  setIngestProgress(resolvedClientId, {
+    clientId: resolvedClientId,
+    status: 'chunking',
+    message: `Memotong teks menjadi chunks dengan sliding window (${chunkSize} / ${chunkOverlap})...`,
+    totalPages: pageCount,
+    currentPage: pageCount,
+    progressPercent: 45,
+  });
   const chunks = await chunkWithPageOffsets(pagesText, chunkSize, chunkOverlap);
   const chunkCount = chunks.length;
   console.log(`[IngestPipeline] Menghasilkan ${chunkCount} chunks dengan pelacakan halaman.`);
+  setIngestProgress(resolvedClientId, {
+    clientId: resolvedClientId,
+    status: 'chunking',
+    message: `Selesai membuat ${chunkCount} chunks dari halaman PDF...`,
+    totalPages: pageCount,
+    currentPage: pageCount,
+    totalChunks: chunkCount,
+    processedChunks: 0,
+    progressPercent: 50,
+  });
 
   // 4. Batch generate embeddings for all chunks in safe micro-batches of 10
   let embeddings: number[][] = [];
   if (chunkCount > 0) {
     console.log(`[IngestPipeline] [3/4] Membuat embedding vector 1024-dim untuk ${chunkCount} chunks...`);
+    setIngestProgress(resolvedClientId, {
+      clientId: resolvedClientId,
+      status: 'embedding',
+      message: `Membuat embedding vector untuk ${chunkCount} chunks...`,
+      totalPages: pageCount,
+      currentPage: pageCount,
+      totalChunks: chunkCount,
+      processedChunks: 0,
+      progressPercent: 55,
+    });
     const chunkContents = chunks.map((c) => c.content);
-    
+
     // Process embeddings in micro-batches of 10 chunks to prevent HeadersTimeoutError
     const EMBED_BATCH_SIZE = 10;
     for (let i = 0; i < chunkContents.length; i += EMBED_BATCH_SIZE) {
@@ -77,8 +127,18 @@ export async function ingestPdf(
       embeddings.push(...batchEmbeds);
 
       const processedCount = Math.min(i + slice.length, chunkCount);
+      const percent = Number(((processedCount / chunkCount) * 100).toFixed(1));
+      setIngestProgress(resolvedClientId, {
+        clientId: resolvedClientId,
+        status: 'embedding',
+        message: `Embedding progress: ${processedCount}/${chunkCount} chunks (${percent}%)...`,
+        totalPages: pageCount,
+        currentPage: pageCount,
+        totalChunks: chunkCount,
+        processedChunks: processedCount,
+        progressPercent: 55 + (percent * 0.35),
+      });
       if (processedCount % 50 === 0 || processedCount === chunkCount || chunkCount <= 50) {
-        const percent = ((processedCount / chunkCount) * 100).toFixed(1);
         console.log(`[IngestPipeline] -> Embedding progress: ${processedCount}/${chunkCount} chunks (${percent}%)...`);
       }
     }
@@ -86,6 +146,16 @@ export async function ingestPdf(
 
   // 5. Create upload batch record in PostgreSQL
   console.log(`[IngestPipeline] [4/4] Menyimpan batch & ${chunkCount} chunks ke pgvector...`);
+  setIngestProgress(resolvedClientId, {
+    clientId: resolvedClientId,
+    status: 'storing',
+    message: `Menyimpan batch dan ${chunkCount} chunks ke pgvector...`,
+    totalPages: pageCount,
+    currentPage: pageCount,
+    totalChunks: chunkCount,
+    processedChunks: chunkCount,
+    progressPercent: 92,
+  });
   const batchId = await createUploadBatch(filename, pageCount);
 
   // 6. Insert all document chunks with pgvector embeddings
@@ -104,6 +174,16 @@ export async function ingestPdf(
   }
 
   console.log(`[IngestPipeline] Sukses: Batch ID: ${batchId}, Total Halaman: ${pageCount}, Total Chunks: ${chunkCount} tersimpan di pgvector.`);
+  setIngestProgress(resolvedClientId, {
+    clientId: resolvedClientId,
+    status: 'completed',
+    message: `Selesai: ${pageCount} halaman dan ${chunkCount} chunks berhasil di-ingest.`,
+    totalPages: pageCount,
+    currentPage: pageCount,
+    totalChunks: chunkCount,
+    processedChunks: chunkCount,
+    progressPercent: 100,
+  });
 
   // 7. Catatan: Kurasi AI tidak lagi berjalan otomatis di background
   // Dokumen tersimpan dengan status 'Belum Dikurasi', dan pengguna dapat menjalankannya manual via Studio

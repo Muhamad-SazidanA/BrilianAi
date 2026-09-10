@@ -1,11 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queuePdfIngestion } from '@lib/queue/ingestQueue';
-
+import { getIngestProgress, clearIngestProgress, setIngestProgress } from '@lib/ingest/ingestProgress';
 
 export const dynamic = 'force-dynamic';
 
 // Standard PDF 4-byte magic signature: %PDF (0x25, 0x50, 0x44, 0x46)
 const PDF_MAGIC_BYTES = Buffer.from([0x25, 0x50, 0x44, 0x46]);
+
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const clientId = searchParams.get('clientId');
+
+  if (!clientId) {
+    return NextResponse.json(
+      { error: 'clientId is required' },
+      { status: 400 }
+    );
+  }
+
+  const progress = getIngestProgress(clientId);
+  if (!progress) {
+    return NextResponse.json(
+      { status: 'idle', message: 'Tidak ada proses ingest aktif.', progressPercent: 0 },
+      { status: 200 }
+    );
+  }
+
+  return NextResponse.json(progress, { status: 200 });
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -31,8 +53,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Process ingestion via BullMQ queue
-    const result = await queuePdfIngestion(buffer, filename);
+    const clientId =
+      (formData.get('clientId') as string | null) || `upload-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    clearIngestProgress(clientId);
+    setIngestProgress(clientId, {
+      clientId,
+      status: 'queued',
+      message: 'Antrian ingest dibuat, menunggu eksekusi pipeline...',
+      progressPercent: 5,
+    });
+
+    const result = await queuePdfIngestion(buffer, filename, undefined, clientId);
+    clearIngestProgress(clientId);
 
     return NextResponse.json(
       {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, ArrowRight, FileText, Layers, ExternalLink } from 'lucide-react';
@@ -46,11 +46,48 @@ export default function UploadPage() {
   const [currentStepMessage, setCurrentStepMessage] = useState('');
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [result, setResult] = useState<IngestionResult | null>(null);
+  const [liveProgress, setLiveProgress] = useState<{ status?: string; message?: string; totalChunks?: number; processedChunks?: number; progressPercent?: number; totalPages?: number; currentPage?: number } | null>(null);
+  const clientIdRef = useRef<string | null>(null);
+  const progressPollRef = useRef<NodeJS.Timeout | null>(null);
+
+  const stopPolling = () => {
+    if (progressPollRef.current) {
+      clearInterval(progressPollRef.current);
+      progressPollRef.current = null;
+    }
+  };
+
+  const fetchUploadProgress = async () => {
+    if (!clientIdRef.current) return;
+
+    try {
+      const res = await fetch(`/api/documents/upload?clientId=${clientIdRef.current}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setLiveProgress(data);
+
+      if (data.message) {
+        setCurrentStepMessage(data.message);
+      }
+
+      if (data.status === 'completed' || data.progressPercent >= 100) {
+        stopPolling();
+      }
+    } catch {
+      // ignore polling errors
+    }
+  };
+
+  useEffect(() => {
+    return () => stopPolling();
+  }, []);
 
   const handleUpload = async (file: File) => {
     setIsUploading(true);
     setUploadError(null);
     setResult(null);
+    setLiveProgress(null);
+    clientIdRef.current = `upload-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
     toast.info(
       language === 'en'
@@ -70,6 +107,9 @@ export default function UploadPage() {
     try {
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('clientId', clientIdRef.current || '');
+
+      progressPollRef.current = setInterval(fetchUploadProgress, 900);
 
       // Simulating visual progression based on server timestamps
       const timer1 = setTimeout(() => {
@@ -117,9 +157,18 @@ export default function UploadPage() {
         throw new Error(data.error || 'Gagal memproses dokumen');
       }
 
+      stopPolling();
+      setLiveProgress({
+        status: 'completed',
+        message: 'Ingestion selesai dengan sukses!',
+        totalChunks: data.chunk_count,
+        processedChunks: data.chunk_count,
+        progressPercent: 100,
+      });
+      setCurrentStepMessage(`Selesai: ${data.page_count} halaman, ${data.chunk_count} chunks berhasil dibuat.`);
+
       // Mark all done
       setSteps((prev) => prev.map((s) => ({ ...s, status: 'done' })));
-      setCurrentStepMessage('Ingestion selesai dengan sukses!');
       setResult(data);
       toast.success(
         language === 'en'
@@ -127,6 +176,7 @@ export default function UploadPage() {
           : `Dokumen "${file.name}" berhasil diproses!`
       );
     } catch (err: any) {
+      stopPolling();
       const errMsg = err.message || 'Terjadi kesalahan saat memproses file';
       setUploadError(errMsg);
       setSteps((prev) =>
@@ -215,6 +265,7 @@ export default function UploadPage() {
           steps={steps}
           currentStepMessage={currentStepMessage}
           isProcessing={isUploading}
+          currentProgress={liveProgress}
         />
       </div>
     </AppShell>

@@ -10,6 +10,7 @@ export interface IngestJobData {
   fileBufferBase64: string;
   filename: string;
   options?: IngestOptions;
+  clientId?: string;
 }
 
 export function getRedisConnectionOptions() {
@@ -62,9 +63,9 @@ export function getIngestWorker(): Worker<IngestJobData, UploadResult> {
     workerInstance = new Worker<IngestJobData, UploadResult>(
       INGEST_QUEUE_NAME,
       async (job: Job<IngestJobData, UploadResult>) => {
-        const { fileBufferBase64, filename, options } = job.data;
+        const { fileBufferBase64, filename, options, clientId } = job.data;
         const fileBuffer = Buffer.from(fileBufferBase64, 'base64');
-        return await ingestPdf(fileBuffer, filename, options);
+        return await ingestPdf(fileBuffer, filename, options, clientId);
       },
       {
         connection,
@@ -103,7 +104,8 @@ export function getIngestQueueEvents(): QueueEvents {
 export async function queuePdfIngestion(
   fileBuffer: Buffer,
   filename: string,
-  options?: IngestOptions
+  options?: IngestOptions,
+  clientId?: string
 ): Promise<UploadResult> {
   try {
     const queue = getIngestQueue();
@@ -115,6 +117,7 @@ export async function queuePdfIngestion(
       fileBufferBase64: fileBuffer.toString('base64'),
       filename,
       options,
+      clientId,
     });
 
     const result = await job.waitUntilFinished(queueEvents);
@@ -125,6 +128,6 @@ export async function queuePdfIngestion(
       error instanceof Error ? error.message : error
     );
     // Fallback directly to ingestPdf
-    return await ingestPdf(fileBuffer, filename, options);
+    return await ingestPdf(fileBuffer, filename, options, clientId);
   }
 }

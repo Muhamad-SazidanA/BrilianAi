@@ -9,9 +9,17 @@ interface PipelineStepperProps {
   steps: PipelineStep[];
   currentStepMessage?: string;
   isProcessing: boolean;
+  currentProgress?: {
+    status?: string;
+    totalChunks?: number;
+    processedChunks?: number;
+    progressPercent?: number;
+    totalPages?: number;
+    currentPage?: number;
+  } | null;
 }
 
-export default function PipelineStepper({ steps, currentStepMessage, isProcessing }: PipelineStepperProps) {
+export default function PipelineStepper({ steps, currentStepMessage, isProcessing, currentProgress }: PipelineStepperProps) {
   const { t } = useLanguage();
 
   return (
@@ -155,6 +163,44 @@ export default function PipelineStepper({ steps, currentStepMessage, isProcessin
             </div>
             <div style={{ fontSize: '13px', color: 'var(--text-primary)', marginTop: '2px', fontWeight: 500 }}>
               {currentStepMessage}
+            </div>
+
+            <div style={{ marginTop: '10px' }}>
+              <div
+                style={{
+                  width: '100%',
+                  height: '10px',
+                  backgroundColor: 'rgba(99, 102, 241, 0.12)',
+                  borderRadius: '999px',
+                  overflow: 'hidden',
+                  border: '1px solid rgba(99, 102, 241, 0.18)',
+                }}
+              >
+                <div
+                  style={{
+                    width: `${Math.min(100, Math.max(0, currentProgress?.progressPercent ?? 0))}%`,
+                    height: '100%',
+                    background: 'linear-gradient(90deg, #7aa8ff 0%, #6d8ef3 100%)',
+                    borderRadius: '999px',
+                    transition: 'width 0.25s ease',
+                  }}
+                />
+              </div>
+
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px', display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
+                <span>
+                  {currentProgress?.totalChunks !== undefined && currentProgress?.processedChunks !== undefined
+                    ? `${currentProgress.processedChunks} / ${currentProgress.totalChunks} chunks diproses`
+                    : currentProgress?.totalPages !== undefined && currentProgress?.currentPage !== undefined
+                      ? `${currentProgress.currentPage} / ${currentProgress.totalPages} halaman`
+                      : currentProgress?.progressPercent !== undefined
+                        ? `${Math.round(currentProgress.progressPercent)}% selesai`
+                        : 'Memproses...'}
+                </span>
+                <span style={{ fontWeight: 700, color: 'var(--color-primary)' }}>
+                  {currentProgress?.progressPercent !== undefined ? `${Math.round(currentProgress.progressPercent)}%` : '0%' }
+                </span>
+              </div>
             </div>
           </div>
         </div>
