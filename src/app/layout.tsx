@@ -8,7 +8,9 @@ export const metadata: Metadata = {
   title: 'Brilian.Ai — AI Ingestion & pgvector Knowledge Base',
   description: 'Sistem Ingestion PDF dan Basis Pengetahuan Enterprise Brilian.Ai dengan pgvector.',
   icons: {
-    icon: '/icon.svg',
+    icon: '/images/BrilianLogo-Close-P.svg',
+    shortcut: '/images/BrilianLogo-Close-P.svg',
+    apple: '/images/BrilianLogo-Close-P.svg',
   },
 };
 
