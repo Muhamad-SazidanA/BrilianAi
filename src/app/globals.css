@@ -678,9 +678,11 @@ select.input-text option {
   display: flex;
   align-items: center;
   background-color: var(--bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-radius: 9999px;
   border: 1px solid var(--border-default);
-  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 10px 30px -4px rgba(15, 23, 42, 0.1), 0 4px 12px -2px rgba(15, 23, 42, 0.06);
   padding: 8px 14px;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   width: 100%;
@@ -689,7 +691,7 @@ select.input-text option {
 .chat-pill-bar:hover,
 .chat-pill-bar:focus-within {
   border-color: var(--color-primary-border);
-  box-shadow: 0 6px 28px rgba(15, 23, 42, 0.09), 0 0 0 3px var(--color-primary-ring);
+  box-shadow: 0 16px 36px -4px rgba(15, 23, 42, 0.14), 0 6px 16px -2px rgba(15, 23, 42, 0.08), 0 0 0 3px var(--color-primary-ring);
 }
 
 .chat-container-bg {

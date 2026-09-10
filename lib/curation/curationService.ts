@@ -152,6 +152,18 @@ export async function curateRawText(
 
 // Track active batches being curated to prevent parallel race conditions
 const activeCurationBatches = new Set<string>();
+const abortedBatches = new Set<string>();
+
+/**
+ * Membatalkan proses kurasi yang sedang berjalan untuk batch tertentu
+ * (misalnya saat dokumen dihapus oleh pengguna).
+ */
+export function abortCuration(batchId: string): void {
+  abortedBatches.add(batchId);
+  activeCurationBatches.delete(batchId);
+  progressMap.delete(batchId);
+  console.log(`[CurationService] Sinyal pembatalan kurasi dikirim untuk batch ${batchId}.`);
+}
 
 export interface CurationProgress {
   batchId: string;
@@ -276,6 +288,11 @@ async function curateBatchInternal(
   let processedIndex = 0;
 
   for (const chunk of uncuratedChunks) {
+    if (abortedBatches.has(batchId)) {
+      console.log(`[CurationService] Kurasi batch ${batchId} dihentikan karena batch dibatalkan/dihapus.`);
+      break;
+    }
+
     const pageLabel =
       chunk.source_page_start === chunk.source_page_end
         ? `Halaman ${chunk.source_page_start}`
@@ -283,6 +300,10 @@ async function curateBatchInternal(
 
     // Ekstrak 1 atau lebih insight dari chunk ini
     const curatedItems = await curateRawTextMultiple(chunk.content, pageLabel);
+
+    if (abortedBatches.has(batchId)) {
+      break;
+    }
 
     for (const curated of curatedItems) {
       // Embed immediately with BGE-M3 (1024-dim)
@@ -296,21 +317,36 @@ async function curateBatchInternal(
         console.warn('[CurationService] Embedding warning, using zero-vector fallback:', embErr);
       }
 
-      const inserted = await insertCuratedInsights(batchId, [
-        {
-          title: curated.title,
-          content: curated.content,
-          importance: curated.importance,
-          category: curated.category,
-          tags: curated.tags,
-          sourcePages: pageLabel,
-          sourceChunkId: chunk.id,
-          embedding,
-        },
-      ]);
+      try {
+        const inserted = await insertCuratedInsights(batchId, [
+          {
+            title: curated.title,
+            content: curated.content,
+            importance: curated.importance,
+            category: curated.category,
+            tags: curated.tags,
+            sourcePages: pageLabel,
+            sourceChunkId: chunk.id,
+            embedding,
+          },
+        ]);
 
-      if (inserted.length > 0) {
-        results.push(inserted[0]);
+        if (inserted.length > 0) {
+          results.push(inserted[0]);
+        }
+      } catch (insertErr: any) {
+        // Tangani jika batch dihapus saat kurasi masih berjalan di background
+        if (
+          insertErr?.code === '23503' ||
+          String(insertErr?.message).includes('violates foreign key constraint')
+        ) {
+          console.warn(
+            `[CurationService] Batch ${batchId} telah dihapus dari database saat kurasi berlangsung. Menghentikan kurasi secara aman.`
+          );
+          abortedBatches.add(batchId);
+          return results;
+        }
+        throw insertErr;
       }
     }
 
@@ -387,10 +423,16 @@ export async function curateAllChunks(
 
   try {
     while (true) {
+      if (abortedBatches.has(batchId)) {
+        console.log(`[CurationService] Kurasi batch ${batchId} dibatalkan.`);
+        break;
+      }
+
       const newlyCurated = await curateBatchInternal(
         batchId,
         microBatchSize,
         (insight) => {
+          if (abortedBatches.has(batchId)) return;
           processedChunks = Math.min(totalChunks, processedChunks + 1);
           curatedInsightsCount++;
           const percent = totalChunks > 0 ? Math.min(100, Math.round((processedChunks / totalChunks) * 100)) : 100;
@@ -408,6 +450,10 @@ export async function curateAllChunks(
         }
       );
 
+      if (abortedBatches.has(batchId)) {
+        break;
+      }
+
       if (newlyCurated.length === 0) {
         break;
       }
@@ -415,6 +461,11 @@ export async function curateAllChunks(
       console.log(
         `[CurationService] Progres batch ${batchId}: +${newlyCurated.length} insight baru (total chunk diproses: ${processedChunks}/${totalChunks})`
       );
+    }
+
+    if (abortedBatches.has(batchId)) {
+      progressMap.delete(batchId);
+      return totalNewCurated;
     }
 
     // Bersihkan duplikat identik bila ada
@@ -434,6 +485,17 @@ export async function curateAllChunks(
       updatedAt: Date.now(),
     });
   } catch (err: any) {
+    if (
+      abortedBatches.has(batchId) ||
+      err?.code === '23503' ||
+      String(err?.message).includes('violates foreign key constraint')
+    ) {
+      console.warn(
+        `[CurationService] Kurasi batch ${batchId} dihentikan karena batch telah dihapus atau dibatalkan.`
+      );
+      progressMap.delete(batchId);
+      return totalNewCurated;
+    }
     console.error(`[CurationService] Error saat kurasi batch ${batchId}:`, err);
     progressMap.set(batchId, {
       batchId,
@@ -449,6 +511,7 @@ export async function curateAllChunks(
     throw err;
   } finally {
     activeCurationBatches.delete(batchId);
+    abortedBatches.delete(batchId);
   }
 
   console.log(

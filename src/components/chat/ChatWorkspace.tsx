@@ -281,46 +281,29 @@ export default function ChatWorkspace() {
         overflow: 'hidden',
       }}
     >
-      {/* ── 1. FIXED TOP HEADER BAR ─────────────────────────── */}
+      {/* ── 1. FLOATING TOP HEADER BAR (Mengambang tanpa Background) ─────── */}
       <header
         style={{
-          width: '100%',
-          padding: '1rem 2rem',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          padding: '1rem 1.75rem',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           backgroundColor: 'transparent',
           borderBottom: 'none',
-          flexShrink: 0,
           zIndex: 30,
+          pointerEvents: 'none',
         }}
       >
         {/* Left: Active Knowledge Indicator */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {/* <span
-            style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              backgroundColor: '#059669',
-              boxShadow: '0 0 0 3px rgba(5, 150, 105, 0.2)',
-              display: 'inline-block',
-            }}
-          />
-          <span
-            style={{
-              fontSize: '13px',
-              fontWeight: 600,
-              color: 'var(--text-secondary)',
-              letterSpacing: '-0.01em',
-            }}
-          >
-            {language === 'en' ? 'Apps Brilian Knowledge' : 'Basis Pengetahuan Brilian.Ai'}
-          </span> */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', pointerEvents: 'auto' }}>
         </div>
 
-        {/* Right: Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {/* Right: Actions Floating Pills */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', pointerEvents: 'auto' }}>
           {hasMessages && (
             <button
               onClick={handleClearHistory}
@@ -330,8 +313,11 @@ export default function ChatWorkspace() {
                 padding: '6px 14px',
                 fontSize: '12.5px',
                 backgroundColor: 'var(--bg-card)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
                 borderColor: 'var(--border-default)',
                 color: 'var(--text-primary)',
+                boxShadow: '0 2px 10px rgba(15, 23, 42, 0.06)',
               }}
               title={t('chat.reset_btn')}
             >
@@ -348,8 +334,11 @@ export default function ChatWorkspace() {
               padding: '6px 14px',
               fontSize: '12.5px',
               backgroundColor: 'var(--bg-card)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
               borderColor: 'var(--border-default)',
               color: 'var(--text-primary)',
+              boxShadow: '0 2px 10px rgba(15, 23, 42, 0.06)',
             }}
           >
             <Plus size={13} />
@@ -358,14 +347,15 @@ export default function ChatWorkspace() {
         </div>
       </header>
 
-      {/* ── 2. SCROLLABLE MIDDLE CONTAINER (Scrollbar at Far Right Edge) ───── */}
+      {/* ── 2. SCROLLABLE MIDDLE CONTAINER (Full Height behind Floating Header & Dock) ───── */}
       <div
         style={{
-          flex: 1,
           width: '100%',
+          height: '100%',
           overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
+          position: 'relative',
         }}
       >
         <div
@@ -373,7 +363,7 @@ export default function ChatWorkspace() {
             width: '100%',
             maxWidth: '52rem',
             margin: '0 auto',
-            padding: '1.5rem 1.5rem',
+            padding: hasMessages ? '4.75rem 1.5rem 8.5rem' : '4.5rem 1.5rem 7.5rem',
             flex: 1,
             display: 'flex',
             flexDirection: 'column',
@@ -559,15 +549,19 @@ export default function ChatWorkspace() {
         </div>
       </div>
 
-      {/* ── 3. FIXED BOTTOM DOCK (Pill Capsule + Disclaimer Footer) ─────── */}
+      {/* ── 3. FLOATING BOTTOM DOCK (Mengambang tanpa Background Container) ─────── */}
       <div
         style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
           width: '100%',
           backgroundColor: 'transparent',
           borderTop: 'none',
-          flexShrink: 0,
           zIndex: 30,
-          padding: '0.85rem 1.5rem 1rem',
+          padding: '0 1.5rem 1.25rem',
+          pointerEvents: 'none',
         }}
       >
         <div
@@ -578,6 +572,7 @@ export default function ChatWorkspace() {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
+            pointerEvents: 'auto',
           }}
         >
           {/* Centered Pill Capsule Search Prompt Bar */}

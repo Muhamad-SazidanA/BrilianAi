@@ -6,6 +6,7 @@ import {
   listChunks,
   listCuratedInsights,
 } from '@lib/db/vectorStore';
+import { abortCuration } from '@lib/curation/curationService';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +16,8 @@ export async function DELETE(
 ) {
   try {
     const { id } = params;
+    // Hentikan kurasi jika dokumen sedang diproses AI di background
+    abortCuration(id);
     const success = await deleteUploadBatch(id);
 
     if (!success) {
