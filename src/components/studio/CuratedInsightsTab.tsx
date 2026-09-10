@@ -31,7 +31,9 @@ function formatSourcePages(sourcePages?: string, pageLabel: string = 'Halaman'):
 interface CurationProgressState {
   batchId: string;
   totalChunks: number;
+  processedChunks?: number;
   curatedChunks: number;
+  curatedInsightsCount?: number;
   currentPercent: number;
   status: 'idle' | 'running' | 'completed' | 'error';
   currentChunkTitle?: string;
