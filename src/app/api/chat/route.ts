@@ -7,7 +7,7 @@ export const maxDuration = 300; // 5 menit batas eksekusi untuk CPU inference di
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { query, documentId, allowPublicKnowledge, topK, minSimilarity } = body;
+    const { query, documentId, allowPublicKnowledge, topK, minSimilarity, bypassCache } = body;
 
     if (!query || typeof query !== 'string' || query.trim().length === 0) {
       return NextResponse.json(
@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
       allowPublicKnowledge: Boolean(allowPublicKnowledge),
       topK: typeof topK === 'number' ? topK : undefined,
       minSimilarity: typeof minSimilarity === 'number' ? minSimilarity : undefined,
+      bypassCache: Boolean(bypassCache),
     });
 
     return NextResponse.json(result, { status: 200 });

@@ -8,6 +8,12 @@ export interface ChatSource {
   similarity: number;
 }
 
+export interface ChatMessageVariant {
+  text: string;
+  sources?: ChatSource[];
+  timestamp?: string;
+}
+
 export interface ChatMessage {
   id: string;
   sender: 'user' | 'ai';
@@ -15,12 +21,15 @@ export interface ChatMessage {
   sources?: ChatSource[];
   timestamp: string;
   isError?: boolean;
+  variants?: ChatMessageVariant[];
+  currentVariantIndex?: number;
 }
 
 export interface ChatRequestPayload {
   query: string;
   documentId?: string;
   allowPublicKnowledge?: boolean;
+  bypassCache?: boolean;
 }
 
 export interface ChatResponsePayload {

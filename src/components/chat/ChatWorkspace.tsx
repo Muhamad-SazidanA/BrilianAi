@@ -10,7 +10,13 @@ import {
   Loader2,
   RefreshCw,
 } from 'lucide-react';
-import { ChatMessage, ChatSource } from '@/types/chat';
+import {
+  ChatMessage,
+  ChatSource,
+  ChatMessageVariant,
+  ChatRequestPayload,
+  ChatResponsePayload,
+} from '@/types/chat';
 import ChatMessageItem from './ChatMessageItem';
 import CitationDrawer from './CitationDrawer';
 import { useLanguage } from '@/context/LanguageContext';
@@ -33,8 +39,12 @@ export default function ChatWorkspace() {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // Execute AI chat query and append response
-  const executeAiResponse = async (queryText: string) => {
+  // Execute AI chat query and append response or create new variant on retry
+  const executeAiResponse = async (
+    queryText: string,
+    targetMessageId?: string,
+    isRetry?: boolean
+  ) => {
     const trimmed = queryText.trim();
     if (!trimmed || isLoading) return;
 
@@ -42,9 +52,10 @@ export default function ChatWorkspace() {
     setIsLoading(true);
 
     try {
-      const payload = {
+      const payload: ChatRequestPayload = {
         query: trimmed,
         allowPublicKnowledge,
+        bypassCache: isRetry,
       };
 
       const res = await fetch('/api/chat', {
@@ -53,33 +64,103 @@ export default function ChatWorkspace() {
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
+      const data: ChatResponsePayload = await res.json();
 
       if (!res.ok) {
         throw new Error(data.error || 'Gagal memproses pertanyaan');
       }
 
-      const aiMessage: ChatMessage = {
-        id: `ai-${Date.now()}`,
-        sender: 'ai',
-        text: data.answer || 'Maaf, tidak ada informasi yang ditemukan dari dokumen.',
-        sources: data.sources || [],
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
+      const answerText = data.answer || 'Maaf, tidak ada informasi yang ditemukan dari dokumen.';
+      const sources = data.sources || [];
+      const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-      setMessages((prev) => [...prev, aiMessage]);
+      if (targetMessageId) {
+        // Regenerate/retry: append new variant to target message
+        setMessages((prev) =>
+          prev.map((msg) => {
+            if (msg.id !== targetMessageId) return msg;
+
+            const existingVariants: ChatMessageVariant[] =
+              msg.variants && msg.variants.length > 0
+                ? [...msg.variants]
+                : [{ text: msg.text, sources: msg.sources, timestamp: msg.timestamp }];
+
+            const newVariant: ChatMessageVariant = {
+              text: answerText,
+              sources,
+              timestamp,
+            };
+
+            const updatedVariants = [...existingVariants, newVariant];
+            const newIndex = updatedVariants.length - 1;
+
+            return {
+              ...msg,
+              text: answerText,
+              sources,
+              timestamp,
+              isError: false,
+              variants: updatedVariants,
+              currentVariantIndex: newIndex,
+            };
+          })
+        );
+        toast.success(
+          language === 'en'
+            ? 'Regenerated new response'
+            : 'Jawaban baru berhasil dibuat'
+        );
+      } else {
+        const initialVariant: ChatMessageVariant = {
+          text: answerText,
+          sources,
+          timestamp,
+        };
+
+        const aiMessage: ChatMessage = {
+          id: `ai-${Date.now()}`,
+          sender: 'ai',
+          text: answerText,
+          sources,
+          timestamp,
+          variants: [initialVariant],
+          currentVariantIndex: 0,
+        };
+
+        setMessages((prev) => [...prev, aiMessage]);
+      }
     } catch (err: any) {
-      const errorMessage: ChatMessage = {
-        id: `err-${Date.now()}`,
-        sender: 'ai',
-        text: `Terjadi kesalahan: ${err.message || 'Gagal menghubungi server'}`,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isError: true,
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      if (targetMessageId) {
+        toast.error(err.message || 'Gagal menyusun ulang jawaban AI');
+      } else {
+        const errorMessage: ChatMessage = {
+          id: `err-${Date.now()}`,
+          sender: 'ai',
+          text: `Terjadi kesalahan: ${err.message || 'Gagal menghubungi server'}`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isError: true,
+        };
+        setMessages((prev) => [...prev, errorMessage]);
+      }
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSwitchVariant = (messageId: string, newIndex: number) => {
+    setMessages((prev) =>
+      prev.map((msg) => {
+        if (msg.id !== messageId || !msg.variants || !msg.variants[newIndex]) return msg;
+        const selected = msg.variants[newIndex];
+        return {
+          ...msg,
+          currentVariantIndex: newIndex,
+          text: selected.text,
+          sources: selected.sources || [],
+          timestamp: selected.timestamp || msg.timestamp,
+        };
+      })
+    );
   };
 
   // Restore messages and options from sessionStorage on mount (persists across page navigation)
@@ -465,12 +546,15 @@ export default function ChatWorkspace() {
                   key={msg.id}
                   message={msg}
                   onSelectCitation={(source) => setInspectingSource(source)}
+                  onSwitchVariant={(newIndex) => handleSwitchVariant(msg.id, newIndex)}
                   onRetry={() => {
                     if (msg.sender === 'user') {
                       executeAiResponse(msg.text);
                     } else {
                       const prevUser = [...messages.slice(0, idx)].reverse().find((m) => m.sender === 'user');
-                      if (prevUser) executeAiResponse(prevUser.text);
+                      if (prevUser) {
+                        executeAiResponse(prevUser.text, msg.id, true);
+                      }
                     }
                   }}
                 />

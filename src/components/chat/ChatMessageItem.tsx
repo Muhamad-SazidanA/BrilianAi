@@ -10,6 +10,8 @@ import {
   ExternalLink,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { ChatMessage, ChatSource } from '@/types/chat';
 import MarkdownContent from '@/components/ui/MarkdownContent';
@@ -20,12 +22,14 @@ interface ChatMessageItemProps {
   message: ChatMessage;
   onSelectCitation: (source: ChatSource) => void;
   onRetry?: () => void;
+  onSwitchVariant?: (newIndex: number) => void;
 }
 
 export default function ChatMessageItem({
   message,
   onSelectCitation,
   onRetry,
+  onSwitchVariant,
 }: ChatMessageItemProps) {
   const { language, t } = useLanguage();
   const isUser = message.sender === 'user';
@@ -34,6 +38,24 @@ export default function ChatMessageItem({
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
+  // Determine active response variant for AI messages
+  const variants =
+    !isUser && message.variants && message.variants.length > 0
+      ? message.variants
+      : [{ text: message.text, sources: message.sources, timestamp: message.timestamp }];
+
+  const variantsCount = variants.length;
+  const currentIndex =
+    typeof message.currentVariantIndex === 'number' &&
+    message.currentVariantIndex >= 0 &&
+    message.currentVariantIndex < variantsCount
+      ? message.currentVariantIndex
+      : variantsCount - 1;
+
+  const currentVariant = variants[currentIndex] || variants[0];
+  const activeAiText = currentVariant?.text ?? message.text;
+  const activeAiSources = currentVariant?.sources ?? message.sources ?? [];
+
   const isLongMessage = isUser && message.text.length > 350;
   const displayText =
     isUser && isLongMessage && !isExpanded
@@ -41,7 +63,8 @@ export default function ChatMessageItem({
       : message.text;
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(message.text);
+    const textToCopy = isUser ? message.text : activeAiText;
+    navigator.clipboard.writeText(textToCopy);
     setIsCopied(true);
     toast.success(
       language === 'en'
@@ -66,7 +89,8 @@ export default function ChatMessageItem({
       setIsSpeaking(false);
     } else {
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(message.text);
+      const textToSpeak = isUser ? message.text : activeAiText;
+      const utterance = new SpeechSynthesisUtterance(textToSpeak);
       utterance.lang = language === 'en' ? 'en-US' : 'id-ID';
       utterance.onend = () => setIsSpeaking(false);
       utterance.onerror = () => setIsSpeaking(false);
@@ -180,13 +204,13 @@ export default function ChatMessageItem({
             }}
           >
             {message.isError ? (
-              <div style={{ whiteSpace: 'pre-wrap' }}>{message.text}</div>
+              <div style={{ whiteSpace: 'pre-wrap' }}>{activeAiText}</div>
             ) : (
-              <MarkdownContent content={message.text} />
+              <MarkdownContent content={activeAiText} />
             )}
           </div>
 
-          {/* Action Icons Row (Only 3 icons: Salin, Read Audio, Try Again) & Verified Source Citations */}
+          {/* Action Icons Row (Variants Pager, Salin, Read Audio, Try Again) & Verified Source Citations */}
           <div
             style={{
               marginTop: '12px',
@@ -198,8 +222,83 @@ export default function ChatMessageItem({
               flexWrap: 'wrap',
             }}
           >
-            {/* 3 Action Bar Icons */}
+            {/* Action Bar & Response Variants */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {/* Variant Pagination: < X / Y > */}
+              {variantsCount > 1 && (
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    marginRight: '6px',
+                    padding: '2px 4px',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    color: 'var(--text-primary)',
+                    userSelect: 'none',
+                  }}
+                >
+                  <button
+                    type="button"
+                    disabled={currentIndex <= 0}
+                    onClick={() => onSwitchVariant && onSwitchVariant(currentIndex - 1)}
+                    title={language === 'en' ? 'Previous response' : 'Jawaban sebelumnya'}
+                    style={{
+                      padding: '3px 4px',
+                      borderRadius: '4px',
+                      border: 'none',
+                      backgroundColor: 'transparent',
+                      cursor: currentIndex <= 0 ? 'not-allowed' : 'pointer',
+                      opacity: currentIndex <= 0 ? 0.3 : 1,
+                      color: 'inherit',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.15s ease',
+                    }}
+                    className={currentIndex > 0 ? 'hover:bg-slate-100 dark:hover:bg-slate-800' : ''}
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <span
+                    style={{
+                      minWidth: '32px',
+                      textAlign: 'center',
+                      fontVariantNumeric: 'tabular-nums',
+                      letterSpacing: '0.03em',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                    }}
+                  >
+                    {currentIndex + 1} / {variantsCount}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={currentIndex >= variantsCount - 1}
+                    onClick={() => onSwitchVariant && onSwitchVariant(currentIndex + 1)}
+                    title={language === 'en' ? 'Next response' : 'Jawaban berikutnya'}
+                    style={{
+                      padding: '3px 4px',
+                      borderRadius: '4px',
+                      border: 'none',
+                      backgroundColor: 'transparent',
+                      cursor: currentIndex >= variantsCount - 1 ? 'not-allowed' : 'pointer',
+                      opacity: currentIndex >= variantsCount - 1 ? 0.3 : 1,
+                      color: 'inherit',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.15s ease',
+                    }}
+                    className={currentIndex < variantsCount - 1 ? 'hover:bg-slate-100 dark:hover:bg-slate-800' : ''}
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              )}
+
               {/* 1. Salin (Copy) */}
               <button
                 type="button"
@@ -276,7 +375,7 @@ export default function ChatMessageItem({
             </div>
 
             {/* Verified Sources Pill Citations */}
-            {message.sources && message.sources.length > 0 && (
+            {activeAiSources && activeAiSources.length > 0 && (
               <div
                 style={{
                   display: 'flex',
@@ -285,7 +384,7 @@ export default function ChatMessageItem({
                   flexWrap: 'wrap',
                 }}
               >
-                {message.sources.map((src, idx) => (
+                {activeAiSources.map((src, idx) => (
                   <button
                     key={idx}
                     type="button"

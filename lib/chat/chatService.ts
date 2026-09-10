@@ -40,6 +40,7 @@ export interface ChatRequestOptions {
   allowPublicKnowledge?: boolean;
   topK?: number;
   minSimilarity?: number;
+  bypassCache?: boolean;
 }
 
 export interface ChatResponseResult {
@@ -134,11 +135,14 @@ export async function askDocumentChat(
     }
   }
 
-  // 0b. Deterministic Response Cache
   const cacheKey = generateChatCacheKey(trimmedQuery, options?.documentId);
-  const cached = await getCachedChatResponse(cacheKey);
-  if (cached) {
-    return cached;
+
+  // 0b. Deterministic Response Cache (dilewati jika bypassCache aktif, misal saat user klik Try Again)
+  if (!options?.bypassCache) {
+    const cached = await getCachedChatResponse(cacheKey);
+    if (cached) {
+      return cached;
+    }
   }
 
   // 1. Agent 3: Guardrail & Router
