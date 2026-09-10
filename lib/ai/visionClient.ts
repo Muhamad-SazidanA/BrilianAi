@@ -68,8 +68,8 @@ export async function extractPageText(
     return '';
   }
 
-  // Model ID terkunci eksklusif: TIDAK ADA fallback ke model lain
-  const modelName = options?.model || process.env.GEMINI_MODEL || 'gemini-2.0-flash-lite';
+  // Model ID default
+  const modelName = options?.model || process.env.GEMINI_MODEL || 'gemini-2.5-flash';
   const maxRetries = options?.maxRetries ?? 2;
   const timeoutMs = options?.timeoutMs ?? 45000;
   let delay = options?.initialBackoffMs ?? 1000;
@@ -119,9 +119,50 @@ export async function extractPageText(
         return '';
       }
 
-      // Jika error 404 (model tidak valid / dihentikan Google), langsung STOP dan gagalkan tanpa retry
+      // Jika error 404 (model dihentikan Google), coba model alternatif atau OpenAI Vision
       const errorBody = await res.text().catch(() => '');
       if (res.status === 404) {
+        console.warn(`[Agent 1: Vision Ingestion] Model "${modelName}" 404 (dihentikan Google). Mengalihkan ke model aktif alternatif...`);
+
+        // 1. Coba Gemini alternatif
+        const fallbackGeminiModels = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.5-flash-lite'];
+        for (const altModel of fallbackGeminiModels) {
+          if (altModel === modelName) continue;
+          try {
+            const altRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${altModel}:generateContent?key=${geminiApiKey}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [
+                  {
+                    parts: [
+                      { text: SYSTEM_VISION_PROMPT },
+                      { inline_data: { mime_type: 'image/png', data: base64Image } },
+                    ],
+                  },
+                ],
+                generationConfig: { temperature: 0.1, maxOutputTokens: 4096 },
+              }),
+            });
+            if (altRes.ok) {
+              const altData = await altRes.json();
+              const text = altData?.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (text && typeof text === 'string') {
+                return text.trim();
+              }
+            }
+          } catch {}
+        }
+
+        // 2. Coba OpenAI GPT-4o-mini Vision jika Gemini seluruhnya 404
+        const openAiApiKey = process.env.OPENAI_API_KEY;
+        if (openAiApiKey) {
+          try {
+            const openAiText = await extractWithOpenAiVision(base64Image, openAiApiKey);
+            if (openAiText) return openAiText;
+          } catch {}
+        }
+
         throw new Error(
           `[Agent 1: Vision Ingestion] Model "${modelName}" TIDAK TERSEDIA atau telah dihentikan oleh Google (HTTP 404). Detail: ${errorBody}`
         );
@@ -130,7 +171,6 @@ export async function extractPageText(
       throw new Error(`[Agent 1: Vision Ingestion] Google API HTTP ${res.status}: ${errorBody}`);
     } catch (error: any) {
       attempt++;
-      // Jika model 404, langsung gagalkan proses agar developer tahu dan tidak membakar token
       if (error?.message?.includes('HTTP 404') || error?.message?.includes('TIDAK TERSEDIA')) {
         console.error(error.message);
         throw error;
@@ -141,11 +181,64 @@ export async function extractPageText(
         await new Promise((resolve) => setTimeout(resolve, delay));
         delay *= 2;
       } else {
+        // Fallback terakhir ke OpenAI Vision sebelum melempar error
+        const openAiApiKey = process.env.OPENAI_API_KEY;
+        if (openAiApiKey) {
+          try {
+            const fallbackText = await extractWithOpenAiVision(base64Image, openAiApiKey);
+            if (fallbackText) return fallbackText;
+          } catch {}
+        }
+
         console.error(`[Agent 1: Vision Ingestion] Gagal mengekstrak teks dengan model "${modelName}": ${error?.message}`);
         throw error;
       }
     }
   }
 
+  return '';
+}
+
+/**
+ * Fallback ekstraksi gambar menggunakan OpenAI GPT-4o-mini Vision
+ */
+async function extractWithOpenAiVision(base64Image: string, apiKey: string): Promise<string> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 35000);
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: SYSTEM_VISION_PROMPT },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Ekstrak teks dan representasikan tabel dalam format tabel Markdown dari gambar ini:' },
+              {
+                type: 'image_url',
+                image_url: { url: `data:image/png;base64,${base64Image}` },
+              },
+            ],
+          },
+        ],
+        max_tokens: 4096,
+        temperature: 0.1,
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (res.ok) {
+      const data = await res.json();
+      return data?.choices?.[0]?.message?.content?.trim() || '';
+    }
+  } catch (err: any) {
+    console.warn('[VisionClient] OpenAI vision fallback notice:', err?.message);
+  }
   return '';
 }
