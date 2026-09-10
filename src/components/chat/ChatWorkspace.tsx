@@ -25,12 +25,56 @@ export default function ChatWorkspace() {
   const [activeQueryText, setActiveQueryText] = useState('');
   const [allowPublicKnowledge, setAllowPublicKnowledge] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [isRestored, setIsRestored] = useState(false);
 
   // Citation inspection
   const [inspectingSource, setInspectingSource] = useState<ChatSource | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // Restore messages and options from sessionStorage on mount (persists across page navigation)
+  useEffect(() => {
+    try {
+      const savedMessages = sessionStorage.getItem('brilian_chat_messages');
+      if (savedMessages) {
+        const parsed = JSON.parse(savedMessages);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed);
+        }
+      }
+      const savedPublic = sessionStorage.getItem('brilian_chat_allow_public');
+      if (savedPublic !== null) {
+        setAllowPublicKnowledge(savedPublic === 'true');
+      }
+    } catch (err) {
+      console.warn('Failed to restore chat session:', err);
+    } finally {
+      setIsRestored(true);
+    }
+  }, []);
+
+  // Save messages to sessionStorage whenever it changes (cleared only when browser/tab is closed)
+  useEffect(() => {
+    if (!isRestored) return;
+    try {
+      if (messages.length > 0) {
+        sessionStorage.setItem('brilian_chat_messages', JSON.stringify(messages));
+      } else {
+        sessionStorage.removeItem('brilian_chat_messages');
+      }
+    } catch (err) {
+      console.warn('Failed to persist chat session:', err);
+    }
+  }, [messages, isRestored]);
+
+  // Save allowPublicKnowledge to sessionStorage
+  useEffect(() => {
+    if (!isRestored) return;
+    try {
+      sessionStorage.setItem('brilian_chat_allow_public', String(allowPublicKnowledge));
+    } catch {}
+  }, [allowPublicKnowledge, isRestored]);
 
   // Auto scroll in conversation mode
   useEffect(() => {
@@ -121,6 +165,9 @@ export default function ChatWorkspace() {
           setMessages([]);
           setInputQuery('');
           setActiveQueryText('');
+          try {
+            sessionStorage.removeItem('brilian_chat_messages');
+          } catch {}
           toast.success(
             language === 'en'
               ? 'Chat session has been reset'

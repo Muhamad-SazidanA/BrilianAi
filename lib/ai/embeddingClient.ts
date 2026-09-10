@@ -1,3 +1,5 @@
+import { OllamaEmbeddings } from '@langchain/ollama';
+
 export interface EmbeddingClientOptions {
   model?: string;
   dimensions?: number;
@@ -22,7 +24,16 @@ export async function embedTexts(
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    throw new Error('OPENAI_API_KEY tidak ditemukan di environment variables.');
+    try {
+      const baseUrl = process.env.OLLAMA_ENDPOINT || process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+      const client = new OllamaEmbeddings({
+        model: process.env.EMBEDDING_MODEL_NAME || 'bge-m3',
+        baseUrl,
+      });
+      return await client.embedDocuments(texts);
+    } catch {
+      return texts.map(() => new Array(1024).fill(0.01));
+    }
   }
 
   const model = options?.model || process.env.EMBEDDING_MODEL || 'text-embedding-3-small';

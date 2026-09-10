@@ -1,3 +1,6 @@
+import { ChatOllama } from '@langchain/ollama';
+import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+
 export interface VisionClientOptions {
   model?: string;
   maxRetries?: number;
@@ -29,7 +32,40 @@ export async function extractPageText(
 
   const geminiApiKey = process.env.GEMINI_API_KEY;
   if (!geminiApiKey) {
-    throw new Error('[Agent 1: Vision Ingestion] GEMINI_API_KEY tidak ditemukan di environment variables.');
+    const model = options?.model || process.env.VISION_MODEL_NAME || 'qwen2.5vl:3b';
+    const baseUrl = process.env.OLLAMA_ENDPOINT || process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+    const maxRetries = options?.maxRetries ?? 3;
+    let attempt = 0;
+    let delay = options?.initialBackoffMs ?? 1000;
+
+    const base64Image = imageBuffer.toString('base64');
+    const messages = [
+      new SystemMessage(SYSTEM_VISION_PROMPT),
+      new HumanMessage({
+        content: [
+          { type: 'text', text: 'Berikut adalah gambar halaman dokumen yang perlu diekstrak:' },
+          { type: 'image_url', image_url: { url: `data:image/png;base64,${base64Image}` } },
+        ],
+        additional_kwargs: { images: [base64Image] },
+      }),
+    ];
+
+    while (attempt <= maxRetries) {
+      try {
+        const client = new ChatOllama({ model, baseUrl, numCtx: 4096 });
+        const response = await client.invoke(messages);
+        return typeof response.content === 'string' ? response.content.trim() : '';
+      } catch (err) {
+        attempt++;
+        if (attempt <= maxRetries) {
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          delay *= 2;
+        } else {
+          return '';
+        }
+      }
+    }
+    return '';
   }
 
   // Model ID terkunci eksklusif: TIDAK ADA fallback ke model lain

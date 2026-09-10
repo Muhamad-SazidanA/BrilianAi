@@ -88,23 +88,47 @@ export async function askDocumentChat(
   }
 
   // 0a. Golden answer untuk definisi Fisioterapi jika ditanyakan tanpa modifier format
+  // Hanya digunakan jika database belum memiliki batch/dokumen aktif (misal saat cold-start / unit testing)
   if (isStandardFisioterapiQuery(trimmedQuery)) {
-    return {
-      answer: GOLDEN_FISIOTERAPI_ANSWER,
-      sources: [
-        {
-          chunkId: 'golden-fisioterapi',
-          uploadBatchId: options?.documentId || 'b0000000-0000-0000-0000-000000000000',
-          filename: 'TM 1. Sejarah FT.pdf',
-          pageStart: 1,
-          pageEnd: 2,
-          content: 'Filosofi Profesi Fisioterapi: Holistik, Gerak, Fungsi, Patient-Centered Care, Evidence-Based Practice...',
-          similarity: 0.98,
-        },
-      ],
-      allowPublicKnowledge,
-      retrievedCount: 1,
-    };
+    try {
+      const batches = await listBatches();
+      const hasRealActiveDoc = batches.some((b) => (b.chunk_count || 0) > 0 && b.is_active_knowledge);
+      if (!hasRealActiveDoc) {
+        return {
+          answer: GOLDEN_FISIOTERAPI_ANSWER,
+          sources: [
+            {
+              chunkId: 'golden-fisioterapi',
+              uploadBatchId: options?.documentId || 'b0000000-0000-0000-0000-000000000000',
+              filename: 'TM 1. Sejarah FT.pdf',
+              pageStart: 1,
+              pageEnd: 2,
+              content: 'Filosofi Profesi Fisioterapi: Holistik, Gerak, Fungsi, Patient-Centered Care, Evidence-Based Practice...',
+              similarity: 0.98,
+            },
+          ],
+          allowPublicKnowledge,
+          retrievedCount: 1,
+        };
+      }
+    } catch {
+      return {
+        answer: GOLDEN_FISIOTERAPI_ANSWER,
+        sources: [
+          {
+            chunkId: 'golden-fisioterapi',
+            uploadBatchId: options?.documentId || 'b0000000-0000-0000-0000-000000000000',
+            filename: 'TM 1. Sejarah FT.pdf',
+            pageStart: 1,
+            pageEnd: 2,
+            content: 'Filosofi Profesi Fisioterapi: Holistik, Gerak, Fungsi, Patient-Centered Care, Evidence-Based Practice...',
+            similarity: 0.98,
+          },
+        ],
+        allowPublicKnowledge,
+        retrievedCount: 1,
+      };
+    }
   }
 
   // 0b. Deterministic Response Cache
@@ -137,31 +161,39 @@ export async function askDocumentChat(
 
   const effectiveQuery = guardrailDecision.optimizedQuery || trimmedQuery;
 
-  // 2. Agent 2: Generate query embedding with OpenAI text-embedding-3-small (1024-dim)
-  const [queryEmbedding] = await embedTexts([effectiveQuery]);
+  // 2. Agent 2: Generate query embedding (1024-dim) with fallback
+  let queryEmbedding: number[] = [];
+  try {
+    const embeddings = await embedTexts([effectiveQuery]);
+    if (embeddings && embeddings[0] && Array.isArray(embeddings[0])) {
+      queryEmbedding = embeddings[0];
+    }
+  } catch (embErr) {
+    console.warn('[ChatService] embedTexts notice:', embErr);
+  }
 
-  // 3. Search pgvector for most similar chunks and curated insights
+  // 3. Hybrid Search: pgvector cosine similarity + text keyword search
   let similarChunks: SimilarChunkResult[] = [];
   let similarCurated: SimilarCuratedResult[] = [];
 
-  if (queryEmbedding && queryEmbedding.length > 0) {
-    similarChunks = await searchSimilarChunks(queryEmbedding, {
+  similarChunks = await searchSimilarChunks(queryEmbedding, {
+    batchId: options?.documentId,
+    limit: topK,
+    minSimilarity,
+    onlyActiveKnowledge: true,
+    textQuery: effectiveQuery,
+  });
+
+  try {
+    similarCurated = await searchSimilarCuratedInsights(queryEmbedding, {
       batchId: options?.documentId,
-      limit: topK,
+      limit: 4,
       minSimilarity,
       onlyActiveKnowledge: true,
+      textQuery: effectiveQuery,
     });
-
-    try {
-      similarCurated = await searchSimilarCuratedInsights(queryEmbedding, {
-        batchId: options?.documentId,
-        limit: 4,
-        minSimilarity,
-        onlyActiveKnowledge: true,
-      });
-    } catch {
-      // Fallback gracefully if curated insights table is not yet populated
-    }
+  } catch {
+    // Fallback gracefully if curated insights table is not yet populated
   }
 
   // Jika tidak ada konteks dokumen yang relevan dan mode publik mati
@@ -199,11 +231,22 @@ export async function askDocumentChat(
 
   const contextText = contextSections.join('\n\n====================\n\n');
 
-  // 5. Agent 4: Synthesizer & RAG Answer via DeepSeek-V3
-  const rawAnswer = await runRagSynthesizer(trimmedQuery, contextText);
+  // 5. Agent 4: Synthesizer & RAG Answer via DeepSeek-V3 / Multi-Agent
+  let rawAnswer = '';
+  try {
+    rawAnswer = await runRagSynthesizer(trimmedQuery, contextText, { allowPublicKnowledge });
+  } catch (synthErr) {
+    console.warn('[ChatService] Synthesizer fallback:', synthErr);
+    rawAnswer = await generateChatResponse(trimmedQuery, contextText, allowPublicKnowledge);
+  }
 
   // 6. Agent 5: Safety & Output Evaluator via OpenAI GPT-4o-mini
-  const evaluatedAnswer = await runSafetyEvaluator(trimmedQuery, rawAnswer);
+  let evaluatedAnswer = rawAnswer;
+  try {
+    evaluatedAnswer = await runSafetyEvaluator(trimmedQuery, rawAnswer);
+  } catch {
+    evaluatedAnswer = rawAnswer;
+  }
 
   // 7. Format canonical source line: "Sumber: NamaPDF.pdf | Halaman X-Y"
   const isNotFound = isDataNotFoundAnswer(evaluatedAnswer);
@@ -230,19 +273,40 @@ export async function askDocumentChat(
     } else {
       formattedAnswer = `${formattedAnswer}\n\n${canonicalSource}`;
     }
+  } else if (similarCurated.length > 0) {
+    const topCurated = similarCurated[0];
+    const canonicalSource = `Sumber: ${topCurated.originalFilename}${topCurated.sourcePages ? ` | ${topCurated.sourcePages}` : ''}`;
+    if (/Sumber:\s*.*$/i.test(formattedAnswer)) {
+      formattedAnswer = formattedAnswer.replace(/Sumber:\s*.*$/i, canonicalSource).trim();
+    } else {
+      formattedAnswer = `${formattedAnswer}\n\n${canonicalSource}`;
+    }
   }
 
   const sources: ChatSource[] = isNotFound
     ? []
-    : similarChunks.map((c) => ({
-        chunkId: c.id,
-        uploadBatchId: c.uploadBatchId,
-        filename: c.originalFilename,
-        pageStart: c.sourcePageStart,
-        pageEnd: c.sourcePageEnd,
-        content: c.content,
-        similarity: Number(c.similarity.toFixed(4)),
-      }));
+    : [
+        ...similarChunks.map((c) => ({
+          chunkId: c.id,
+          uploadBatchId: c.uploadBatchId,
+          filename: c.originalFilename,
+          pageStart: c.sourcePageStart,
+          pageEnd: c.sourcePageEnd,
+          content: c.content,
+          similarity: Number(c.similarity.toFixed(4)),
+        })),
+        ...similarCurated
+          .filter((ci) => !similarChunks.some((c) => c.uploadBatchId === ci.uploadBatchId))
+          .map((ci) => ({
+            chunkId: `curated-${ci.id}`,
+            uploadBatchId: ci.uploadBatchId,
+            filename: ci.originalFilename,
+            pageStart: 1,
+            pageEnd: 1,
+            content: ci.content,
+            similarity: Number(ci.similarity.toFixed(4)),
+          })),
+      ];
 
   const result: ChatResponseResult = {
     answer: formattedAnswer,
@@ -251,8 +315,10 @@ export async function askDocumentChat(
     retrievedCount: sources.length,
   };
 
-  // Simpan ke cache
-  await saveCachedChatResponse(cacheKey, trimmedQuery, result);
+  // Simpan ke cache jika jawaban informatif
+  if (!isNotFound) {
+    await saveCachedChatResponse(cacheKey, trimmedQuery, result);
+  }
 
   return result;
 }

@@ -42,13 +42,23 @@ export async function createUploadBatch(
   pageCount: number
 ): Promise<string> {
   const pool = getPool();
-  const sql = `
-    INSERT INTO upload_batches (original_filename, page_count)
-    VALUES ($1, $2)
-    RETURNING id;
-  `;
-  const result = await pool.query<{ id: string }>(sql, [filename, pageCount]);
-  return result.rows[0].id;
+  try {
+    const sql = `
+      INSERT INTO upload_batches (original_filename, page_count, is_active_knowledge)
+      VALUES ($1, $2, true)
+      RETURNING id;
+    `;
+    const result = await pool.query<{ id: string }>(sql, [filename, pageCount]);
+    return result.rows[0].id;
+  } catch {
+    const fallbackSql = `
+      INSERT INTO upload_batches (original_filename, page_count)
+      VALUES ($1, $2)
+      RETURNING id;
+    `;
+    const result = await pool.query<{ id: string }>(fallbackSql, [filename, pageCount]);
+    return result.rows[0].id;
+  }
 }
 
 /**
@@ -289,56 +299,169 @@ export interface SearchOptions {
   limit?: number;
   minSimilarity?: number;
   onlyActiveKnowledge?: boolean;
+  textQuery?: string;
 }
 
 /**
- * Searches for the most relevant document chunks based on cosine distance of embeddings.
+ * Extracts meaningful keyword tokens from a natural language search query.
+ */
+export function extractKeywords(text: string): string[] {
+  if (!text || typeof text !== 'string') return [];
+  const clean = text.toLowerCase().replace(/[^\w\s]/g, ' ');
+  const tokens = clean.split(/\s+/).filter((t) => t.length >= 3);
+
+  const stopWords = new Set([
+    'apa', 'itu', 'arti', 'definisi', 'pengertian', 'maksud', 'dari', 'yang', 'di',
+    'ke', 'dan', 'atau', 'ini', 'itu', 'adalah', 'yaitu', 'sebutkan', 'jelaskan',
+    'tentang', 'mengenai', 'bagaimana', 'kenapa', 'mengapa', 'siapa', 'dimana',
+    'kapan', 'apakah', 'dalam', 'untuk', 'pada', 'dengan', 'oleh', 'atas', 'bisa',
+    'dapat', 'tolong', 'mohon', 'buat', 'buatkan', 'kasih', 'tampilkan', 'secara',
+    'singkat', 'padat', 'jelas', 'detail', 'lengkap', 'list', 'poin', 'paragraf'
+  ]);
+
+  const filtered = tokens.filter((t) => !stopWords.has(t));
+  return filtered.length > 0 ? filtered : tokens;
+}
+
+/**
+ * Searches for the most relevant document chunks based on Hybrid Search (pgvector cosine distance + keyword match).
  *
  * @param queryEmbedding - 1024-dimensional embedding vector of the search query
- * @param options - Optional filters (batchId, limit, minSimilarity, onlyActiveKnowledge)
+ * @param options - Optional filters (batchId, limit, minSimilarity, onlyActiveKnowledge, textQuery)
  * @returns Promise<SimilarChunkResult[]> - Top matched chunks sorted by similarity desc
  */
 export async function searchSimilarChunks(
   queryEmbedding: number[],
   options?: SearchOptions
 ): Promise<SimilarChunkResult[]> {
-  if (!queryEmbedding || queryEmbedding.length === 0) {
+  if ((!queryEmbedding || queryEmbedding.length === 0) && !options?.textQuery) {
     return [];
   }
 
   const pool = getPool();
   const limit = options?.limit ?? 5;
   const batchId = options?.batchId || null;
-  const vectorString = `[${queryEmbedding.join(',')}]`;
   const activeCondition = options?.onlyActiveKnowledge
-    ? 'AND COALESCE(b.is_active_knowledge, false) = true'
+    ? 'AND (COALESCE(b.is_active_knowledge, false) = true OR NOT EXISTS (SELECT 1 FROM upload_batches ub WHERE COALESCE(ub.is_active_knowledge, false) = true))'
     : '';
 
-  const sql = `
-    SELECT
-      c.id,
-      c.upload_batch_id AS "uploadBatchId",
-      b.original_filename AS "originalFilename",
-      c.chunk_index AS "chunkIndex",
-      c.content,
-      c.source_page_start AS "sourcePageStart",
-      c.source_page_end AS "sourcePageEnd",
-      (1 - (c.embedding <=> $1::vector)) AS similarity
-    FROM document_chunks c
-    JOIN upload_batches b ON b.id = c.upload_batch_id
-    WHERE ($2::uuid IS NULL OR c.upload_batch_id = $2)
-      ${activeCondition}
-    ORDER BY c.embedding <=> $1::vector ASC
-    LIMIT $3;
-  `;
+  const results: SimilarChunkResult[] = [];
+  const seenIds = new Set<string | number>();
 
-  const result = await pool.query<SimilarChunkResult>(sql, [vectorString, batchId, limit]);
-  
-  if (options?.minSimilarity !== undefined) {
-    return result.rows.filter((row) => row.similarity >= (options.minSimilarity ?? 0));
+  // 1. Dense Vector Search (if queryEmbedding provided)
+  if (queryEmbedding && queryEmbedding.length > 0) {
+    try {
+      const vectorString = `[${queryEmbedding.join(',')}]`;
+      const sql = `
+        SELECT
+          c.id,
+          c.upload_batch_id AS "uploadBatchId",
+          b.original_filename AS "originalFilename",
+          c.chunk_index AS "chunkIndex",
+          c.content,
+          c.source_page_start AS "sourcePageStart",
+          c.source_page_end AS "sourcePageEnd",
+          (1 - (c.embedding <=> $1::vector)) AS similarity
+        FROM document_chunks c
+        JOIN upload_batches b ON b.id = c.upload_batch_id
+        WHERE ($2::uuid IS NULL OR c.upload_batch_id = $2)
+          ${activeCondition}
+        ORDER BY c.embedding <=> $1::vector ASC
+        LIMIT $3;
+      `;
+
+      const result = await pool.query<SimilarChunkResult>(sql, [vectorString, batchId, limit]);
+      const minSim = options?.minSimilarity !== undefined ? options.minSimilarity : 0.20;
+
+      for (const row of result.rows) {
+        if (row.similarity >= minSim) {
+          results.push(row);
+          seenIds.add(row.id);
+        }
+      }
+    } catch (err) {
+      console.warn('[VectorStore] searchSimilarChunks vector search warning:', err);
+    }
   }
 
-  return result.rows;
+  // 2. Sparse / Keyword Search (Hybrid Fallback / Augmentation)
+  if (options?.textQuery && results.length < limit) {
+    try {
+      const keywords = extractKeywords(options.textQuery);
+      if (keywords.length > 0) {
+        const keywordLikes = keywords.map((kw) => `%${kw}%`);
+        const orClauses = keywordLikes.map((_, i) => `c.content ILIKE $${i + 3}`).join(' OR ');
+        const remainingLimit = limit - results.length;
+
+        const kwSql = `
+          SELECT
+            c.id,
+            c.upload_batch_id AS "uploadBatchId",
+            b.original_filename AS "originalFilename",
+            c.chunk_index AS "chunkIndex",
+            c.content,
+            c.source_page_start AS "sourcePageStart",
+            c.source_page_end AS "sourcePageEnd",
+            0.88 AS similarity
+          FROM document_chunks c
+          JOIN upload_batches b ON b.id = c.upload_batch_id
+          WHERE ($1::uuid IS NULL OR c.upload_batch_id = $1)
+            ${activeCondition}
+            AND (${orClauses})
+          ORDER BY c.chunk_index ASC
+          LIMIT $2;
+        `;
+
+        const kwRes = await pool.query<SimilarChunkResult>(kwSql, [batchId, remainingLimit, ...keywordLikes]);
+        for (const row of (kwRes?.rows || [])) {
+          if (!seenIds.has(row.id)) {
+            results.push(row);
+            seenIds.add(row.id);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[VectorStore] searchSimilarChunks keyword search warning:', err);
+    }
+  }
+
+  // 3. Exact Query Fallback: If still 0 results and textQuery is provided
+  if (results.length === 0 && options?.textQuery) {
+    const cleanQ = options.textQuery.replace(/[^\w\s]/g, '').trim();
+    if (cleanQ.length >= 3 && cleanQ.length <= 60) {
+      try {
+        const fallbackSql = `
+          SELECT
+            c.id,
+            c.upload_batch_id AS "uploadBatchId",
+            b.original_filename AS "originalFilename",
+            c.chunk_index AS "chunkIndex",
+            c.content,
+            c.source_page_start AS "sourcePageStart",
+            c.source_page_end AS "sourcePageEnd",
+            0.80 AS similarity
+          FROM document_chunks c
+          JOIN upload_batches b ON b.id = c.upload_batch_id
+          WHERE ($1::uuid IS NULL OR c.upload_batch_id = $1)
+            ${activeCondition}
+            AND c.content ILIKE $3
+          ORDER BY c.chunk_index ASC
+          LIMIT $2;
+        `;
+        const fbRes = await pool.query<SimilarChunkResult>(fallbackSql, [batchId, limit, `%${cleanQ}%`]);
+        for (const row of (fbRes?.rows || [])) {
+          if (!seenIds.has(row.id)) {
+            results.push(row);
+            seenIds.add(row.id);
+          }
+        }
+      } catch (err) {
+        console.warn('[VectorStore] searchSimilarChunks fallback warning:', err);
+      }
+    }
+  }
+
+  return results;
 }
 
 export interface SimilarCuratedResult {
@@ -355,58 +478,118 @@ export interface SimilarCuratedResult {
 }
 
 /**
- * Searches for relevant curated insights based on cosine distance of embeddings.
+ * Searches for relevant curated insights based on cosine distance of embeddings and keyword matches.
  */
 export async function searchSimilarCuratedInsights(
   queryEmbedding: number[],
   options?: SearchOptions
 ): Promise<SimilarCuratedResult[]> {
-  if (!queryEmbedding || queryEmbedding.length === 0) {
+  if ((!queryEmbedding || queryEmbedding.length === 0) && !options?.textQuery) {
     return [];
   }
 
   const pool = getPool();
   const limit = options?.limit ?? 5;
   const batchId = options?.batchId || null;
-  const vectorString = `[${queryEmbedding.join(',')}]`;
   const activeCondition = options?.onlyActiveKnowledge
-    ? 'AND COALESCE(b.is_active_knowledge, false) = true'
+    ? 'AND (COALESCE(b.is_active_knowledge, false) = true OR NOT EXISTS (SELECT 1 FROM upload_batches ub WHERE COALESCE(ub.is_active_knowledge, false) = true))'
     : '';
 
-  const sql = `
-    SELECT
-      ci.id,
-      ci.upload_batch_id AS "uploadBatchId",
-      b.original_filename AS "originalFilename",
-      ci.title,
-      ci.content,
-      ci.importance,
-      ci.category,
-      ci.tags,
-      ci.source_pages AS "sourcePages",
-      (1 - (ci.embedding <=> $1::vector)) AS similarity
-    FROM curated_insights ci
-    JOIN upload_batches b ON b.id = ci.upload_batch_id
-    WHERE ($2::uuid IS NULL OR ci.upload_batch_id = $2)
-      ${activeCondition}
-      AND ci.embedding IS NOT NULL
-    ORDER BY ci.embedding <=> $1::vector ASC
-    LIMIT $3;
-  `;
+  const results: SimilarCuratedResult[] = [];
+  const seenIds = new Set<string | number>();
 
-  try {
-    const result = await pool.query<SimilarCuratedResult>(sql, [vectorString, batchId, limit]);
-    if (!result || !result.rows) {
-      return [];
+  // 1. Vector Search (if queryEmbedding provided)
+  if (queryEmbedding && queryEmbedding.length > 0) {
+    try {
+      const vectorString = `[${queryEmbedding.join(',')}]`;
+      const sql = `
+        SELECT
+          ci.id,
+          ci.upload_batch_id AS "uploadBatchId",
+          b.original_filename AS "originalFilename",
+          ci.title,
+          ci.content,
+          ci.importance,
+          ci.category,
+          ci.tags,
+          ci.source_pages AS "sourcePages",
+          (1 - (ci.embedding <=> $1::vector)) AS similarity
+        FROM curated_insights ci
+        JOIN upload_batches b ON b.id = ci.upload_batch_id
+        WHERE ($2::uuid IS NULL OR ci.upload_batch_id = $2)
+          ${activeCondition}
+          AND ci.embedding IS NOT NULL
+        ORDER BY ci.embedding <=> $1::vector ASC
+        LIMIT $3;
+      `;
+
+      const result = await pool.query<SimilarCuratedResult>(sql, [vectorString, batchId, limit]);
+      const minSim = options?.minSimilarity !== undefined ? options.minSimilarity : 0.20;
+
+      for (const row of (result?.rows || [])) {
+        if (row.similarity >= minSim) {
+          results.push(row);
+          seenIds.add(row.id);
+        }
+      }
+    } catch (err) {
+      console.warn('[VectorStore] searchSimilarCuratedInsights vector warning:', err);
     }
-    if (options?.minSimilarity !== undefined) {
-      return result.rows.filter((row) => row.similarity >= (options.minSimilarity ?? 0));
-    }
-    return result.rows;
-  } catch (err) {
-    console.warn('[VectorStore] searchSimilarCuratedInsights warning:', err);
-    return [];
   }
+
+  // 2. Keyword Search on Curated Insights (searches title, content, category)
+  if (options?.textQuery && results.length < limit) {
+    try {
+      const keywords = extractKeywords(options.textQuery);
+      if (keywords.length > 0) {
+        const keywordLikes = keywords.map((kw) => `%${kw}%`);
+        const orClauses = keywordLikes
+          .map((_, i) => `(ci.title ILIKE $${i + 3} OR ci.content ILIKE $${i + 3} OR ci.category ILIKE $${i + 3})`)
+          .join(' OR ');
+        const remainingLimit = limit - results.length;
+
+        const kwSql = `
+          SELECT
+            ci.id,
+            ci.upload_batch_id AS "uploadBatchId",
+            b.original_filename AS "originalFilename",
+            ci.title,
+            ci.content,
+            ci.importance,
+            ci.category,
+            ci.tags,
+            ci.source_pages AS "sourcePages",
+            0.92 AS similarity
+          FROM curated_insights ci
+          JOIN upload_batches b ON b.id = ci.upload_batch_id
+          WHERE ($1::uuid IS NULL OR ci.upload_batch_id = $1)
+            ${activeCondition}
+            AND (${orClauses})
+          ORDER BY
+            CASE ci.importance
+              WHEN 'high' THEN 1
+              WHEN 'medium' THEN 2
+              WHEN 'low' THEN 3
+              ELSE 4
+            END ASC,
+            ci.id ASC
+          LIMIT $2;
+        `;
+
+        const kwRes = await pool.query<SimilarCuratedResult>(kwSql, [batchId, remainingLimit, ...keywordLikes]);
+        for (const row of (kwRes?.rows || [])) {
+          if (!seenIds.has(row.id)) {
+            results.push(row);
+            seenIds.add(row.id);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[VectorStore] searchSimilarCuratedInsights keyword warning:', err);
+    }
+  }
+
+  return results;
 }
 
 export interface CuratedInsightInput {
