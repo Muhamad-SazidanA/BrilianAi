@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
@@ -38,6 +38,61 @@ export default function Sidebar({
   const { language, t } = useLanguage();
   const { currentUser, hasPermission } = useUserSession();
   const [docCount, setDocCount] = useState<number>(stats?.totalDocuments || 0);
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+
+  useEffect(() => {
+    const updateTheme = () => {
+      const saved = typeof window !== 'undefined' ? localStorage.getItem('theme_preference') : null;
+      const attr = typeof document !== 'undefined' ? document.documentElement.getAttribute('data-theme') : null;
+      if (saved === 'dark' || attr === 'dark') {
+        setTheme('dark');
+      } else {
+        setTheme('light');
+      }
+    };
+
+    updateTheme();
+
+    const observer = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        if (m.type === 'attributes' && m.attributeName === 'data-theme') {
+          updateTheme();
+        }
+      }
+    });
+
+    if (typeof document !== 'undefined') {
+      observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['data-theme'],
+      });
+    }
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'theme_preference') {
+        updateTheme();
+      }
+    };
+    window.addEventListener('storage', onStorage);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
+
+  const logoSrc = useMemo(() => {
+    const isDark = theme === 'dark';
+    if (isCollapsed) {
+      return isDark
+        ? '/images/Brilian.AI%20logo-Close-P.svg'
+        : '/images/BrilianLogo-Close-B.svg';
+    } else {
+      return isDark
+        ? '/images/BrilianLogo-Open-P.svg'
+        : '/images/BrilianLogo-Open-B.svg';
+    }
+  }, [theme, isCollapsed]);
 
   useEffect(() => {
     async function checkDocCount() {
@@ -196,19 +251,23 @@ export default function Sidebar({
         >
           {isCollapsed ? (
             <Image
-              src="/images/BrilianLogo-Close.svg"
+              key={`collapsed-${theme}`}
+              src={logoSrc}
               alt="Brilian.Ai"
               width={38}
               height={38}
+              priority
               style={{ objectFit: 'contain', display: 'block' }}
             />
           ) : (
             <Image
-              src="/images/BrilianLogo-Open.svg"
+              key={`open-${theme}`}
+              src={logoSrc}
               alt="Brilian.Ai"
-              width={136}
-              height={68}
-              style={{ objectFit: 'contain', display: 'block' }}
+              width={140}
+              height={52}
+              priority
+              style={{ objectFit: 'contain', display: 'block', maxHeight: '52px', width: 'auto' }}
             />
           )}
         </Link>
