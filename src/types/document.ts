@@ -6,6 +6,7 @@ export interface UploadBatch {
   uploaded_at: string;
   is_active_knowledge?: boolean;
   curated_count?: number;
+  processed_chunks?: number;
 }
 
 export interface DocumentChunk {

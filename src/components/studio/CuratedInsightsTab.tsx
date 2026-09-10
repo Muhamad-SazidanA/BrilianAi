@@ -274,24 +274,51 @@ export default function CuratedInsightsTab({
               <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
                 Curated Insights ({insights.length})
               </h3>
-              {isUncurated ? (
-                <span
-                  className="badge"
-                  style={{
-                    backgroundColor: 'var(--bg-subtle)',
-                    color: 'var(--text-muted)',
-                    border: '1px solid var(--border-default)',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                  }}
-                >
-                  Belum Dikurasi
-                </span>
-              ) : (
-                <span className="badge badge-success" style={{ fontSize: '11px', fontWeight: 600 }}>
-                  Terkurasi ({insights.length})
-                </span>
-              )}
+              {(() => {
+                const total = progress?.totalChunks || 0;
+                const processed = progress?.processedChunks || 0;
+                const isCompleted = total > 0 && processed >= total;
+
+                if (isCompleted || (!isUncurated && insights.length > 0 && isCompleted)) {
+                  return (
+                    <span className="badge badge-success" style={{ fontSize: '11px', fontWeight: 600 }}>
+                      100% Terkurasi ({insights.length} Insight)
+                    </span>
+                  );
+                }
+
+                if (processed > 0 && total > 0) {
+                  const pct = Math.round((processed / total) * 100);
+                  return (
+                    <span className="badge badge-warning" style={{ fontSize: '11px', fontWeight: 600 }}>
+                      {pct}% ({insights.length} Insight)
+                    </span>
+                  );
+                }
+
+                if (!isUncurated) {
+                  return (
+                    <span className="badge badge-success" style={{ fontSize: '11px', fontWeight: 600 }}>
+                      Terkurasi ({insights.length} Insight)
+                    </span>
+                  );
+                }
+
+                return (
+                  <span
+                    className="badge"
+                    style={{
+                      backgroundColor: 'var(--bg-subtle)',
+                      color: 'var(--text-muted)',
+                      border: '1px solid var(--border-default)',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Belum Dikurasi
+                  </span>
+                );
+              })()}
             </div>
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '3px' }}>
               {t('curate.subtitle')}
@@ -428,7 +455,10 @@ export default function CuratedInsightsTab({
                 {Math.max(1, currentPercent)}%
               </span>
               <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                {progress?.curatedChunks || 0} / {progress?.totalChunks || '?'} chunk selesai
+                {progress?.processedChunks || progress?.curatedChunks || 0} / {progress?.totalChunks || '?'} raw chunk diproses
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--color-primary)', fontWeight: 600, marginTop: '2px' }}>
+                {progress?.curatedInsightsCount || insights.length} insight dibuat
               </div>
             </div>
           </div>

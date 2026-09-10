@@ -172,40 +172,73 @@ export default function DocumentStudioPage() {
                   <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     Status Kurasi
                   </span>
-                  {insights.length > 0 ? (
-                    <span
-                      className="badge badge-success"
-                      style={{
-                        padding: '4px 10px',
-                        fontSize: '11.5px',
-                        fontWeight: 600,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '5px',
-                      }}
-                    >
-                      <CheckCircle2 size={12} />
-                      <span>Terkurasi ({insights.length} Insight)</span>
-                    </span>
-                  ) : (
-                    <span
-                      className="badge"
-                      style={{
-                        padding: '4px 10px',
-                        fontSize: '11.5px',
-                        fontWeight: 600,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '5px',
-                        backgroundColor: 'var(--bg-subtle)',
-                        color: 'var(--text-muted)',
-                        border: '1px solid var(--border-default)',
-                      }}
-                    >
-                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--color-warning)' }} />
-                      <span>Belum Dikurasi</span>
-                    </span>
-                  )}
+                  {(() => {
+                    const total = chunks.length;
+                    const processedChunksSet = new Set(
+                      insights.map((i) => (i.source_chunk_id ? String(i.source_chunk_id) : null)).filter(Boolean)
+                    );
+                    const processedCount = processedChunksSet.size;
+                    const is100Percent = total > 0 && processedCount >= total;
+
+                    if (is100Percent) {
+                      return (
+                        <span
+                          className="badge badge-success"
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: '11.5px',
+                            fontWeight: 600,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                          }}
+                          title={`Seluruh ${total} raw chunks telah selesai dikurasi menjadi ${insights.length} insight.`}
+                        >
+                          <CheckCircle2 size={12} />
+                          <span>100% Terkurasi ({insights.length} Insight)</span>
+                        </span>
+                      );
+                    }
+
+                    if (processedCount > 0) {
+                      const pct = Math.round((processedCount / total) * 100);
+                      return (
+                        <span
+                          className="badge badge-warning"
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: '11.5px',
+                            fontWeight: 600,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                          }}
+                        >
+                          <span>{pct}% ({insights.length} Insight)</span>
+                        </span>
+                      );
+                    }
+
+                    return (
+                      <span
+                        className="badge"
+                        style={{
+                          padding: '4px 10px',
+                          fontSize: '11.5px',
+                          fontWeight: 600,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          backgroundColor: 'var(--bg-subtle)',
+                          color: 'var(--text-muted)',
+                          border: '1px solid var(--border-default)',
+                        }}
+                      >
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--color-warning)' }} />
+                        <span>Belum Dikurasi</span>
+                      </span>
+                    );
+                  })()}
                 </div>
 
                 {/* Vertical Divider */}

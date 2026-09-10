@@ -8,6 +8,7 @@ export interface UploadBatch {
   uploaded_at: Date | string;
   is_active_knowledge?: boolean;
   curated_count?: number;
+  processed_chunks?: number;
 }
 
 export interface ChunkInput {
@@ -155,10 +156,14 @@ export async function listBatches(): Promise<UploadBatch[]> {
         b.page_count, 
         b.uploaded_at, 
         COALESCE(b.is_active_knowledge, false) AS is_active_knowledge,
-        COALESCE(ci.curated_count, 0)::int AS curated_count
+        COALESCE(ci.curated_count, 0)::int AS curated_count,
+        COALESCE(ci.processed_chunks, 0)::int AS processed_chunks
       FROM upload_batches b
       LEFT JOIN (
-        SELECT upload_batch_id, COUNT(*)::int AS curated_count
+        SELECT 
+          upload_batch_id, 
+          COUNT(*)::int AS curated_count,
+          COUNT(DISTINCT source_chunk_id)::int AS processed_chunks
         FROM curated_insights
         GROUP BY upload_batch_id
       ) ci ON ci.upload_batch_id = b.id
@@ -174,7 +179,7 @@ export async function listBatches(): Promise<UploadBatch[]> {
     `;
     try {
       const result = await pool.query<UploadBatch>(fallbackSql);
-      return result.rows.map((b) => ({ ...b, curated_count: 0 }));
+      return result.rows.map((b) => ({ ...b, curated_count: 0, processed_chunks: 0 }));
     } catch {
       const basicSql = `
         SELECT id, original_filename, chunk_count, page_count, uploaded_at
@@ -182,13 +187,13 @@ export async function listBatches(): Promise<UploadBatch[]> {
         ORDER BY uploaded_at DESC;
       `;
       const result = await pool.query<UploadBatch>(basicSql);
-      return result.rows.map((b) => ({ ...b, is_active_knowledge: false, curated_count: 0 }));
+      return result.rows.map((b) => ({ ...b, is_active_knowledge: false, curated_count: 0, processed_chunks: 0 }));
     }
   }
 }
 
 /**
- * Gets a single upload batch by ID beserta curated_count.
+ * Gets a single upload batch by ID beserta curated_count dan processed_chunks.
  */
 export async function getBatchById(batchId: string): Promise<UploadBatch | null> {
   const pool = getPool();
@@ -201,10 +206,14 @@ export async function getBatchById(batchId: string): Promise<UploadBatch | null>
         b.page_count, 
         b.uploaded_at, 
         COALESCE(b.is_active_knowledge, false) AS is_active_knowledge,
-        COALESCE(ci.curated_count, 0)::int AS curated_count
+        COALESCE(ci.curated_count, 0)::int AS curated_count,
+        COALESCE(ci.processed_chunks, 0)::int AS processed_chunks
       FROM upload_batches b
       LEFT JOIN (
-        SELECT upload_batch_id, COUNT(*)::int AS curated_count
+        SELECT 
+          upload_batch_id, 
+          COUNT(*)::int AS curated_count,
+          COUNT(DISTINCT source_chunk_id)::int AS processed_chunks
         FROM curated_insights
         WHERE upload_batch_id = $1
         GROUP BY upload_batch_id
@@ -221,7 +230,7 @@ export async function getBatchById(batchId: string): Promise<UploadBatch | null>
     `;
     try {
       const result = await pool.query<UploadBatch>(fallbackSql, [batchId]);
-      return result.rows[0] ? { ...result.rows[0], curated_count: 0 } : null;
+      return result.rows[0] ? { ...result.rows[0], curated_count: 0, processed_chunks: 0 } : null;
     } catch {
       const basicSql = `
         SELECT id, original_filename, chunk_count, page_count, uploaded_at
@@ -229,7 +238,7 @@ export async function getBatchById(batchId: string): Promise<UploadBatch | null>
         WHERE id = $1;
       `;
       const result = await pool.query<UploadBatch>(basicSql, [batchId]);
-      return result.rows[0] ? { ...result.rows[0], is_active_knowledge: false, curated_count: 0 } : null;
+      return result.rows[0] ? { ...result.rows[0], is_active_knowledge: false, curated_count: 0, processed_chunks: 0 } : null;
     }
   }
 }
@@ -789,8 +798,8 @@ export async function insertCuratedInsights(
 }
 
 /**
- * Deduplicates curated_insights in database by removing duplicate rows for the same source_chunk_id,
- * keeping the newest record per chunk.
+ * Deduplicates curated_insights in database by removing duplicate rows
+ * keeping newest records while ensuring exact duplicate content is removed.
  */
 export async function deduplicateCuratedInsights(batchId?: string): Promise<number> {
   const pool = getPool();
@@ -800,11 +809,11 @@ export async function deduplicateCuratedInsights(batchId?: string): Promise<numb
       WHERE id IN (
         SELECT id FROM (
           SELECT id, ROW_NUMBER() OVER (
-            PARTITION BY upload_batch_id, source_chunk_id 
+            PARTITION BY upload_batch_id, source_chunk_id, LOWER(TRIM(title)), MD5(TRIM(content))
             ORDER BY id DESC
           ) as rnum
           FROM curated_insights
-          WHERE source_chunk_id IS NOT NULL
+          WHERE 1 = 1
             ${batchId ? 'AND upload_batch_id = $1' : ''}
         ) t
         WHERE t.rnum > 1
@@ -820,7 +829,7 @@ export async function deduplicateCuratedInsights(batchId?: string): Promise<numb
 
 /**
  * Lists all curated insights for a specific batch ID, ordered by importance and created_at.
- * Guarantees that at most 1 insight is returned per source_chunk_id even if duplicate rows exist.
+ * Guarantees that exact identical duplicate insights are filtered out.
  */
 export async function listCuratedInsights(batchId: string): Promise<CuratedInsight[]> {
   const pool = getPool();
@@ -838,7 +847,7 @@ export async function listCuratedInsights(batchId: string): Promise<CuratedInsig
         source_chunk_id,
         created_at,
         ROW_NUMBER() OVER (
-          PARTITION BY upload_batch_id, source_chunk_id 
+          PARTITION BY upload_batch_id, LOWER(TRIM(title)), MD5(TRIM(content))
           ORDER BY id DESC
         ) as rn
       FROM curated_insights
@@ -856,7 +865,7 @@ export async function listCuratedInsights(batchId: string): Promise<CuratedInsig
       source_chunk_id,
       created_at
     FROM ranked_insights
-    WHERE source_chunk_id IS NULL OR rn = 1
+    WHERE rn = 1
     ORDER BY
       CASE importance
         WHEN 'high' THEN 1

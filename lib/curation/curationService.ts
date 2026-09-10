@@ -6,6 +6,7 @@ import {
   insertCuratedInsights,
   listCuratedInsights,
   updateCuratedInsight,
+  deduplicateCuratedInsights,
   CuratedInsight,
   CuratedInsightInput,
   DocumentChunk,
@@ -44,23 +45,34 @@ Hasilkan HANYA output JSON valid tanpa teks penjelasan tambahan dengan skema:
 }`;
 
 /**
- * Curates a single raw text chunk using OpenAI GPT-4o-mini into clean, structured insight.
+ * Curates a raw text chunk into clean, structured insight(s).
+ * Bisa menghasilkan 1 atau lebih insight jika dalam 1 chunk terdapat beberapa topik/tabel berbeda.
  */
-export async function curateRawText(
+export async function curateRawTextMultiple(
   rawContent: string,
   pageRange: string = ''
-): Promise<CurationResultPayload> {
+): Promise<CurationResultPayload[]> {
   const openAiApiKey = process.env.OPENAI_API_KEY;
-  const deepseekApiKey = process.env.DEEPSEEK_API_KEY;
 
   const prompt = `Berikut potongan teks mentah dari dokumen${pageRange ? ` (${pageRange})` : ''}:
 """
 ${rawContent}
 """
 
-Ubah menjadi JSON Insight Kurasi sesuai format yang telah ditentukan.`;
+Ubah menjadi JSON Insight Kurasi. Jika teks memuat 2 atau lebih topik/tabel penting yang berbeda, ekstrak masing-masing menjadi insight terpisah dalam array "insights". Jika hanya 1 topik, kembalikan 1 insight.
+Format output JSON:
+{
+  "insights": [
+    {
+      "title": "string",
+      "content": "string",
+      "importance": "high" | "medium" | "low",
+      "category": "string",
+      "tags": ["string"]
+    }
+  ]
+}`;
 
-  // 1. Primary: OpenAI GPT-4o-mini with native JSON mode
   if (openAiApiKey) {
     try {
       const controller = new AbortController();
@@ -91,13 +103,21 @@ Ubah menjadi JSON Insight Kurasi sesuai format yang telah ditentukan.`;
         const rawOutput = data?.choices?.[0]?.message?.content;
         if (rawOutput) {
           const parsed = JSON.parse(rawOutput);
-          return {
-            title: parsed.title || 'Insight Dokumen',
-            content: parsed.content || rawContent,
-            importance: ['high', 'medium', 'low'].includes(parsed.importance) ? parsed.importance : 'medium',
-            category: parsed.category || 'track1_financial',
-            tags: Array.isArray(parsed.tags) && parsed.tags.length > 0 ? parsed.tags : ['Umum'],
-          };
+          const rawItems = Array.isArray(parsed.insights)
+            ? parsed.insights
+            : parsed.title
+            ? [parsed]
+            : [];
+
+          if (rawItems.length > 0) {
+            return rawItems.map((item: any) => ({
+              title: item.title || 'Insight Dokumen',
+              content: item.content || rawContent,
+              importance: ['high', 'medium', 'low'].includes(item.importance) ? item.importance : 'medium',
+              category: item.category || 'track1_financial',
+              tags: Array.isArray(item.tags) && item.tags.length > 0 ? item.tags : ['Umum'],
+            }));
+          }
         }
       }
     } catch (err: any) {
@@ -105,15 +125,29 @@ Ubah menjadi JSON Insight Kurasi sesuai format yang telah ditentukan.`;
     }
   }
 
-  // Fallback if AI fails or returns invalid format
+  // Fallback
   const firstLine = rawContent.split('\n')[0].replace(/[^a-zA-Z0-9\s]/g, '').trim();
-  return {
-    title: firstLine.length > 5 ? firstLine.substring(0, 45) : 'Ringkasan Informasi Dokumen',
-    content: rawContent.trim(),
-    importance: 'medium',
-    category: 'track1_financial',
-    tags: ['Dokumen', 'Mentah'],
-  };
+  return [
+    {
+      title: firstLine.length > 5 ? firstLine.substring(0, 45) : 'Ringkasan Informasi Dokumen',
+      content: rawContent.trim(),
+      importance: 'medium',
+      category: 'track1_financial',
+      tags: ['Dokumen', 'Mentah'],
+    },
+  ];
+}
+
+/**
+ * Curates a single raw text chunk using OpenAI GPT-4o-mini into clean, structured insight.
+ * Kompatibel dengan unit test yang menguji single insight.
+ */
+export async function curateRawText(
+  rawContent: string,
+  pageRange: string = ''
+): Promise<CurationResultPayload> {
+  const items = await curateRawTextMultiple(rawContent, pageRange);
+  return items[0];
 }
 
 // Track active batches being curated to prevent parallel race conditions
@@ -122,7 +156,9 @@ const activeCurationBatches = new Set<string>();
 export interface CurationProgress {
   batchId: string;
   totalChunks: number;
-  curatedChunks: number;
+  processedChunks: number;
+  curatedChunks: number; // alias untuk backward compatibility dengan frontend
+  curatedInsightsCount: number;
   currentPercent: number;
   status: 'idle' | 'running' | 'completed' | 'error';
   currentChunkTitle?: string;
@@ -134,7 +170,8 @@ const progressMap = new Map<string, CurationProgress>();
 
 /**
  * Mendapatkan progres kurasi dokumen secara real-time.
- * Jika sedang berjalan, mengambil dari memory. Jika tidak, menghitung langsung dari DB.
+ * Dokumen dianggap 100% selesai jika seluruh raw chunk telah diproses,
+ * terlepas dari apakah jumlah Curated Insights lebih banyak atau lebih sedikit dari Raw Chunks.
  */
 export async function getCurationProgress(batchId: string): Promise<CurationProgress> {
   const existing = progressMap.get(batchId);
@@ -144,30 +181,42 @@ export async function getCurationProgress(batchId: string): Promise<CurationProg
     return existing;
   }
 
-  // Jika tidak aktif, ambil hitungan aktual dari DB
+  // Ambil hitungan aktual dari DB
   try {
     const rawChunks = await listChunks(batchId);
     const existingInsights = await listCuratedInsights(batchId);
     const totalChunks = rawChunks.length;
-    const curatedChunks = existingInsights.length;
-    const currentPercent =
-      totalChunks > 0 ? Math.min(100, Math.round((curatedChunks / totalChunks) * 100)) : 100;
 
+    // Hitung berapa raw chunk unik yang sudah selesai diproses
+    const processedChunkIds = new Set(
+      existingInsights
+        .map((i) => (i.source_chunk_id ? String(i.source_chunk_id) : null))
+        .filter(Boolean)
+    );
+    const processedChunks = processedChunkIds.size;
+    const curatedInsightsCount = existingInsights.length;
+
+    const currentPercent =
+      totalChunks > 0 ? Math.min(100, Math.round((processedChunks / totalChunks) * 100)) : 100;
+
+    const isCompleted = totalChunks > 0 && processedChunks >= totalChunks;
     const status: 'idle' | 'running' | 'completed' | 'error' = isRunning
       ? 'running'
-      : totalChunks > 0 && curatedChunks >= totalChunks
+      : isCompleted
       ? 'completed'
-      : curatedChunks > 0
+      : processedChunks > 0
       ? 'idle'
       : 'idle';
 
     const progress: CurationProgress = {
       batchId,
       totalChunks,
-      curatedChunks,
-      currentPercent,
+      processedChunks,
+      curatedChunks: processedChunks,
+      curatedInsightsCount,
+      currentPercent: isCompleted ? 100 : currentPercent,
       status,
-      currentChunkTitle: existing?.currentChunkTitle || (status === 'completed' ? 'Selesai' : undefined),
+      currentChunkTitle: existing?.currentChunkTitle || (status === 'completed' ? 'Kurasi Selesai 100%' : undefined),
       updatedAt: Date.now(),
     };
     progressMap.set(batchId, progress);
@@ -176,7 +225,9 @@ export async function getCurationProgress(batchId: string): Promise<CurationProg
     return {
       batchId,
       totalChunks: 0,
+      processedChunks: 0,
       curatedChunks: 0,
+      curatedInsightsCount: 0,
       currentPercent: 0,
       status: 'error',
       error: err?.message || 'Gagal memeriksa progres',
@@ -198,23 +249,23 @@ export function isBatchCurating(batchId: string): boolean {
 async function curateBatchInternal(
   batchId: string,
   limit: number = 25,
-  onProgress?: (curatedChunk: CuratedInsight, index: number, total: number) => void
+  onProgress?: (curatedChunk: CuratedInsight, processedIndex: number, totalToProcess: number) => void
 ): Promise<CuratedInsight[]> {
   const rawChunks = await listChunks(batchId);
   if (rawChunks.length === 0) {
     return [];
   }
 
-  // Get already curated source chunk IDs to avoid re-curating
+  // Ambil ID chunk yang sudah pernah diproses agar tidak memproses ulang
   const existingInsights = await listCuratedInsights(batchId);
-  const curatedChunkIds = new Set(
+  const processedChunkIds = new Set(
     existingInsights
       .map((i) => (i.source_chunk_id ? String(i.source_chunk_id) : null))
       .filter(Boolean)
   );
 
   const uncuratedChunks = rawChunks
-    .filter((c) => !curatedChunkIds.has(String(c.id)))
+    .filter((c) => !processedChunkIds.has(String(c.id)))
     .slice(0, limit);
 
   if (uncuratedChunks.length === 0) {
@@ -230,38 +281,42 @@ async function curateBatchInternal(
         ? `Halaman ${chunk.source_page_start}`
         : `Halaman ${chunk.source_page_start}-${chunk.source_page_end}`;
 
-    const curated = await curateRawText(chunk.content, pageLabel);
+    // Ekstrak 1 atau lebih insight dari chunk ini
+    const curatedItems = await curateRawTextMultiple(chunk.content, pageLabel);
 
-    // Embed immediately with BGE-M3 (1024-dim)
-    let embedding: number[] = new Array(1024).fill(0);
-    try {
-      const embs = await embedTexts([`${curated.title}\n${curated.content}`]);
-      if (embs && embs[0]) {
-        embedding = embs[0];
+    for (const curated of curatedItems) {
+      // Embed immediately with BGE-M3 (1024-dim)
+      let embedding: number[] = new Array(1024).fill(0);
+      try {
+        const embs = await embedTexts([`${curated.title}\n${curated.content}`]);
+        if (embs && embs[0]) {
+          embedding = embs[0];
+        }
+      } catch (embErr) {
+        console.warn('[CurationService] Embedding warning, using zero-vector fallback:', embErr);
       }
-    } catch (embErr) {
-      console.warn('[CurationService] Embedding warning, using zero-vector fallback:', embErr);
+
+      const inserted = await insertCuratedInsights(batchId, [
+        {
+          title: curated.title,
+          content: curated.content,
+          importance: curated.importance,
+          category: curated.category,
+          tags: curated.tags,
+          sourcePages: pageLabel,
+          sourceChunkId: chunk.id,
+          embedding,
+        },
+      ]);
+
+      if (inserted.length > 0) {
+        results.push(inserted[0]);
+      }
     }
 
-    const inserted = await insertCuratedInsights(batchId, [
-      {
-        title: curated.title,
-        content: curated.content,
-        importance: curated.importance,
-        category: curated.category,
-        tags: curated.tags,
-        sourcePages: pageLabel,
-        sourceChunkId: chunk.id,
-        embedding,
-      },
-    ]);
-
-    if (inserted.length > 0) {
-      results.push(inserted[0]);
-      processedIndex++;
-      if (onProgress) {
-        onProgress(inserted[0], processedIndex, uncuratedChunks.length);
-      }
+    processedIndex++;
+    if (onProgress && results.length > 0) {
+      onProgress(results[results.length - 1], processedIndex, uncuratedChunks.length);
     }
   }
 
@@ -288,8 +343,7 @@ export async function curateBatch(batchId: string, limit: number = 25): Promise<
 
 /**
  * Continuously curates ALL raw chunks for a batch in iterative safe micro-batches (default: 20)
- * until 100% of chunks are converted into curated insights.
- * Memperbarui progressMap secara real-time untuk visual progress bar 1-100%.
+ * until 100% of raw chunks are evaluated and converted into curated insights.
  */
 export async function curateAllChunks(
   batchId: string,
@@ -306,13 +360,22 @@ export async function curateAllChunks(
   const rawChunks = await listChunks(batchId);
   const initialInsights = await listCuratedInsights(batchId);
   const totalChunks = rawChunks.length;
-  let curatedCount = initialInsights.length;
 
-  const initialPercent = totalChunks > 0 ? Math.round((curatedCount / totalChunks) * 100) : 100;
+  const processedChunkIds = new Set(
+    initialInsights
+      .map((i) => (i.source_chunk_id ? String(i.source_chunk_id) : null))
+      .filter(Boolean)
+  );
+  let processedChunks = processedChunkIds.size;
+  let curatedInsightsCount = initialInsights.length;
+
+  const initialPercent = totalChunks > 0 ? Math.round((processedChunks / totalChunks) * 100) : 100;
   progressMap.set(batchId, {
     batchId,
     totalChunks,
-    curatedChunks: curatedCount,
+    processedChunks,
+    curatedChunks: processedChunks,
+    curatedInsightsCount,
     currentPercent: Math.max(1, initialPercent),
     status: 'running',
     currentChunkTitle: 'Menyiapkan proses kurasi...',
@@ -320,7 +383,7 @@ export async function curateAllChunks(
   });
 
   let totalNewCurated = 0;
-  console.log(`[CurationService] Memulai kurasi AI manual untuk batch ${batchId} (${totalChunks} chunks total)...`);
+  console.log(`[CurationService] Memulai kurasi AI untuk batch ${batchId} (${totalChunks} chunks total, ${processedChunks} sudah terproses)...`);
 
   try {
     while (true) {
@@ -328,12 +391,15 @@ export async function curateAllChunks(
         batchId,
         microBatchSize,
         (insight) => {
-          curatedCount++;
-          const percent = totalChunks > 0 ? Math.min(100, Math.round((curatedCount / totalChunks) * 100)) : 100;
+          processedChunks = Math.min(totalChunks, processedChunks + 1);
+          curatedInsightsCount++;
+          const percent = totalChunks > 0 ? Math.min(100, Math.round((processedChunks / totalChunks) * 100)) : 100;
           progressMap.set(batchId, {
             batchId,
             totalChunks,
-            curatedChunks: curatedCount,
+            processedChunks,
+            curatedChunks: processedChunks,
+            curatedInsightsCount,
             currentPercent: Math.max(1, percent),
             status: 'running',
             currentChunkTitle: insight.title,
@@ -347,15 +413,21 @@ export async function curateAllChunks(
       }
       totalNewCurated += newlyCurated.length;
       console.log(
-        `[CurationService] Progres batch ${batchId}: +${newlyCurated.length} chunks baru (total terkurasi: ${curatedCount}/${totalChunks})`
+        `[CurationService] Progres batch ${batchId}: +${newlyCurated.length} insight baru (total chunk diproses: ${processedChunks}/${totalChunks})`
       );
     }
+
+    // Bersihkan duplikat identik bila ada
+    await deduplicateCuratedInsights(batchId);
+    const finalInsights = await listCuratedInsights(batchId);
 
     // Selesai 100%
     progressMap.set(batchId, {
       batchId,
       totalChunks,
-      curatedChunks: curatedCount,
+      processedChunks: totalChunks,
+      curatedChunks: totalChunks,
+      curatedInsightsCount: finalInsights.length,
       currentPercent: 100,
       status: 'completed',
       currentChunkTitle: 'Kurasi AI selesai 100%',
@@ -366,8 +438,10 @@ export async function curateAllChunks(
     progressMap.set(batchId, {
       batchId,
       totalChunks,
-      curatedChunks: curatedCount,
-      currentPercent: totalChunks > 0 ? Math.round((curatedCount / totalChunks) * 100) : 0,
+      processedChunks,
+      curatedChunks: processedChunks,
+      curatedInsightsCount,
+      currentPercent: totalChunks > 0 ? Math.round((processedChunks / totalChunks) * 100) : 0,
       status: 'error',
       error: err?.message || 'Terjadi kesalahan saat kurasi',
       updatedAt: Date.now(),
@@ -378,7 +452,7 @@ export async function curateAllChunks(
   }
 
   console.log(
-    `[CurationService] ✅ Selesai! Total ${totalNewCurated} chunks baru berhasil dikurasi menjadi insight untuk batch ${batchId}.`
+    `[CurationService] ✅ Selesai! Seluruh ${totalChunks} chunks diproses. Dihasilkan total ${totalNewCurated} insights baru untuk batch ${batchId}.`
   );
   return totalNewCurated;
 }

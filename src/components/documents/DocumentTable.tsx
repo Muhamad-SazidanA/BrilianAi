@@ -301,40 +301,73 @@ export default function DocumentTable({
 
                       {/* Curation Status */}
                       <td style={{ padding: '14px 1rem' }}>
-                        {isCurated ? (
-                          <span
-                            className="badge badge-success"
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '5px',
-                              fontSize: '11.5px',
-                              padding: '4px 8px',
-                              fontWeight: 600,
-                            }}
-                          >
-                            <CheckCircle2 size={12} />
-                            <span>{t('table.curated_badge')} ({batch.curated_count})</span>
-                          </span>
-                        ) : (
-                          <span
-                            className="badge"
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '5px',
-                              fontSize: '11.5px',
-                              padding: '4px 8px',
-                              fontWeight: 600,
-                              backgroundColor: 'var(--bg-subtle)',
-                              color: 'var(--text-muted)',
-                              border: '1px solid var(--border-default)',
-                            }}
-                          >
-                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--color-warning)' }} />
-                            <span>{t('table.uncurated_badge')}</span>
-                          </span>
-                        )}
+                        {(() => {
+                          const total = batch.chunk_count || 0;
+                          const processed = batch.processed_chunks || 0;
+                          const count = batch.curated_count || 0;
+                          const isCompleted = total > 0 && processed >= total;
+                          const isPartial = processed > 0 && !isCompleted;
+
+                          if (isCompleted) {
+                            return (
+                              <span
+                                className="badge badge-success"
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  fontSize: '11.5px',
+                                  padding: '4px 8px',
+                                  fontWeight: 600,
+                                }}
+                                title={`Seluruh ${total} raw chunks telah selesai dikurasi menjadi ${count} insight.`}
+                              >
+                                <CheckCircle2 size={12} />
+                                <span>100% Terkurasi ({count} Insight)</span>
+                              </span>
+                            );
+                          }
+
+                          if (isPartial) {
+                            const pct = Math.round((processed / total) * 100);
+                            return (
+                              <span
+                                className="badge badge-warning"
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  fontSize: '11.5px',
+                                  padding: '4px 8px',
+                                  fontWeight: 600,
+                                }}
+                                title={`${processed} dari ${total} raw chunk diproses.`}
+                              >
+                                <span>{pct}% ({count} Insight)</span>
+                              </span>
+                            );
+                          }
+
+                          return (
+                            <span
+                              className="badge"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                fontSize: '11.5px',
+                                padding: '4px 8px',
+                                fontWeight: 600,
+                                backgroundColor: 'var(--bg-subtle)',
+                                color: 'var(--text-muted)',
+                                border: '1px solid var(--border-default)',
+                              }}
+                            >
+                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--color-warning)' }} />
+                              <span>{t('table.uncurated_badge')}</span>
+                            </span>
+                          );
+                        })()}
                       </td>
 
                       {/* AI Knowledge Base Toggle (Separated Status and Clear Action Button) */}

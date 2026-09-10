@@ -178,7 +178,7 @@ export default function DocumentsPage() {
         {/* Document Stats Cards */}
         <DocumentStatsCards
           batches={batches}
-          selectedFilter={selectedFilter}
+          activeFilter={selectedFilter}
           onSelectFilter={setSelectedFilter}
         />
 
