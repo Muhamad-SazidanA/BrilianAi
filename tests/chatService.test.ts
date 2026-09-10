@@ -114,40 +114,31 @@ describe('AI Chatbot Service (Llama 3.2 3B & pgvector RAG)', () => {
       );
     });
 
-    it('should safely handle similarity when returned as a string from postgres (prevent toFixed is not a function)', async () => {
-      vi.spyOn(embeddingClient, 'embedTexts').mockResolvedValueOnce([new Array(1024).fill(0.01)]);
-      mockPool.query.mockImplementation((sql: string) => {
-        if (sql.includes('COUNT(*)')) {
-          return Promise.resolve({ rows: [{ count: 1 }], rowCount: 1 });
-        }
-        return Promise.resolve({
-          rows: [
-            {
-              id: 99,
-              uploadBatchId: 'batch-string-sim',
-              originalFilename: 'sop_keamanan.pdf',
-              chunkIndex: 0,
-              content: 'SOP Akses Ruang Server...',
-              sourcePageStart: 1,
-              sourcePageEnd: 1,
-              similarity: '0.87654321', // String returned by pg driver
-            },
-          ],
-          rowCount: 1,
-        });
+    it('should query pgvector and parse similarity correctly even if returned as string from pg driver', async () => {
+      const dummyVector = new Array(1024).fill(0.1);
+      const mockRows: any[] = [
+        {
+          id: 99,
+          uploadBatchId: 'b1111111-2222-3333-4444-555555555555',
+          originalFilename: 'pedoman_audit.pdf',
+          chunkIndex: 0,
+          content: 'Pasal 4: Ketentuan audit operasional.',
+          sourcePageStart: 2,
+          sourcePageEnd: 2,
+          similarity: '0.87654321', // String returned by postgres
+        },
+      ];
+
+      mockPool.query.mockResolvedValueOnce({ rows: mockRows, rowCount: 1 });
+
+      const results = await searchSimilarChunks(dummyVector, {
+        batchId: 'b1111111-2222-3333-4444-555555555555',
+        limit: 3,
       });
 
-      vi.spyOn(chatClient, 'generateChatResponse').mockResolvedValueOnce(
-        'Berdasarkan dokumen sop_keamanan.pdf Halaman 1, SOP akses server...'
-      );
-
-      const result = await askDocumentChat('Ada sop apa saja??', {
-        allowPublicKnowledge: false,
-      });
-
-      expect(result.sources).toHaveLength(1);
-      expect(result.sources[0].similarity).toBe(0.8765);
-      expect(typeof result.sources[0].similarity).toBe('number');
+      expect(results).toHaveLength(1);
+      expect(results[0].similarity).toBe(0.87654321);
+      expect(typeof results[0].similarity).toBe('number');
     });
 
     it('should pass allowPublicKnowledge = true to chatClient when enabled', async () => {

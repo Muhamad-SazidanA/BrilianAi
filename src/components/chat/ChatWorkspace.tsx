@@ -33,6 +33,55 @@ export default function ChatWorkspace() {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
+  // Execute AI chat query and append response
+  const executeAiResponse = async (queryText: string) => {
+    const trimmed = queryText.trim();
+    if (!trimmed || isLoading) return;
+
+    setActiveQueryText(trimmed);
+    setIsLoading(true);
+
+    try {
+      const payload = {
+        query: trimmed,
+        allowPublicKnowledge,
+      };
+
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Gagal memproses pertanyaan');
+      }
+
+      const aiMessage: ChatMessage = {
+        id: `ai-${Date.now()}`,
+        sender: 'ai',
+        text: data.answer || 'Maaf, tidak ada informasi yang ditemukan dari dokumen.',
+        sources: data.sources || [],
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+
+      setMessages((prev) => [...prev, aiMessage]);
+    } catch (err: any) {
+      const errorMessage: ChatMessage = {
+        id: `err-${Date.now()}`,
+        sender: 'ai',
+        text: `Terjadi kesalahan: ${err.message || 'Gagal menghubungi server'}`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isError: true,
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Restore messages and options from sessionStorage on mount (persists across page navigation)
   useEffect(() => {
     try {
@@ -41,6 +90,15 @@ export default function ChatWorkspace() {
         const parsed = JSON.parse(savedMessages);
         if (Array.isArray(parsed) && parsed.length > 0) {
           setMessages(parsed);
+
+          // Auto-resume: If the user navigated away while waiting for an answer,
+          // the last message will be from the user without an AI answer.
+          const lastMsg = parsed[parsed.length - 1];
+          if (lastMsg && lastMsg.sender === 'user') {
+            setTimeout(() => {
+              executeAiResponse(lastMsg.text);
+            }, 120);
+          }
         }
       }
       const savedPublic = sessionStorage.getItem('brilian_chat_allow_public');
@@ -52,6 +110,7 @@ export default function ChatWorkspace() {
     } finally {
       setIsRestored(true);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Save messages to sessionStorage whenever it changes (cleared only when browser/tab is closed)
@@ -96,9 +155,20 @@ export default function ChatWorkspace() {
 
   const handleSend = async (queryText?: string) => {
     const textToSend = (queryText || inputQuery).trim();
-    if (!textToSend || isLoading) return;
 
-    setActiveQueryText(textToSend);
+    // If input is empty, check if there is an unanswered question at the end of messages
+    if (!textToSend) {
+      if (messages.length > 0 && !isLoading) {
+        const lastMsg = messages[messages.length - 1];
+        if (lastMsg.sender === 'user') {
+          await executeAiResponse(lastMsg.text);
+        }
+      }
+      return;
+    }
+
+    if (isLoading) return;
+
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       sender: 'user',
@@ -108,47 +178,8 @@ export default function ChatWorkspace() {
 
     setMessages((prev) => [...prev, userMessage]);
     setInputQuery('');
-    setIsLoading(true);
 
-    try {
-      const payload = {
-        query: textToSend,
-        allowPublicKnowledge,
-      };
-
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Gagal memproses pertanyaan');
-      }
-
-      const aiMessage: ChatMessage = {
-        id: `ai-${Date.now()}`,
-        sender: 'ai',
-        text: data.answer || 'Maaf, tidak ada informasi yang ditemukan dari dokumen.',
-        sources: data.sources || [],
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-
-      setMessages((prev) => [...prev, aiMessage]);
-    } catch (err: any) {
-      const errorMessage: ChatMessage = {
-        id: `err-${Date.now()}`,
-        sender: 'ai',
-        text: `Terjadi kesalahan: ${err.message || 'Gagal menghubungi server'}`,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isError: true,
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
-    }
+    await executeAiResponse(textToSend);
   };
 
   const handleClearHistory = () => {
@@ -439,13 +470,62 @@ export default function ChatWorkspace() {
           ) : (
             /* Active Message Stream */
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-              {messages.map((msg) => (
+              {messages.map((msg, idx) => (
                 <ChatMessageItem
                   key={msg.id}
                   message={msg}
                   onSelectCitation={(source) => setInspectingSource(source)}
+                  onRetry={() => {
+                    if (msg.sender === 'user') {
+                      executeAiResponse(msg.text);
+                    } else {
+                      const prevUser = [...messages.slice(0, idx)].reverse().find((m) => m.sender === 'user');
+                      if (prevUser) executeAiResponse(prevUser.text);
+                    }
+                  }}
                 />
               ))}
+
+              {/* Banner jika pertanyaan terakhir belum dijawab (misal akibat pindah page) */}
+              {hasMessages && messages[messages.length - 1].sender === 'user' && !isLoading && (
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    margin: '0.25rem 0 1.25rem',
+                    padding: '8px 14px',
+                    borderRadius: 'var(--radius-sm)',
+                    backgroundColor: 'var(--bg-subtle)',
+                    border: '1px dashed var(--border-default)',
+                    fontSize: '13px',
+                    color: 'var(--text-secondary)',
+                    width: 'fit-content',
+                  }}
+                >
+                  <span>
+                    {language === 'en'
+                      ? 'Question waiting for answer:'
+                      : 'Pertanyaan ini belum terjawab:'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => executeAiResponse(messages[messages.length - 1].text)}
+                    className="btn btn-primary btn-sm"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '4px 12px',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    <RefreshCw size={13} />
+                    <span>{language === 'en' ? 'Get Answer' : 'Jawab Sekarang'}</span>
+                  </button>
+                </div>
+              )}
 
               {isLoading && (
                 <div
@@ -466,7 +546,9 @@ export default function ChatWorkspace() {
                 >
                   <Loader2 size={15} className="animate-spin" color="#2563EB" />
                   <span style={{ fontWeight: 500 }}>
-                    Searching isolated internal documents...
+                    {language === 'en'
+                      ? 'Searching isolated internal documents...'
+                      : 'Menganalisis dokumen internal...'}
                   </span>
                 </div>
               )}

@@ -128,7 +128,7 @@ describe('vectorStore (PostgreSQL + pgvector Store)', () => {
     expect(batches[0].id).toBe('b2');
 
     const [sql] = mockPool.query.mock.calls[0];
-    expect(sql).toContain('ORDER BY uploaded_at DESC');
+    expect(sql).toContain('uploaded_at DESC');
   });
 
   it('5. deleteUploadBatch() should execute DELETE and return true on success', async () => {

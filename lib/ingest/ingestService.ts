@@ -105,18 +105,9 @@ export async function ingestPdf(
 
   console.log(`[IngestPipeline] ✅ SUKSES! Batch ID: ${batchId}, Total Halaman: ${pageCount}, Total Chunks: ${chunkCount} tersimpan di pgvector.`);
 
-  // 7. Otomatis langsung membuat kurasi insight menyeluruh di background begitu data mentah lengkap
-  if (chunkCount > 0) {
-    console.log(`[IngestPipeline] 🤖 Data mentah lengkap (${chunkCount} chunks)! Memulai kurasi AI otomatis menyeluruh untuk batch ${batchId}...`);
-    import('../curation/curationService')
-      .then(({ curateAllChunks }) => curateAllChunks(batchId, 20))
-      .then((totalCurated) => {
-        console.log(`[IngestPipeline] ✅ Kurasi AI otomatis 100% selesai: ${totalCurated}/${chunkCount} insight berhasil dibuat untuk batch ${batchId}.`);
-      })
-      .catch((err) => {
-        console.warn(`[IngestPipeline] Kurasi AI otomatis info/warning untuk batch ${batchId}:`, err);
-      });
-  }
+  // 7. Catatan: Kurasi AI tidak lagi berjalan otomatis di background
+  // Dokumen tersimpan dengan status 'Belum Dikurasi', dan pengguna dapat menjalankannya manual via Studio
+  console.log(`[IngestPipeline] 📄 Dokumen siap. Status: Belum Dikurasi (tersedia kurasi manual via Studio).`);
 
   // 8. Return complete upload result
   return {

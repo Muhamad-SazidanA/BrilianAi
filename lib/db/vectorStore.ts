@@ -7,6 +7,7 @@ export interface UploadBatch {
   page_count: number;
   uploaded_at: Date | string;
   is_active_knowledge?: boolean;
+  curated_count?: number;
 }
 
 export interface ChunkInput {
@@ -139,6 +140,7 @@ export async function insertChunks(
 
 /**
  * Lists all upload batches ordered by latest uploaded_at first.
+ * Mengembalikan metadata batch beserta total curated_count dari tabel curated_insights.
  *
  * @returns Promise<UploadBatch[]> - Array of upload batches
  */
@@ -146,44 +148,89 @@ export async function listBatches(): Promise<UploadBatch[]> {
   const pool = getPool();
   try {
     const sql = `
-      SELECT id, original_filename, chunk_count, page_count, uploaded_at, COALESCE(is_active_knowledge, false) AS is_active_knowledge
-      FROM upload_batches
-      ORDER BY uploaded_at DESC;
+      SELECT 
+        b.id, 
+        b.original_filename, 
+        b.chunk_count, 
+        b.page_count, 
+        b.uploaded_at, 
+        COALESCE(b.is_active_knowledge, false) AS is_active_knowledge,
+        COALESCE(ci.curated_count, 0)::int AS curated_count
+      FROM upload_batches b
+      LEFT JOIN (
+        SELECT upload_batch_id, COUNT(*)::int AS curated_count
+        FROM curated_insights
+        GROUP BY upload_batch_id
+      ) ci ON ci.upload_batch_id = b.id
+      ORDER BY b.uploaded_at DESC;
     `;
     const result = await pool.query<UploadBatch>(sql);
     return result.rows;
   } catch {
     const fallbackSql = `
-      SELECT id, original_filename, chunk_count, page_count, uploaded_at
+      SELECT id, original_filename, chunk_count, page_count, uploaded_at, COALESCE(is_active_knowledge, false) AS is_active_knowledge
       FROM upload_batches
       ORDER BY uploaded_at DESC;
     `;
-    const result = await pool.query<UploadBatch>(fallbackSql);
-    return result.rows.map((b) => ({ ...b, is_active_knowledge: false }));
+    try {
+      const result = await pool.query<UploadBatch>(fallbackSql);
+      return result.rows.map((b) => ({ ...b, curated_count: 0 }));
+    } catch {
+      const basicSql = `
+        SELECT id, original_filename, chunk_count, page_count, uploaded_at
+        FROM upload_batches
+        ORDER BY uploaded_at DESC;
+      `;
+      const result = await pool.query<UploadBatch>(basicSql);
+      return result.rows.map((b) => ({ ...b, is_active_knowledge: false, curated_count: 0 }));
+    }
   }
 }
 
 /**
- * Gets a single upload batch by ID.
+ * Gets a single upload batch by ID beserta curated_count.
  */
 export async function getBatchById(batchId: string): Promise<UploadBatch | null> {
   const pool = getPool();
   try {
     const sql = `
-      SELECT id, original_filename, chunk_count, page_count, uploaded_at, COALESCE(is_active_knowledge, false) AS is_active_knowledge
-      FROM upload_batches
-      WHERE id = $1;
+      SELECT 
+        b.id, 
+        b.original_filename, 
+        b.chunk_count, 
+        b.page_count, 
+        b.uploaded_at, 
+        COALESCE(b.is_active_knowledge, false) AS is_active_knowledge,
+        COALESCE(ci.curated_count, 0)::int AS curated_count
+      FROM upload_batches b
+      LEFT JOIN (
+        SELECT upload_batch_id, COUNT(*)::int AS curated_count
+        FROM curated_insights
+        WHERE upload_batch_id = $1
+        GROUP BY upload_batch_id
+      ) ci ON ci.upload_batch_id = b.id
+      WHERE b.id = $1;
     `;
     const result = await pool.query<UploadBatch>(sql, [batchId]);
     return result.rows[0] || null;
   } catch {
     const fallbackSql = `
-      SELECT id, original_filename, chunk_count, page_count, uploaded_at
+      SELECT id, original_filename, chunk_count, page_count, uploaded_at, COALESCE(is_active_knowledge, false) AS is_active_knowledge
       FROM upload_batches
       WHERE id = $1;
     `;
-    const result = await pool.query<UploadBatch>(fallbackSql, [batchId]);
-    return result.rows[0] ? { ...result.rows[0], is_active_knowledge: false } : null;
+    try {
+      const result = await pool.query<UploadBatch>(fallbackSql, [batchId]);
+      return result.rows[0] ? { ...result.rows[0], curated_count: 0 } : null;
+    } catch {
+      const basicSql = `
+        SELECT id, original_filename, chunk_count, page_count, uploaded_at
+        FROM upload_batches
+        WHERE id = $1;
+      `;
+      const result = await pool.query<UploadBatch>(basicSql, [batchId]);
+      return result.rows[0] ? { ...result.rows[0], is_active_knowledge: false, curated_count: 0 } : null;
+    }
   }
 }
 

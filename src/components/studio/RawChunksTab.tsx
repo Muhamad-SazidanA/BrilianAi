@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, Layers, Copy, Check, FileText } from 'lucide-react';
+import { Search, Layers, Copy, Check, FileText, Sparkles, ArrowRight } from 'lucide-react';
 import { DocumentChunk } from '@/types/document';
 import { useLanguage } from '@/context/LanguageContext';
 import { toast } from 'sonner';
@@ -9,9 +9,16 @@ import { toast } from 'sonner';
 interface RawChunksTabProps {
   chunks: DocumentChunk[];
   isLoading: boolean;
+  curatedCount?: number;
+  onStartCuration?: () => void;
 }
 
-export default function RawChunksTab({ chunks, isLoading }: RawChunksTabProps) {
+export default function RawChunksTab({
+  chunks,
+  isLoading,
+  curatedCount = 0,
+  onStartCuration,
+}: RawChunksTabProps) {
   const { language, t } = useLanguage();
   const [search, setSearch] = useState('');
   const [copiedId, setCopiedId] = useState<string | number | null>(null);
@@ -33,6 +40,66 @@ export default function RawChunksTab({ chunks, isLoading }: RawChunksTabProps) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      {/* Uncurated Notification Banner */}
+      {!isLoading && curatedCount === 0 && chunks.length > 0 && (
+        <div
+          className="ui-card"
+          style={{
+            padding: '1.25rem 1.5rem',
+            background: 'linear-gradient(135deg, var(--bg-card) 0%, var(--bg-subtle) 100%)',
+            border: '1px solid var(--color-primary-subtle)',
+            borderRadius: 'var(--radius-lg)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '1rem',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                backgroundColor: 'var(--color-primary-subtle)',
+                color: 'var(--color-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <Sparkles size={20} />
+            </div>
+            <div>
+              <h4 style={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                {language === 'en'
+                  ? 'Document is not yet curated'
+                  : 'Dokumen ini belum memiliki kurasi insight'}
+              </h4>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                {language === 'en'
+                  ? `Extract key insights from ${chunks.length} raw chunks into structured knowledge cards with real-time 1-100% progress.`
+                  : `Ekstrak intisari dari ${chunks.length} raw chunk menjadi kartu insight terstruktur dengan loading persentase 1-100%.`}
+              </p>
+            </div>
+          </div>
+
+          {onStartCuration && (
+            <button
+              onClick={onStartCuration}
+              className="btn btn-primary btn-sm"
+              style={{ padding: '8px 16px', fontWeight: 600 }}
+            >
+              <Sparkles size={14} />
+              <span>{language === 'en' ? 'Start AI Curation' : 'Mulai Kurasi AI'}</span>
+              <ArrowRight size={13} />
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Search Header */}
       <div className="ui-card" style={{ padding: '1.25rem 1.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>

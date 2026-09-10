@@ -119,6 +119,72 @@ Ubah menjadi JSON Insight Kurasi sesuai format yang telah ditentukan.`;
 // Track active batches being curated to prevent parallel race conditions
 const activeCurationBatches = new Set<string>();
 
+export interface CurationProgress {
+  batchId: string;
+  totalChunks: number;
+  curatedChunks: number;
+  currentPercent: number;
+  status: 'idle' | 'running' | 'completed' | 'error';
+  currentChunkTitle?: string;
+  error?: string;
+  updatedAt: number;
+}
+
+const progressMap = new Map<string, CurationProgress>();
+
+/**
+ * Mendapatkan progres kurasi dokumen secara real-time.
+ * Jika sedang berjalan, mengambil dari memory. Jika tidak, menghitung langsung dari DB.
+ */
+export async function getCurationProgress(batchId: string): Promise<CurationProgress> {
+  const existing = progressMap.get(batchId);
+  const isRunning = activeCurationBatches.has(batchId);
+
+  if (existing && isRunning) {
+    return existing;
+  }
+
+  // Jika tidak aktif, ambil hitungan aktual dari DB
+  try {
+    const rawChunks = await listChunks(batchId);
+    const existingInsights = await listCuratedInsights(batchId);
+    const totalChunks = rawChunks.length;
+    const curatedChunks = existingInsights.length;
+    const currentPercent =
+      totalChunks > 0 ? Math.min(100, Math.round((curatedChunks / totalChunks) * 100)) : 100;
+
+    const status: 'idle' | 'running' | 'completed' | 'error' = isRunning
+      ? 'running'
+      : totalChunks > 0 && curatedChunks >= totalChunks
+      ? 'completed'
+      : curatedChunks > 0
+      ? 'idle'
+      : 'idle';
+
+    const progress: CurationProgress = {
+      batchId,
+      totalChunks,
+      curatedChunks,
+      currentPercent,
+      status,
+      currentChunkTitle: existing?.currentChunkTitle || (status === 'completed' ? 'Selesai' : undefined),
+      updatedAt: Date.now(),
+    };
+    progressMap.set(batchId, progress);
+    return progress;
+  } catch (err: any) {
+    return {
+      batchId,
+      totalChunks: 0,
+      curatedChunks: 0,
+      currentPercent: 0,
+      status: 'error',
+      error: err?.message || 'Gagal memeriksa progres',
+      updatedAt: Date.now(),
+    };
+  }
+}
+
 /**
  * Checks whether a batch is currently being curated.
  */
@@ -129,7 +195,11 @@ export function isBatchCurating(batchId: string): boolean {
 /**
  * Internal logic to curate raw chunks incrementally for a batch.
  */
-async function curateBatchInternal(batchId: string, limit: number = 25): Promise<CuratedInsight[]> {
+async function curateBatchInternal(
+  batchId: string,
+  limit: number = 25,
+  onProgress?: (curatedChunk: CuratedInsight, index: number, total: number) => void
+): Promise<CuratedInsight[]> {
   const rawChunks = await listChunks(batchId);
   if (rawChunks.length === 0) {
     return [];
@@ -152,6 +222,7 @@ async function curateBatchInternal(batchId: string, limit: number = 25): Promise
   }
 
   const results: CuratedInsight[] = [];
+  let processedIndex = 0;
 
   for (const chunk of uncuratedChunks) {
     const pageLabel =
@@ -187,6 +258,10 @@ async function curateBatchInternal(batchId: string, limit: number = 25): Promise
 
     if (inserted.length > 0) {
       results.push(inserted[0]);
+      processedIndex++;
+      if (onProgress) {
+        onProgress(inserted[0], processedIndex, uncuratedChunks.length);
+      }
     }
   }
 
@@ -214,6 +289,7 @@ export async function curateBatch(batchId: string, limit: number = 25): Promise<
 /**
  * Continuously curates ALL raw chunks for a batch in iterative safe micro-batches (default: 20)
  * until 100% of chunks are converted into curated insights.
+ * Memperbarui progressMap secara real-time untuk visual progress bar 1-100%.
  */
 export async function curateAllChunks(
   batchId: string,
@@ -225,26 +301,84 @@ export async function curateAllChunks(
   }
 
   activeCurationBatches.add(batchId);
-  let totalCurated = 0;
-  console.log(`[CurationService] Memulai kurasi AI otomatis menyeluruh untuk batch ${batchId}...`);
+
+  // Inisialisasi status progres
+  const rawChunks = await listChunks(batchId);
+  const initialInsights = await listCuratedInsights(batchId);
+  const totalChunks = rawChunks.length;
+  let curatedCount = initialInsights.length;
+
+  const initialPercent = totalChunks > 0 ? Math.round((curatedCount / totalChunks) * 100) : 100;
+  progressMap.set(batchId, {
+    batchId,
+    totalChunks,
+    curatedChunks: curatedCount,
+    currentPercent: Math.max(1, initialPercent),
+    status: 'running',
+    currentChunkTitle: 'Menyiapkan proses kurasi...',
+    updatedAt: Date.now(),
+  });
+
+  let totalNewCurated = 0;
+  console.log(`[CurationService] Memulai kurasi AI manual untuk batch ${batchId} (${totalChunks} chunks total)...`);
 
   try {
     while (true) {
-      const newlyCurated = await curateBatchInternal(batchId, microBatchSize);
+      const newlyCurated = await curateBatchInternal(
+        batchId,
+        microBatchSize,
+        (insight) => {
+          curatedCount++;
+          const percent = totalChunks > 0 ? Math.min(100, Math.round((curatedCount / totalChunks) * 100)) : 100;
+          progressMap.set(batchId, {
+            batchId,
+            totalChunks,
+            curatedChunks: curatedCount,
+            currentPercent: Math.max(1, percent),
+            status: 'running',
+            currentChunkTitle: insight.title,
+            updatedAt: Date.now(),
+          });
+        }
+      );
+
       if (newlyCurated.length === 0) {
         break;
       }
-      totalCurated += newlyCurated.length;
+      totalNewCurated += newlyCurated.length;
       console.log(
-        `[CurationService] Progres batch ${batchId}: +${newlyCurated.length} chunks baru (total terkurasi: ${totalCurated})`
+        `[CurationService] Progres batch ${batchId}: +${newlyCurated.length} chunks baru (total terkurasi: ${curatedCount}/${totalChunks})`
       );
     }
+
+    // Selesai 100%
+    progressMap.set(batchId, {
+      batchId,
+      totalChunks,
+      curatedChunks: curatedCount,
+      currentPercent: 100,
+      status: 'completed',
+      currentChunkTitle: 'Kurasi AI selesai 100%',
+      updatedAt: Date.now(),
+    });
+  } catch (err: any) {
+    console.error(`[CurationService] Error saat kurasi batch ${batchId}:`, err);
+    progressMap.set(batchId, {
+      batchId,
+      totalChunks,
+      curatedChunks: curatedCount,
+      currentPercent: totalChunks > 0 ? Math.round((curatedCount / totalChunks) * 100) : 0,
+      status: 'error',
+      error: err?.message || 'Terjadi kesalahan saat kurasi',
+      updatedAt: Date.now(),
+    });
+    throw err;
   } finally {
     activeCurationBatches.delete(batchId);
   }
 
   console.log(
-    `[CurationService] ✅ Selesai! Total ${totalCurated} chunks berhasil dikurasi menjadi insight untuk batch ${batchId}.`
+    `[CurationService] ✅ Selesai! Total ${totalNewCurated} chunks baru berhasil dikurasi menjadi insight untuk batch ${batchId}.`
   );
-  return totalCurated;
+  return totalNewCurated;
 }

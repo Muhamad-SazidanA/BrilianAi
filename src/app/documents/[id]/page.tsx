@@ -165,26 +165,110 @@ export default function DocumentStudioPage() {
                 </div>
               </div>
 
-              {/* Status Toggle & Chat Action */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <button
-                  onClick={handleToggleActive}
-                  className={`badge ${batch.is_active_knowledge ? 'badge-success' : 'badge-neutral'}`}
-                  style={{ cursor: 'pointer', padding: '6px 14px', fontSize: '12.5px', transition: 'all 0.15s ease' }}
-                  title="Klik untuk mengubah status basis pengetahuan RAG"
-                >
-                  {batch.is_active_knowledge ? (
-                    <>
-                      <CheckCircle2 size={14} />
-                      <span>{t('studio.active_badge')}</span>
-                    </>
+              {/* Curation & Knowledge Base Status & Action Buttons */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                {/* Curation Status Badge */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Status Kurasi
+                  </span>
+                  {insights.length > 0 ? (
+                    <span
+                      className="badge badge-success"
+                      style={{
+                        padding: '4px 10px',
+                        fontSize: '11.5px',
+                        fontWeight: 600,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                      }}
+                    >
+                      <CheckCircle2 size={12} />
+                      <span>Terkurasi ({insights.length} Insight)</span>
+                    </span>
                   ) : (
-                    <>
-                      <XCircle size={14} />
-                      <span>{t('studio.standby_badge')}</span>
-                    </>
+                    <span
+                      className="badge"
+                      style={{
+                        padding: '4px 10px',
+                        fontSize: '11.5px',
+                        fontWeight: 600,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        backgroundColor: 'var(--bg-subtle)',
+                        color: 'var(--text-muted)',
+                        border: '1px solid var(--border-default)',
+                      }}
+                    >
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--color-warning)' }} />
+                      <span>Belum Dikurasi</span>
+                    </span>
                   )}
-                </button>
+                </div>
+
+                {/* Vertical Divider */}
+                <div style={{ width: '1px', height: '32px', backgroundColor: 'var(--border-default)' }} />
+
+                {/* AI Knowledge Base Status and Action Button */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {batch.is_active_knowledge ? (
+                      <span
+                        style={{
+                          fontSize: '11.5px',
+                          fontWeight: 700,
+                          color: 'var(--color-success)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                        }}
+                      >
+                        <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: 'var(--color-success)', boxShadow: '0 0 6px var(--color-success)' }} />
+                        STATUS: AKTIF DI CHAT
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          fontSize: '11.5px',
+                          fontWeight: 600,
+                          color: 'var(--text-muted)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                        }}
+                      >
+                        <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: 'var(--border-default)' }} />
+                        STATUS: STANDBY (NON-AKTIF)
+                      </span>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={handleToggleActive}
+                    className={`btn btn-xs ${batch.is_active_knowledge ? 'btn-ghost-danger' : 'btn-outline'}`}
+                    style={{
+                      padding: '3px 10px',
+                      fontSize: '11.5px',
+                      borderRadius: 'var(--radius-xs)',
+                      fontWeight: 600,
+                    }}
+                    title="Klik untuk mengubah status dokumen dalam basis pencarian RAG Chat"
+                  >
+                    {batch.is_active_knowledge ? (
+                      <>
+                        <XCircle size={12} />
+                        <span>Nonaktifkan dari Chat</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 size={12} />
+                        <span>Aktifkan untuk Chat</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -239,7 +323,12 @@ export default function DocumentStudioPage() {
         )}
 
         {activeTab === 'chunks' && (
-          <RawChunksTab chunks={chunks} isLoading={isLoading} />
+          <RawChunksTab
+            chunks={chunks}
+            isLoading={isLoading}
+            curatedCount={insights.length}
+            onStartCuration={() => setActiveTab('insights')}
+          />
         )}
 
         {activeTab === 'metadata' && (

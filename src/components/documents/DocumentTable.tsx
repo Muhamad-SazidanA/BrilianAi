@@ -188,6 +188,7 @@ export default function DocumentTable({
                   <th style={{ padding: '14px 1rem' }}>{t('table.col_pages')}</th>
                   <th style={{ padding: '14px 1rem' }}>{t('table.col_chunks')}</th>
                   <th style={{ padding: '14px 1rem' }}>{t('table.col_time')}</th>
+                  <th style={{ padding: '14px 1rem' }}>{t('table.col_curation')}</th>
                   <th style={{ padding: '14px 1rem' }}>{t('table.col_status')}</th>
                   <th style={{ padding: '14px 1.5rem', textAlign: 'right' }}>{t('table.col_actions')}</th>
                 </tr>
@@ -204,6 +205,8 @@ export default function DocumentTable({
                       minute: '2-digit',
                     }
                   );
+
+                  const isCurated = (batch.curated_count || 0) > 0;
 
                   return (
                     <tr
@@ -264,30 +267,104 @@ export default function DocumentTable({
                         {formattedDate}
                       </td>
 
-                      {/* AI Knowledge toggle */}
+                      {/* Curation Status */}
                       <td style={{ padding: '14px 1rem' }}>
-                        <button
-                          onClick={() => onToggleActive(batch.id, !batch.is_active_knowledge)}
-                          className={`badge ${batch.is_active_knowledge ? 'badge-success' : 'badge-neutral'}`}
-                          style={{
-                            cursor: 'pointer',
-                            padding: '4px 10px',
-                            transition: 'all 0.15s ease',
-                          }}
-                          title={t('table.toggle_tooltip')}
-                        >
+                        {isCurated ? (
+                          <span
+                            className="badge badge-success"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              fontSize: '11.5px',
+                              padding: '4px 8px',
+                              fontWeight: 600,
+                            }}
+                          >
+                            <CheckCircle2 size={12} />
+                            <span>{t('table.curated_badge')} ({batch.curated_count})</span>
+                          </span>
+                        ) : (
+                          <span
+                            className="badge"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              fontSize: '11.5px',
+                              padding: '4px 8px',
+                              fontWeight: 600,
+                              backgroundColor: 'var(--bg-subtle)',
+                              color: 'var(--text-muted)',
+                              border: '1px solid var(--border-default)',
+                            }}
+                          >
+                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--color-warning)' }} />
+                            <span>{t('table.uncurated_badge')}</span>
+                          </span>
+                        )}
+                      </td>
+
+                      {/* AI Knowledge Base Toggle (Separated Status and Clear Action Button) */}
+                      <td style={{ padding: '14px 1rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start' }}>
+                          {/* Visual Status Indicator */}
                           {batch.is_active_knowledge ? (
-                            <>
-                              <CheckCircle2 size={12} />
-                              <span>{t('table.status_active')}</span>
-                            </>
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                color: 'var(--color-success)',
+                                letterSpacing: '0.02em',
+                              }}
+                            >
+                              <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: 'var(--color-success)', boxShadow: '0 0 6px var(--color-success)' }} />
+                              {t('table.status_active_rag')}
+                            </span>
                           ) : (
-                            <>
-                              <XCircle size={12} />
-                              <span>{t('table.status_inactive')}</span>
-                            </>
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                color: 'var(--text-muted)',
+                              }}
+                            >
+                              <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: 'var(--border-default)' }} />
+                              {t('table.status_standby')}
+                            </span>
                           )}
-                        </button>
+
+                          {/* Explicit Action Button */}
+                          <button
+                            onClick={() => onToggleActive(batch.id, !batch.is_active_knowledge)}
+                            className={`btn btn-xs ${batch.is_active_knowledge ? 'btn-ghost-danger' : 'btn-outline'}`}
+                            style={{
+                              padding: '2px 8px',
+                              fontSize: '11px',
+                              borderRadius: 'var(--radius-xs)',
+                              fontWeight: 600,
+                            }}
+                            title={t('table.toggle_tooltip')}
+                          >
+                            {batch.is_active_knowledge ? (
+                              <>
+                                <XCircle size={11} />
+                                <span>{t('table.action_deactivate')}</span>
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 size={11} />
+                                <span>{t('table.action_activate')}</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
                       </td>
 
                       {/* Actions */}
