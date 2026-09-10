@@ -84,7 +84,7 @@ export async function extractPdfPagesTextHybrid(
     throw new Error('Failed to process PDF: Document contains 0 pages.');
   }
 
-  console.log(`[IngestPipeline] 📄 Total ${pageCount} halaman terdeteksi dalam dokumen.`);
+  console.log(`[IngestPipeline] Total ${pageCount} halaman terdeteksi dalam dokumen.`);
 
   const results: PageTextResult[] = [];
 
@@ -101,7 +101,7 @@ export async function extractPdfPagesTextHybrid(
         // Log periodically for large documents to avoid flooding console
         if (pageNumber % 50 === 1 || pageNumber === pageCount || pageCount <= 30) {
           console.log(
-            `[IngestPipeline] ⚡ Halaman ${pageNumber}/${pageCount}: Fast-Path Teks Digital (${digitalText.length} karakter)`
+            `[IngestPipeline] Halaman ${pageNumber}/${pageCount}: Fast-Path Teks Digital (${digitalText.length} karakter)`
           );
         }
         results.push({
@@ -111,7 +111,7 @@ export async function extractPdfPagesTextHybrid(
       } else {
         // Only render image on-demand if digital text is empty / scanned
         console.log(
-          `[IngestPipeline] 🤖 Halaman ${pageNumber}/${pageCount}: Teks digital minim/scan, memindai via AI Vision...`
+          `[IngestPipeline] Halaman ${pageNumber}/${pageCount}: Teks digital minim/scan, memindai via AI Vision...`
         );
         pixmap = page.toPixmap(mupdf.Matrix.scale(1.0, 1.0), mupdf.ColorSpace.DeviceRGB);
         const pngBytes = pixmap.asPNG();

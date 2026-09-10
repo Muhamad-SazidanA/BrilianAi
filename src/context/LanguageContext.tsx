@@ -17,6 +17,9 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.documents': 'Knowledge Base',
     'nav.upload': 'Upload Dokumen',
     'nav.chat': 'AI Assistant',
+    'nav.users': 'Kelola Pengguna',
+    'nav.roles': 'Role & Hak Akses',
+    'nav.audit_logs': 'Audit Log Percakapan',
     'nav.close_sidebar': 'Tutup Sidebar (Collapse)',
     'nav.open_sidebar': 'Buka Sidebar (Expand)',
 
@@ -25,6 +28,9 @@ const translations: Record<Language, Record<string, string>> = {
     'header.documents': 'Knowledge Base',
     'header.upload': 'Ingestion & Upload',
     'header.chat': 'AI Assistant',
+    'header.users': 'Kelola Pengguna',
+    'header.roles': 'Role & Hak Akses',
+    'header.logs': 'Audit Log Percakapan',
     'header.upload_btn': 'Upload PDF',
     'header.chat_btn': 'Tanya AI',
 
@@ -266,6 +272,9 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.documents': 'Knowledge Base',
     'nav.upload': 'Upload Document',
     'nav.chat': 'AI Assistant',
+    'nav.users': 'User Management',
+    'nav.roles': 'Roles & Permissions',
+    'nav.audit_logs': 'Chat Audit Logs',
     'nav.close_sidebar': 'Collapse Sidebar',
     'nav.open_sidebar': 'Expand Sidebar',
 
@@ -274,6 +283,9 @@ const translations: Record<Language, Record<string, string>> = {
     'header.documents': 'Knowledge Base',
     'header.upload': 'Ingestion & Upload',
     'header.chat': 'AI Assistant',
+    'header.users': 'User Management',
+    'header.roles': 'Roles & Permissions',
+    'header.logs': 'Chat Audit Logs',
     'header.upload_btn': 'Upload PDF',
     'header.chat_btn': 'Ask AI',
 

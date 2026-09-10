@@ -15,6 +15,7 @@ import {
 import {
   isStandardFisioterapiQuery,
   generateChatCacheKey,
+  clearChatCache,
 } from '../lib/db/chatCacheStore';
 import { POST as handleChatRoute } from '../src/app/api/chat/route';
 import { NextRequest } from 'next/server';
@@ -27,6 +28,7 @@ describe('AI Chatbot Service (Llama 3.2 3B & pgvector RAG)', () => {
   beforeEach(() => {
     mockPool.query.mockReset();
     vi.clearAllMocks();
+    clearChatCache();
     vi.spyOn(dbClient, 'getPool').mockReturnValue(mockPool as any);
   });
 

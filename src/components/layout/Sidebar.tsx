@@ -11,9 +11,14 @@ import {
   MessageSquare,
   ChevronsLeft,
   ChevronsRight,
+  Users,
+  ShieldCheck,
+  ScrollText,
 } from 'lucide-react';
 import NavUser from './NavUser';
 import { useLanguage } from '@/context/LanguageContext';
+import { useUserSession } from '@/context/UserSessionContext';
+import { PermissionKey } from '@/types/user';
 
 interface SidebarProps {
   stats?: {
@@ -31,6 +36,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const { language, t } = useLanguage();
+  const { currentUser, hasPermission } = useUserSession();
   const [docCount, setDocCount] = useState<number>(stats?.totalDocuments || 0);
 
   useEffect(() => {
@@ -58,6 +64,7 @@ export default function Sidebar({
           icon: LayoutDashboard,
           badge: null,
           isActive: pathname === '/',
+          permission: null,
         },
         {
           label: t('nav.upload'),
@@ -65,6 +72,7 @@ export default function Sidebar({
           icon: UploadCloud,
           badge: null,
           isActive: pathname === '/upload',
+          permission: 'documents:upload' as PermissionKey,
         },
         {
           label: t('nav.documents'),
@@ -73,11 +81,12 @@ export default function Sidebar({
           badge: docCount > 0 ? `${docCount}` : null,
           badgeVariant: 'badge-neutral',
           isActive: pathname.startsWith('/documents'),
+          permission: 'documents:read' as PermissionKey,
         },
-      ],
+      ].filter((item) => !item.permission || hasPermission(item.permission)),
     },
     {
-      group: language === 'en' ? 'Assistant & Analytics' : 'Asisten & Analisis',
+      group: language === 'en' ? 'Assistant' : 'Asisten AI',
       items: [
         {
           label: t('nav.chat'),
@@ -85,10 +94,40 @@ export default function Sidebar({
           icon: MessageSquare,
           badge: null,
           isActive: pathname === '/chat',
+          permission: 'chat:query' as PermissionKey,
         },
-      ],
+      ].filter((item) => !item.permission || hasPermission(item.permission)),
     },
-  ];
+    {
+      group: language === 'en' ? 'Administration & Audit' : 'Administrasi & Keamanan',
+      items: [
+        {
+          label: t('nav.users'),
+          href: '/users',
+          icon: Users,
+          badge: null,
+          isActive: pathname.startsWith('/users'),
+          permission: 'users:manage' as PermissionKey,
+        },
+        {
+          label: t('nav.roles'),
+          href: '/roles',
+          icon: ShieldCheck,
+          badge: null,
+          isActive: pathname.startsWith('/roles'),
+          permission: 'roles:manage' as PermissionKey,
+        },
+        {
+          label: t('nav.audit_logs'),
+          href: '/logs',
+          icon: ScrollText,
+          badge: null,
+          isActive: pathname.startsWith('/logs'),
+          permission: 'audit:read' as PermissionKey,
+        },
+      ].filter((item) => !item.permission || hasPermission(item.permission)),
+    },
+  ].filter((group) => group.items.length > 0);
 
   return (
     <aside className={`app-sidebar ${isCollapsed ? 'collapsed' : ''}`}>
@@ -264,10 +303,14 @@ export default function Sidebar({
         }}
       >
         <NavUser
-          user={{
-            name: 'Admin',
-            email: 'admin@brilian.ai',
-          }}
+          user={
+            currentUser
+              ? {
+                  name: currentUser.name,
+                  email: currentUser.email,
+                }
+              : undefined
+          }
           version="Brilian.Ai v1.0.0"
           isCollapsed={isCollapsed}
         />

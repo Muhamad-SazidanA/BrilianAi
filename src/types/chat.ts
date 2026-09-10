@@ -30,6 +30,13 @@ export interface ChatRequestPayload {
   documentId?: string;
   allowPublicKnowledge?: boolean;
   bypassCache?: boolean;
+  user?: {
+    id?: string;
+    name?: string;
+    email?: string;
+    department?: string;
+  };
+  sessionId?: string;
 }
 
 export interface ChatResponsePayload {

@@ -17,9 +17,12 @@ import {
   Cpu,
   Database,
   HelpCircle,
+  Users,
 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { useUserSession } from '@/context/UserSessionContext';
 import { toast } from 'sonner';
+import UserAvatar from '@/components/ui/UserAvatar';
 
 interface NavUserProps {
   user?: {
@@ -39,12 +42,18 @@ export default function NavUser({
   isCollapsed = false,
 }: NavUserProps) {
   const { language, setLanguage, t } = useLanguage();
+  const { currentUser, allUsers, switchUser } = useUserSession();
   const [isOpen, setIsOpen] = useState(false);
   const [showPreferencesSubmenu, setShowPreferencesSubmenu] = useState(false);
+  const [showSwitchUserSubmenu, setShowSwitchUserSubmenu] = useState(false);
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>('light');
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+
+  const activeName = currentUser?.name || user.name;
+  const activeEmail = currentUser?.email || user.email;
+  const activeColor = currentUser?.avatar_color || '#2563EB';
 
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -88,6 +97,7 @@ export default function NavUser({
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
         setShowPreferencesSubmenu(false);
+        setShowSwitchUserSubmenu(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -108,6 +118,7 @@ export default function NavUser({
         onClick={() => {
           setIsOpen(!isOpen);
           setShowPreferencesSubmenu(false);
+          setShowSwitchUserSubmenu(false);
         }}
         style={{
           width: '100%',
@@ -126,27 +137,10 @@ export default function NavUser({
         }}
         className="hover:bg-slate-100 dark:hover:bg-slate-800"
         aria-expanded={isOpen}
-        title={isCollapsed ? `${user.name} (${user.email})` : undefined}
+        title={isCollapsed ? `${activeName} (${activeEmail})` : undefined}
       >
-        {/* Avatar Circle with "A" */}
-        <div
-          style={{
-            width: '34px',
-            height: '34px',
-            borderRadius: '50%',
-            backgroundColor: 'var(--bg-subtle, #F4F4F5)',
-            border: '1px solid var(--border-default, #E4E4E7)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: 600,
-            fontSize: '14px',
-            color: 'var(--color-primary, #2563EB)',
-            flexShrink: 0,
-          }}
-        >
-          {user.name.charAt(0).toUpperCase()}
-        </div>
+        {/* Avatar Circle (Standard Neutral Spensify Avatar) */}
+        <UserAvatar name={activeName} size={34} />
 
         {/* User name & email (hidden when collapsed) */}
         {!isCollapsed && (
@@ -163,7 +157,7 @@ export default function NavUser({
                   whiteSpace: 'nowrap',
                 }}
               >
-                {user.name}
+                {activeName}
               </div>
               <div
                 style={{
@@ -175,7 +169,7 @@ export default function NavUser({
                   whiteSpace: 'nowrap',
                 }}
               >
-                {user.email}
+                {activeEmail}
               </div>
             </div>
 
@@ -212,24 +206,7 @@ export default function NavUser({
               padding: '6px 8px',
             }}
           >
-            <div
-              style={{
-                width: '28px',
-                height: '28px',
-                borderRadius: '50%',
-                backgroundColor: 'var(--bg-subtle, #F4F4F5)',
-                border: '1px solid var(--border-default, #E4E4E7)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 600,
-                fontSize: '12px',
-                color: 'var(--color-primary, #2563EB)',
-                flexShrink: 0,
-              }}
-            >
-              {user.name.charAt(0).toUpperCase()}
-            </div>
+            <UserAvatar name={activeName} size={28} />
             <div style={{ minWidth: 0, flex: 1 }}>
               <div
                 style={{
@@ -242,7 +219,7 @@ export default function NavUser({
                   lineHeight: '15px',
                 }}
               >
-                {user.name}
+                {activeName}
               </div>
               <div
                 style={{
@@ -254,7 +231,7 @@ export default function NavUser({
                   lineHeight: '13px',
                 }}
               >
-                {user.email}
+                {activeEmail}
               </div>
             </div>
           </div>
@@ -290,6 +267,104 @@ export default function NavUser({
             <CircleUser size={14} strokeWidth={1.75} color="var(--text-secondary, #64748B)" />
             <span>{t('user.profile')}</span>
           </button>
+
+          {/* Item 1b: Ganti Akun Demo (Switch User) */}
+          <div style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => {
+                setShowSwitchUserSubmenu(!showSwitchUserSubmenu);
+                setShowPreferencesSubmenu(false);
+              }}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '6px 8px',
+                borderRadius: '5px',
+                fontSize: '12.5px',
+                fontWeight: 500,
+                color: 'var(--text-primary, #0F172A)',
+                backgroundColor: showSwitchUserSubmenu ? 'var(--bg-subtle, #F1F5F9)' : 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'background-color 0.1s ease',
+              }}
+              className="hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Users size={14} strokeWidth={1.75} color="var(--text-secondary, #64748B)" />
+                <span>{language === 'en' ? 'Switch User' : 'Ganti Akun'}</span>
+              </div>
+              <ChevronRight size={12} color="var(--text-secondary, #64748B)" />
+            </button>
+
+            {/* Submenu Switch User */}
+            {showSwitchUserSubmenu && (
+              <div
+                style={{
+                  position: 'absolute',
+                  left: 'calc(100% + 6px)',
+                  bottom: '-30px',
+                  width: '210px',
+                  backgroundColor: 'var(--bg-card, #FFFFFF)',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-default, #E2E8F0)',
+                  boxShadow: 'var(--shadow-lg, 0 10px 25px -5px rgba(0, 0, 0, 0.1))',
+                  padding: '4px',
+                  zIndex: 10000,
+                }}
+              >
+                <div style={{ padding: '4px 8px', fontSize: '10.5px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                  {language === 'en' ? 'Select User' : 'Pilih Akun Demo'}
+                </div>
+                {allUsers.map((u) => {
+                  const isCurrent = (currentUser?.id || '') === u.id;
+                  return (
+                    <button
+                      key={u.id}
+                      type="button"
+                      onClick={() => {
+                        switchUser(u.id);
+                        setShowSwitchUserSubmenu(false);
+                        setIsOpen(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '6px 8px',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        backgroundColor: isCurrent ? 'var(--color-primary-subtle, #EFF6FF)' : 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        gap: '6px',
+                      }}
+                      className="hover:bg-slate-100 dark:hover:bg-slate-800"
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+                        <UserAvatar name={u.name} size={18} />
+                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: isCurrent ? 600 : 400 }}>
+                          {u.name}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
+                          {u.role_id}
+                        </span>
+                        {isCurrent && <Check size={12} color="var(--color-primary, #2563EB)" />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
           {/* Item 2: Preferensi (Tema & Bahasa) */}
           <div style={{ position: 'relative' }}>
@@ -561,23 +636,7 @@ export default function NavUser({
 
             {/* Profile Avatar & Title */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '1.25rem' }}>
-              <div
-                style={{
-                  width: '52px',
-                  height: '52px',
-                  borderRadius: '50%',
-                  backgroundColor: 'var(--color-primary-subtle, #EFF6FF)',
-                  border: '2px solid var(--color-primary-border, #BFDBFE)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '22px',
-                  fontWeight: 700,
-                  color: 'var(--color-primary, #2563EB)',
-                }}
-              >
-                {user.name.charAt(0).toUpperCase()}
-              </div>
+              <UserAvatar name={user.name} size="xl" />
               <div>
                 <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>
                   {user.name}

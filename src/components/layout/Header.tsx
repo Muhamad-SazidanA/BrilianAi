@@ -44,6 +44,24 @@ export default function Header({ title, subtitle, actions }: HeaderProps) {
         { label: t('header.chat'), href: '/chat' },
       ];
     }
+    if (pathname === '/users') {
+      return [
+        { label: t('header.dashboard'), href: '/' },
+        { label: t('header.users'), href: '/users' },
+      ];
+    }
+    if (pathname === '/roles') {
+      return [
+        { label: t('header.dashboard'), href: '/' },
+        { label: t('header.roles'), href: '/roles' },
+      ];
+    }
+    if (pathname === '/logs') {
+      return [
+        { label: t('header.dashboard'), href: '/' },
+        { label: t('header.logs'), href: '/logs' },
+      ];
+    }
     return [{ label: t('header.dashboard'), href: '/' }];
   };
 

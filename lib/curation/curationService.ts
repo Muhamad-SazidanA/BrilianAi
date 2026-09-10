@@ -515,7 +515,7 @@ export async function curateAllChunks(
   }
 
   console.log(
-    `[CurationService] ✅ Selesai! Seluruh ${totalChunks} chunks diproses. Dihasilkan total ${totalNewCurated} insights baru untuk batch ${batchId}.`
+    `[CurationService] Sukses: Seluruh ${totalChunks} chunks diproses. Dihasilkan total ${totalNewCurated} insights baru untuk batch ${batchId}.`
   );
   return totalNewCurated;
 }

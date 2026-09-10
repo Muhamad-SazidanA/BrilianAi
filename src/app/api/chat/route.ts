@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { askDocumentChat } from '@lib/chat/chatService';
+import { saveAuditLog } from '@lib/db/auditLogStore';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 menit batas eksekusi untuk CPU inference di VPS
@@ -7,7 +8,7 @@ export const maxDuration = 300; // 5 menit batas eksekusi untuk CPU inference di
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { query, documentId, allowPublicKnowledge, topK, minSimilarity, bypassCache } = body;
+    const { query, documentId, allowPublicKnowledge, topK, minSimilarity, bypassCache, user, sessionId } = body;
 
     if (!query || typeof query !== 'string' || query.trim().length === 0) {
       return NextResponse.json(
@@ -22,6 +23,21 @@ export async function POST(request: NextRequest) {
       topK: typeof topK === 'number' ? topK : undefined,
       minSimilarity: typeof minSimilarity === 'number' ? minSimilarity : undefined,
       bypassCache: Boolean(bypassCache),
+    });
+
+    // Record audit log asynchronously for enterprise monitoring & compliance
+    saveAuditLog({
+      sessionId: sessionId || `sess-${Date.now()}`,
+      userId: user?.id,
+      userName: user?.name || 'Muhammad Sazidan',
+      userEmail: user?.email || 'admin@brilian.ai',
+      userDepartment: user?.department || 'IT & Architecture',
+      queryText: query.trim(),
+      answerText: result.answer,
+      sources: result.sources,
+      retrievedCount: result.retrievedCount,
+    }).catch((err) => {
+      console.warn('[API /api/chat] Failed to record audit log:', err);
     });
 
     return NextResponse.json(result, { status: 200 });

@@ -45,28 +45,28 @@ export async function ingestPdf(
   const chunkOverlap = options?.chunkOverlap ?? 150;
   const minDigitalTextLength = options?.minDigitalTextLength ?? 40;
 
-  console.log(`[IngestPipeline] 🚀 Memulai ingestion file "${filename}" (${(fileBuffer.length / 1024).toFixed(1)} KB)...`);
+  console.log(`[IngestPipeline] Memulai ingestion file "${filename}" (${(fileBuffer.length / 1024).toFixed(1)} KB)...`);
 
   // 1 & 2. Streaming Hybrid Text Extraction
-  console.log(`[IngestPipeline] ⚡ 1/4 Memproses ekstraksi teks (Streaming Hybrid Engine)...`);
+  console.log(`[IngestPipeline] [1/4] Memproses ekstraksi teks (Streaming Hybrid Engine)...`);
   const pagesText = await extractPdfPagesTextHybrid(fileBuffer, { minDigitalTextLength });
   const pageCount = pagesText.length;
 
   if (pageCount === 0) {
     throw new Error('PDF document contains 0 renderable pages.');
   }
-  console.log(`[IngestPipeline] ✓ Selesai mengekstrak seluruh ${pageCount} halaman.`);
+  console.log(`[IngestPipeline] Selesai mengekstrak seluruh ${pageCount} halaman.`);
 
   // 3. Sliding-window chunking with source page range tracking
-  console.log(`[IngestPipeline] ✂️ 2/4 Memotong teks menjadi Chunks dengan Sliding Window (size: ${chunkSize}, overlap: ${chunkOverlap})...`);
+  console.log(`[IngestPipeline] [2/4] Memotong teks menjadi Chunks dengan Sliding Window (size: ${chunkSize}, overlap: ${chunkOverlap})...`);
   const chunks = await chunkWithPageOffsets(pagesText, chunkSize, chunkOverlap);
   const chunkCount = chunks.length;
-  console.log(`[IngestPipeline] ✓ Menghasilkan ${chunkCount} chunks dengan pelacakan halaman.`);
+  console.log(`[IngestPipeline] Menghasilkan ${chunkCount} chunks dengan pelacakan halaman.`);
 
   // 4. Batch generate embeddings for all chunks in safe micro-batches of 10
   let embeddings: number[][] = [];
   if (chunkCount > 0) {
-    console.log(`[IngestPipeline] 🧠 3/4 Membuat embedding vector 1024-dim (OpenAI text-embedding-3-small) untuk ${chunkCount} chunks...`);
+    console.log(`[IngestPipeline] [3/4] Membuat embedding vector 1024-dim untuk ${chunkCount} chunks...`);
     const chunkContents = chunks.map((c) => c.content);
     
     // Process embeddings in micro-batches of 10 chunks to prevent HeadersTimeoutError
@@ -85,7 +85,7 @@ export async function ingestPdf(
   }
 
   // 5. Create upload batch record in PostgreSQL
-  console.log(`[IngestPipeline] 💾 4/4 Menyimpan batch & ${chunkCount} chunks ke pgvector...`);
+  console.log(`[IngestPipeline] [4/4] Menyimpan batch & ${chunkCount} chunks ke pgvector...`);
   const batchId = await createUploadBatch(filename, pageCount);
 
   // 6. Insert all document chunks with pgvector embeddings
@@ -103,11 +103,11 @@ export async function ingestPdf(
     await insertChunks(batchId, []);
   }
 
-  console.log(`[IngestPipeline] ✅ SUKSES! Batch ID: ${batchId}, Total Halaman: ${pageCount}, Total Chunks: ${chunkCount} tersimpan di pgvector.`);
+  console.log(`[IngestPipeline] Sukses: Batch ID: ${batchId}, Total Halaman: ${pageCount}, Total Chunks: ${chunkCount} tersimpan di pgvector.`);
 
   // 7. Catatan: Kurasi AI tidak lagi berjalan otomatis di background
   // Dokumen tersimpan dengan status 'Belum Dikurasi', dan pengguna dapat menjalankannya manual via Studio
-  console.log(`[IngestPipeline] 📄 Dokumen siap. Status: Belum Dikurasi (tersedia kurasi manual via Studio).`);
+  console.log(`[IngestPipeline] Dokumen siap. Status: Belum Dikurasi (tersedia kurasi manual via Studio).`);
 
   // 8. Return complete upload result
   return {

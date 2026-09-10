@@ -20,11 +20,13 @@ import {
 import ChatMessageItem from './ChatMessageItem';
 import CitationDrawer from './CitationDrawer';
 import { useLanguage } from '@/context/LanguageContext';
+import { useUserSession } from '@/context/UserSessionContext';
 import { toast } from 'sonner';
 
 export default function ChatWorkspace() {
   const router = useRouter();
   const { language, t } = useLanguage();
+  const { currentUser } = useUserSession();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputQuery, setInputQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -38,6 +40,7 @@ export default function ChatWorkspace() {
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const sessionIdRef = useRef<string>(`sess-${Date.now()}`);
 
   // Execute AI chat query and append response or create new variant on retry
   const executeAiResponse = async (
@@ -56,6 +59,15 @@ export default function ChatWorkspace() {
         query: trimmed,
         allowPublicKnowledge,
         bypassCache: isRetry,
+        user: currentUser
+          ? {
+              id: currentUser.id,
+              name: currentUser.name,
+              email: currentUser.email,
+              department: currentUser.department,
+            }
+          : undefined,
+        sessionId: sessionIdRef.current,
       };
 
       const res = await fetch('/api/chat', {

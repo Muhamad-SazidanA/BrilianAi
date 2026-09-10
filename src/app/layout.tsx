@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { LanguageProvider } from '@/context/LanguageContext';
+import { UserSessionProvider } from '@/context/UserSessionContext';
 import ToastProvider from '@/components/providers/ToastProvider';
 
 export const metadata: Metadata = {
@@ -20,8 +21,10 @@ export default function RootLayout({
     <html lang="id">
       <body>
         <LanguageProvider>
-          {children}
-          <ToastProvider />
+          <UserSessionProvider>
+            {children}
+            <ToastProvider />
+          </UserSessionProvider>
         </LanguageProvider>
       </body>
     </html>
