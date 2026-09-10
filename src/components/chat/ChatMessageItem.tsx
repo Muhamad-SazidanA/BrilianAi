@@ -312,7 +312,10 @@ export default function ChatMessageItem({
                       {src.filename.length > 20
                         ? `${src.filename.substring(0, 18)}...`
                         : src.filename}{' '}
-                      ({t('chat.page_abbr')} {src.pageStart})
+                      ({t('chat.page_abbr')}{' '}
+                      {src.pageStart === src.pageEnd
+                        ? src.pageStart
+                        : `${src.pageStart}-${src.pageEnd}`})
                     </span>
                     <ExternalLink size={10} style={{ opacity: 0.6 }} />
                   </button>

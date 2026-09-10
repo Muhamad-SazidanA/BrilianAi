@@ -457,6 +457,43 @@ export async function searchSimilarChunks(
           seenIds.add(row.id);
         }
       }
+
+      // Hybrid Re-ranking: Boost skor jika potongan teks / nama file memuat keyword pertanyaan
+      if (options?.textQuery && results.length > 0) {
+        const keywords = extractKeywords(options.textQuery);
+        if (keywords.length > 0) {
+          for (const row of results) {
+            let boost = 0;
+            const fnLower = (row.originalFilename || '').toLowerCase();
+            const contentLower = (row.content || '').toLowerCase();
+
+            // Boost jika nama file memuat keyword (contoh: "fisioterapi")
+            for (const kw of keywords) {
+              if (fnLower.includes(kw.toLowerCase())) {
+                boost += 0.30;
+                break;
+              }
+            }
+
+            // Boost jika isi teks memuat keyword
+            let matchCount = 0;
+            for (const kw of keywords) {
+              if (contentLower.includes(kw.toLowerCase())) {
+                matchCount++;
+              }
+            }
+            if (matchCount > 0) {
+              boost += Math.min(0.20, matchCount * 0.08);
+            }
+
+            if (boost > 0) {
+              row.similarity = Math.min(0.9999, row.similarity + boost);
+            }
+          }
+
+          results.sort((a, b) => b.similarity - a.similarity);
+        }
+      }
     } catch (err) {
       console.warn('[VectorStore] searchSimilarChunks vector search warning:', err);
     }
@@ -613,6 +650,42 @@ export async function searchSimilarCuratedInsights(
           row.similarity = sim;
           results.push(row);
           seenIds.add(row.id);
+        }
+      }
+
+      // Hybrid Re-ranking: Boost skor jika judul / konten / nama file memuat keyword pertanyaan
+      if (options?.textQuery && results.length > 0) {
+        const keywords = extractKeywords(options.textQuery);
+        if (keywords.length > 0) {
+          for (const row of results) {
+            let boost = 0;
+            const fnLower = (row.originalFilename || '').toLowerCase();
+            const titleLower = (row.title || '').toLowerCase();
+            const contentLower = (row.content || '').toLowerCase();
+
+            for (const kw of keywords) {
+              if (fnLower.includes(kw.toLowerCase()) || titleLower.includes(kw.toLowerCase())) {
+                boost += 0.30;
+                break;
+              }
+            }
+
+            let matchCount = 0;
+            for (const kw of keywords) {
+              if (contentLower.includes(kw.toLowerCase())) {
+                matchCount++;
+              }
+            }
+            if (matchCount > 0) {
+              boost += Math.min(0.20, matchCount * 0.08);
+            }
+
+            if (boost > 0) {
+              row.similarity = Math.min(0.9999, row.similarity + boost);
+            }
+          }
+
+          results.sort((a, b) => b.similarity - a.similarity);
         }
       }
     } catch (err) {

@@ -251,73 +251,32 @@ export async function askDocumentChat(
     evaluatedAnswer = rawAnswer;
   }
 
-  // 7. Format canonical source line: "Sumber: NamaPDF.pdf | Halaman X-Y"
+  // 7. Format canonical source line & sources badges secara cerdas & presisi
   const isNotFound = isDataNotFoundAnswer(evaluatedAnswer);
 
   let formattedAnswer = evaluatedAnswer.trim();
+  let sources: ChatSource[] = [];
+
   if (isNotFound) {
     formattedAnswer = formattedAnswer.replace(/\n*Sumber:\s*.*$/i, '').trim();
-  } else if (similarChunks.length > 0) {
-    const topChunk = similarChunks[0];
-    const sameFileChunks = similarChunks.filter(
-      (c) => c.originalFilename === topChunk.originalFilename
+  } else {
+    const { primaryFilename, pageLabel, filteredSources } = determineAccurateSources(
+      evaluatedAnswer,
+      similarChunks,
+      similarCurated
     );
-    const pages = Array.from(
-      new Set(sameFileChunks.flatMap((c) => [c.sourcePageStart, c.sourcePageEnd]))
-    ).sort((a, b) => a - b);
 
-    const minP = pages[0];
-    const maxP = pages[pages.length - 1];
-    const pageLabel = minP === maxP ? `Halaman ${minP}` : `Halaman ${minP}-${maxP}`;
-    const canonicalSource = `Sumber: ${topChunk.originalFilename} | ${pageLabel}`;
+    if (primaryFilename) {
+      const canonicalSource = `Sumber: ${primaryFilename} | ${pageLabel}`;
+      if (/Sumber:\s*.*$/i.test(formattedAnswer)) {
+        formattedAnswer = formattedAnswer.replace(/Sumber:\s*.*$/i, canonicalSource).trim();
+      } else {
+        formattedAnswer = `${formattedAnswer}\n\n${canonicalSource}`;
+      }
+    }
 
-    if (/Sumber:\s*.*$/i.test(formattedAnswer)) {
-      formattedAnswer = formattedAnswer.replace(/Sumber:\s*.*$/i, canonicalSource).trim();
-    } else {
-      formattedAnswer = `${formattedAnswer}\n\n${canonicalSource}`;
-    }
-  } else if (similarCurated.length > 0) {
-    const topCurated = similarCurated[0];
-    const canonicalSource = `Sumber: ${topCurated.originalFilename}${topCurated.sourcePages ? ` | ${topCurated.sourcePages}` : ''}`;
-    if (/Sumber:\s*.*$/i.test(formattedAnswer)) {
-      formattedAnswer = formattedAnswer.replace(/Sumber:\s*.*$/i, canonicalSource).trim();
-    } else {
-      formattedAnswer = `${formattedAnswer}\n\n${canonicalSource}`;
-    }
+    sources = filteredSources;
   }
-
-  const safeSimilarity = (val: unknown): number => {
-    if (typeof val === 'number') {
-      return isNaN(val) ? 0 : Number(val.toFixed(4));
-    }
-    const parsed = parseFloat(String(val));
-    return isNaN(parsed) ? 0 : Number(parsed.toFixed(4));
-  };
-
-  const sources: ChatSource[] = isNotFound
-    ? []
-    : [
-        ...similarChunks.map((c) => ({
-          chunkId: c.id,
-          uploadBatchId: c.uploadBatchId,
-          filename: c.originalFilename,
-          pageStart: c.sourcePageStart,
-          pageEnd: c.sourcePageEnd,
-          content: c.content,
-          similarity: safeSimilarity(c.similarity),
-        })),
-        ...similarCurated
-          .filter((ci) => !similarChunks.some((c) => c.uploadBatchId === ci.uploadBatchId))
-          .map((ci) => ({
-            chunkId: `curated-${ci.id}`,
-            uploadBatchId: ci.uploadBatchId,
-            filename: ci.originalFilename,
-            pageStart: 1,
-            pageEnd: 1,
-            content: ci.content,
-            similarity: safeSimilarity(ci.similarity),
-          })),
-      ];
 
   const result: ChatResponseResult = {
     answer: formattedAnswer,
@@ -332,4 +291,217 @@ export async function askDocumentChat(
   }
 
   return result;
+}
+
+interface AttributionResult {
+  primaryFilename: string;
+  pageLabel: string;
+  filteredSources: ChatSource[];
+}
+
+/**
+ * Menentukan dokumen sumber yang BENAR-BENAR digunakan dalam jawaban:
+ * 1. Menghargai kutipan eksplisit nama file dari LLM jika cocok dengan kandidat dokumen.
+ * 2. Menghitung content overlap (kesesuaian kata kunci fakta) antara jawaban dan isi teks tiap file.
+ * 3. Menyaring chunk yang tidak relevan (zero overlap) agar tidak mencemari daftar sumber.
+ * 4. Menduplikasi halaman sumber sehingga tidak ada kartu hal yang sama berulang kali.
+ */
+export function determineAccurateSources(
+  evaluatedAnswer: string,
+  chunks: SimilarChunkResult[],
+  curated: SimilarCuratedResult[]
+): AttributionResult {
+  if (chunks.length === 0 && curated.length === 0) {
+    return { primaryFilename: '', pageLabel: '', filteredSources: [] };
+  }
+
+  // 1. Cek apakah LLM secara eksplisit menyebutkan nama file sumber di baris akhir
+  // Contoh: "Sumber: Fisioterapi.pdf | Halaman 1"
+  const explicitMatch = evaluatedAnswer.match(/Sumber:\s*([^\n|]+?)(?:\s*\|\s*([^\n]+))?$/i);
+  let explicitFile: string | null = null;
+  let explicitPage: string | null = null;
+  if (explicitMatch) {
+    explicitFile = explicitMatch[1].trim();
+    explicitPage = explicitMatch[2]?.trim() || null;
+  }
+
+  // 2. Tokenisasi teks jawaban (hilangkan kata sambung/stop words) untuk content overlap
+  const answerTokens = evaluatedAnswer
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .split(/\s+/)
+    .filter(
+      (w) =>
+        w.length >= 4 &&
+        !['yang', 'pada', 'dalam', 'untuk', 'dengan', 'adalah', 'yaitu', 'sumber', 'halaman', 'dari'].includes(w)
+    );
+  const tokenSet = new Set(answerTokens);
+
+  // Kumpulkan nama-nama file unik dari chunks & curated
+  const allCandidateFiles = new Set<string>();
+  for (const c of chunks) allCandidateFiles.add(c.originalFilename);
+  for (const ci of curated) allCandidateFiles.add(ci.originalFilename);
+
+  // Hitung skor kecocokan isi jawaban terhadap masing-masing file
+  const fileScores = new Map<string, number>();
+  for (const fn of Array.from(allCandidateFiles)) {
+    let score = 0;
+    const fnLower = fn.toLowerCase();
+
+    // Jika eksplisit cocok dengan nama file yang ditulis LLM
+    if (explicitFile && (fnLower.includes(explicitFile.toLowerCase()) || explicitFile.toLowerCase().includes(fnLower))) {
+      score += 100;
+    }
+
+    const chunksOfFile = chunks.filter((c) => c.originalFilename === fn);
+    const curatedOfFile = curated.filter((ci) => ci.originalFilename === fn);
+
+    const fullContent = [
+      ...chunksOfFile.map((c) => c.content),
+      ...curatedOfFile.map((ci) => `${ci.title} ${ci.content}`),
+    ]
+      .join(' ')
+      .toLowerCase();
+
+    let matchedTokens = 0;
+    for (const t of Array.from(tokenSet)) {
+      if (fullContent.includes(t)) {
+        matchedTokens++;
+      }
+    }
+    score += matchedTokens;
+    fileScores.set(fn, score);
+  }
+
+  // Cari file dengan skor tertinggi (kontributor utama)
+  let bestFile = chunks[0]?.originalFilename || curated[0]?.originalFilename || '';
+  let highestScore = -1;
+  for (const [fn, score] of Array.from(fileScores.entries())) {
+    if (score > highestScore) {
+      highestScore = score;
+      bestFile = fn;
+    }
+  }
+
+  // Tentukan file-file yang berkontribusi (hanya yang relevan dengan jawaban)
+  const contributingFiles = new Set<string>();
+  contributingFiles.add(bestFile);
+  const minScoreThreshold = Math.max(2, highestScore * 0.25);
+  for (const [fn, score] of Array.from(fileScores.entries())) {
+    if (score >= minScoreThreshold) {
+      contributingFiles.add(fn);
+    }
+  }
+
+  // Tentukan label halaman untuk bestFile
+  const bestFileChunks = chunks.filter((c) => c.originalFilename === bestFile);
+  const bestFileCurated = curated.filter((ci) => ci.originalFilename === bestFile);
+
+  let pageLabel = 'Halaman 1';
+  if (
+    explicitPage &&
+    explicitFile &&
+    (bestFile.toLowerCase().includes(explicitFile.toLowerCase()) ||
+      explicitFile.toLowerCase().includes(bestFile.toLowerCase()))
+  ) {
+    pageLabel = explicitPage.startsWith('Halaman') ? explicitPage : `Halaman ${explicitPage}`;
+  } else if (bestFileChunks.length > 0) {
+    // Ambil hanya chunk yang kontennya benar-benar ada di dalam jawaban
+    const relevantBestChunks = bestFileChunks.filter((c) => {
+      const cLower = (c.content || '').toLowerCase();
+      for (const t of Array.from(tokenSet)) {
+        if (cLower.includes(t)) return true;
+      }
+      return false;
+    });
+
+    const targetChunks = relevantBestChunks.length > 0 ? relevantBestChunks : bestFileChunks;
+    const pages = Array.from(
+      new Set(targetChunks.flatMap((c) => [c.sourcePageStart, c.sourcePageEnd]))
+    ).sort((a, b) => a - b);
+    const minP = pages[0] || 1;
+    const maxP = pages[pages.length - 1] || 1;
+    pageLabel = minP === maxP ? `Halaman ${minP}` : `Halaman ${minP}-${maxP}`;
+  } else if (bestFileCurated.length > 0 && bestFileCurated[0].sourcePages) {
+    pageLabel = bestFileCurated[0].sourcePages;
+  }
+
+  const safeSimilarity = (val: unknown): number => {
+    if (typeof val === 'number') return isNaN(val) ? 0 : Number(val.toFixed(4));
+    const parsed = parseFloat(String(val));
+    return isNaN(parsed) ? 0 : Number(parsed.toFixed(4));
+  };
+
+  const seenPageKeys = new Set<string>();
+  const filteredSources: ChatSource[] = [];
+
+  // Prioritaskan chunks dari bestFile di posisi teratas
+  const sortedChunks = [...chunks].sort((a, b) => {
+    if (a.originalFilename === bestFile && b.originalFilename !== bestFile) return -1;
+    if (b.originalFilename === bestFile && a.originalFilename !== bestFile) return 1;
+    return b.similarity - a.similarity;
+  });
+
+  for (const c of sortedChunks) {
+    if (!contributingFiles.has(c.originalFilename)) continue;
+
+    // Filter keluar chunk dari file yang sama jika chunk tersebut tidak memuat satupun fakta jawaban
+    const cLower = (c.content || '').toLowerCase();
+    const hasTokenMatch = Array.from(tokenSet).some((t) => cLower.includes(t));
+    if (
+      tokenSet.size > 0 &&
+      !hasTokenMatch &&
+      sortedChunks.some(
+        (sc) =>
+          sc.originalFilename === c.originalFilename &&
+          Array.from(tokenSet).some((t) => (sc.content || '').toLowerCase().includes(t))
+      )
+    ) {
+      continue;
+    }
+
+    const pageKey = `${c.uploadBatchId}:${c.sourcePageStart}-${c.sourcePageEnd}`;
+    if (seenPageKeys.has(pageKey)) continue;
+    seenPageKeys.add(pageKey);
+
+    filteredSources.push({
+      chunkId: c.id,
+      uploadBatchId: c.uploadBatchId,
+      filename: c.originalFilename,
+      pageStart: c.sourcePageStart,
+      pageEnd: c.sourcePageEnd,
+      content: c.content,
+      similarity: safeSimilarity(c.similarity),
+    });
+  }
+
+  for (const ci of curated) {
+    if (!contributingFiles.has(ci.originalFilename)) continue;
+    if (filteredSources.some((s) => s.uploadBatchId === ci.uploadBatchId)) continue;
+    filteredSources.push({
+      chunkId: `curated-${ci.id}`,
+      uploadBatchId: ci.uploadBatchId,
+      filename: ci.originalFilename,
+      pageStart: 1,
+      pageEnd: 1,
+      content: ci.content,
+      similarity: safeSimilarity(ci.similarity),
+    });
+  }
+
+  // Jika setelah difilter kosong (misal semua skor 0), kembalikan chunk teratas
+  if (filteredSources.length === 0 && chunks.length > 0) {
+    const c = chunks[0];
+    filteredSources.push({
+      chunkId: c.id,
+      uploadBatchId: c.uploadBatchId,
+      filename: c.originalFilename,
+      pageStart: c.sourcePageStart,
+      pageEnd: c.sourcePageEnd,
+      content: c.content,
+      similarity: safeSimilarity(c.similarity),
+    });
+  }
+
+  return { primaryFilename: bestFile, pageLabel, filteredSources };
 }

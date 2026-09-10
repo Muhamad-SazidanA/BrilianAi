@@ -37,6 +37,9 @@ next-env.d.ts
 # temp/dev helper scripts
 *.ps1
 
+# archives
+*.zip
+
 # internal dev docs (tidak perlu di repo publik)
 Penjelasan.md
 SPESIFIKASI-HARDWARE-GPU.md
