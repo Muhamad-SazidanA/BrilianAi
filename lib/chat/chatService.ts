@@ -283,6 +283,14 @@ export async function askDocumentChat(
     }
   }
 
+  const safeSimilarity = (val: unknown): number => {
+    if (typeof val === 'number') {
+      return isNaN(val) ? 0 : Number(val.toFixed(4));
+    }
+    const parsed = parseFloat(String(val));
+    return isNaN(parsed) ? 0 : Number(parsed.toFixed(4));
+  };
+
   const sources: ChatSource[] = isNotFound
     ? []
     : [
@@ -293,7 +301,7 @@ export async function askDocumentChat(
           pageStart: c.sourcePageStart,
           pageEnd: c.sourcePageEnd,
           content: c.content,
-          similarity: Number(c.similarity.toFixed(4)),
+          similarity: safeSimilarity(c.similarity),
         })),
         ...similarCurated
           .filter((ci) => !similarChunks.some((c) => c.uploadBatchId === ci.uploadBatchId))
@@ -304,7 +312,7 @@ export async function askDocumentChat(
             pageStart: 1,
             pageEnd: 1,
             content: ci.content,
-            similarity: Number(ci.similarity.toFixed(4)),
+            similarity: safeSimilarity(ci.similarity),
           })),
       ];
 

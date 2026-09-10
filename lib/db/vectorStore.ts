@@ -373,8 +373,11 @@ export async function searchSimilarChunks(
       const result = await pool.query<SimilarChunkResult>(sql, [vectorString, batchId, limit]);
       const minSim = options?.minSimilarity !== undefined ? options.minSimilarity : 0.20;
 
-      for (const row of result.rows) {
-        if (row.similarity >= minSim) {
+      for (const row of (result?.rows || [])) {
+        const rawSim = typeof row.similarity === 'number' ? row.similarity : parseFloat(String(row.similarity));
+        const sim = isNaN(rawSim) ? 0 : rawSim;
+        if (sim >= minSim) {
+          row.similarity = sim;
           results.push(row);
           seenIds.add(row.id);
         }
@@ -415,6 +418,7 @@ export async function searchSimilarChunks(
         const kwRes = await pool.query<SimilarChunkResult>(kwSql, [batchId, remainingLimit, ...keywordLikes]);
         for (const row of (kwRes?.rows || [])) {
           if (!seenIds.has(row.id)) {
+            row.similarity = Number(row.similarity) || 0.88;
             results.push(row);
             seenIds.add(row.id);
           }
@@ -451,6 +455,7 @@ export async function searchSimilarChunks(
         const fbRes = await pool.query<SimilarChunkResult>(fallbackSql, [batchId, limit, `%${cleanQ}%`]);
         for (const row of (fbRes?.rows || [])) {
           if (!seenIds.has(row.id)) {
+            row.similarity = Number(row.similarity) || 0.80;
             results.push(row);
             seenIds.add(row.id);
           }
@@ -527,7 +532,10 @@ export async function searchSimilarCuratedInsights(
       const minSim = options?.minSimilarity !== undefined ? options.minSimilarity : 0.20;
 
       for (const row of (result?.rows || [])) {
-        if (row.similarity >= minSim) {
+        const rawSim = typeof row.similarity === 'number' ? row.similarity : parseFloat(String(row.similarity));
+        const sim = isNaN(rawSim) ? 0 : rawSim;
+        if (sim >= minSim) {
+          row.similarity = sim;
           results.push(row);
           seenIds.add(row.id);
         }
@@ -579,6 +587,7 @@ export async function searchSimilarCuratedInsights(
         const kwRes = await pool.query<SimilarCuratedResult>(kwSql, [batchId, remainingLimit, ...keywordLikes]);
         for (const row of (kwRes?.rows || [])) {
           if (!seenIds.has(row.id)) {
+            row.similarity = Number(row.similarity) || 0.92;
             results.push(row);
             seenIds.add(row.id);
           }

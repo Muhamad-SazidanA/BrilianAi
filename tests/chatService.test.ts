@@ -25,6 +25,7 @@ describe('AI Chatbot Service (Llama 3.2 3B & pgvector RAG)', () => {
   };
 
   beforeEach(() => {
+    mockPool.query.mockReset();
     vi.clearAllMocks();
     vi.spyOn(dbClient, 'getPool').mockReturnValue(mockPool as any);
   });
@@ -111,6 +112,42 @@ describe('AI Chatbot Service (Llama 3.2 3B & pgvector RAG)', () => {
         expect.stringContaining('sop_keuangan.pdf'),
         false
       );
+    });
+
+    it('should safely handle similarity when returned as a string from postgres (prevent toFixed is not a function)', async () => {
+      vi.spyOn(embeddingClient, 'embedTexts').mockResolvedValueOnce([new Array(1024).fill(0.01)]);
+      mockPool.query.mockImplementation((sql: string) => {
+        if (sql.includes('COUNT(*)')) {
+          return Promise.resolve({ rows: [{ count: 1 }], rowCount: 1 });
+        }
+        return Promise.resolve({
+          rows: [
+            {
+              id: 99,
+              uploadBatchId: 'batch-string-sim',
+              originalFilename: 'sop_keamanan.pdf',
+              chunkIndex: 0,
+              content: 'SOP Akses Ruang Server...',
+              sourcePageStart: 1,
+              sourcePageEnd: 1,
+              similarity: '0.87654321', // String returned by pg driver
+            },
+          ],
+          rowCount: 1,
+        });
+      });
+
+      vi.spyOn(chatClient, 'generateChatResponse').mockResolvedValueOnce(
+        'Berdasarkan dokumen sop_keamanan.pdf Halaman 1, SOP akses server...'
+      );
+
+      const result = await askDocumentChat('Ada sop apa saja??', {
+        allowPublicKnowledge: false,
+      });
+
+      expect(result.sources).toHaveLength(1);
+      expect(result.sources[0].similarity).toBe(0.8765);
+      expect(typeof result.sources[0].similarity).toBe('number');
     });
 
     it('should pass allowPublicKnowledge = true to chatClient when enabled', async () => {

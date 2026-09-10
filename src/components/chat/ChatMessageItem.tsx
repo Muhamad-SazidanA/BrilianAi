@@ -12,6 +12,7 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { ChatMessage, ChatSource } from '@/types/chat';
+import MarkdownContent from '@/components/ui/MarkdownContent';
 import { useLanguage } from '@/context/LanguageContext';
 import { toast } from 'sonner';
 
@@ -166,19 +167,23 @@ export default function ChatMessageItem({
           {/* AI Response Text (No Bubble Card Background) */}
           <div
             style={{
-              fontSize: '15.5px',
-              lineHeight: '27px',
+              fontSize: '15px',
+              lineHeight: '26px',
               color: message.isError
                 ? 'var(--color-danger-text)'
                 : 'var(--text-primary)',
-              whiteSpace: 'pre-wrap',
               wordBreak: 'break-word',
               fontWeight: 400,
               padding: '4px 0',
               maxWidth: '100%',
+              width: '100%',
             }}
           >
-            {message.text}
+            {message.isError ? (
+              <div style={{ whiteSpace: 'pre-wrap' }}>{message.text}</div>
+            ) : (
+              <MarkdownContent content={message.text} />
+            )}
           </div>
 
           {/* Action Icons Row (Only 3 icons: Salin, Read Audio, Try Again) & Verified Source Citations */}

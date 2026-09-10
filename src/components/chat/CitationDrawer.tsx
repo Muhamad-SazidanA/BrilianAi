@@ -3,6 +3,7 @@
 import React from 'react';
 import { X, FileText, Layers, Percent, ExternalLink } from 'lucide-react';
 import { ChatSource } from '@/types/chat';
+import MarkdownContent from '@/components/ui/MarkdownContent';
 import { useLanguage } from '@/context/LanguageContext';
 
 interface CitationDrawerProps {
@@ -105,15 +106,11 @@ export default function CitationDrawer({ source, isOpen, onClose }: CitationDraw
               border: '1px solid var(--border-default)',
               borderRadius: 'var(--radius-sm)',
               padding: '14px',
-              fontSize: '13px',
-              lineHeight: '21px',
-              color: 'var(--text-primary)',
-              whiteSpace: 'pre-wrap',
-              maxHeight: '400px',
+              maxHeight: '420px',
               overflowY: 'auto',
             }}
           >
-            {source.content}
+            <MarkdownContent content={source.content} compact />
           </div>
         </div>
 

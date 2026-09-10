@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, BookOpen } from 'lucide-react';
+import { X, BookOpen, Eye, Edit3 } from 'lucide-react';
 import { CuratedInsightItem, InsightImportance } from '@/types/curation';
+import MarkdownContent from '@/components/ui/MarkdownContent';
 import { useLanguage } from '@/context/LanguageContext';
 
 interface InsightEditorModalProps {
@@ -21,6 +22,7 @@ export default function InsightEditorModal({ insight, isOpen, onClose, onSave }:
   const [tagsStr, setTagsStr] = useState('');
   const [sourcePages, setSourcePages] = useState('1');
   const [isSaving, setIsSaving] = useState(false);
+  const [previewMode, setPreviewMode] = useState(false);
 
   useEffect(() => {
     if (insight) {
@@ -29,7 +31,8 @@ export default function InsightEditorModal({ insight, isOpen, onClose, onSave }:
       setImportance(insight.importance || 'medium');
       setCategory(insight.category || 'Ringkasan');
       setTagsStr(Array.isArray(insight.tags) ? insight.tags.join(', ') : '');
-      setSourcePages(insight.source_pages || '1');
+      const rawPages = insight.source_pages || '1';
+      setSourcePages(rawPages.replace(/^(halaman|page|hal\.?)\s+/i, '').trim() || '1');
     } else {
       setTitle('');
       setContent('');
@@ -38,6 +41,7 @@ export default function InsightEditorModal({ insight, isOpen, onClose, onSave }:
       setTagsStr('');
       setSourcePages('1');
     }
+    setPreviewMode(false);
   }, [insight]);
 
   if (!isOpen) return null;
@@ -150,17 +154,84 @@ export default function InsightEditorModal({ insight, isOpen, onClose, onSave }:
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '5px' }}>
-              {t('insight.content')}
-            </label>
-            <textarea
-              rows={5}
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="input-text"
-              placeholder="Tuliskan sintesis poin-poin penting isi insight..."
-              required
-            />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
+              <label style={{ fontSize: '12.5px', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                {t('insight.content')}
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <button
+                  type="button"
+                  onClick={() => setPreviewMode(false)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '2px 8px',
+                    fontSize: '11px',
+                    borderRadius: '4px',
+                    border: 'none',
+                    backgroundColor: !previewMode ? 'var(--bg-subtle)' : 'transparent',
+                    color: !previewMode ? 'var(--color-primary)' : 'var(--text-muted)',
+                    fontWeight: !previewMode ? 600 : 400,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <Edit3 size={12} />
+                  <span>Edit</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewMode(true)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '2px 8px',
+                    fontSize: '11px',
+                    borderRadius: '4px',
+                    border: 'none',
+                    backgroundColor: previewMode ? 'var(--bg-subtle)' : 'transparent',
+                    color: previewMode ? 'var(--color-primary)' : 'var(--text-muted)',
+                    fontWeight: previewMode ? 600 : 400,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <Eye size={12} />
+                  <span>Pratinjau Tabel & Teks</span>
+                </button>
+              </div>
+            </div>
+
+            {previewMode ? (
+              <div
+                style={{
+                  minHeight: '130px',
+                  maxHeight: '260px',
+                  overflowY: 'auto',
+                  padding: '10px 12px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--border-default)',
+                  backgroundColor: 'var(--bg-app)',
+                }}
+              >
+                {content.trim() ? (
+                  <MarkdownContent content={content} compact />
+                ) : (
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                    Belum ada teks untuk dipratinjau.
+                  </span>
+                )}
+              </div>
+            ) : (
+              <textarea
+                rows={6}
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                className="input-text"
+                placeholder="Tuliskan sintesis atau tabel Markdown intisari dokumen..."
+                required
+              />
+            )}
           </div>
 
           <div>

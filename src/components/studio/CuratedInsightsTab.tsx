@@ -16,8 +16,15 @@ import {
 } from 'lucide-react';
 import { CuratedInsightItem } from '@/types/curation';
 import InsightEditorModal from './InsightEditorModal';
+import MarkdownContent from '@/components/ui/MarkdownContent';
 import { useLanguage } from '@/context/LanguageContext';
 import { toast } from 'sonner';
+
+function formatSourcePages(sourcePages?: string, pageLabel: string = 'Halaman'): string {
+  if (!sourcePages || sourcePages.trim() === '' || sourcePages === 'N/A') return 'N/A';
+  const cleaned = sourcePages.replace(/^(halaman|page|hal\.?)\s+/i, '').trim();
+  return `${pageLabel} ${cleaned || sourcePages}`;
+}
 
 interface CuratedInsightsTabProps {
   batchId: string;
@@ -327,15 +334,15 @@ export default function CuratedInsightsTab({
                   </div>
                 </div>
 
-                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '21px', flex: 1, whiteSpace: 'pre-line' }}>
-                  {item.content}
-                </p>
+                <div style={{ flex: 1, minHeight: 0 }}>
+                  <MarkdownContent content={item.content} compact />
+                </div>
 
                 {/* Footer: Source Pages and Tags */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--border-default)', paddingTop: '10px', fontSize: '12px', color: 'var(--text-secondary)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                     <BookOpen size={13} color="var(--color-primary)" />
-                    <span style={{ fontWeight: 500 }}>{t('curate.page')} {item.source_pages || 'N/A'}</span>
+                    <span style={{ fontWeight: 500 }}>{formatSourcePages(item.source_pages, t('curate.page'))}</span>
                   </div>
 
                   {item.tags && item.tags.length > 0 && (
