@@ -2,63 +2,112 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Search,
-  Download,
-  MessageSquare,
-  BookOpen,
-  ChevronRight,
-  ChevronLeft,
-  X,
-  Loader2,
-  RefreshCw,
-  Tag,
-  Users,
-  Activity,
-  FileText,
-  Eye,
-  CheckCircle2,
-  ExternalLink,
+  Search, Download, X, Loader2,
+  ChevronLeft, ChevronRight, ChevronDown, Eye,
+  MessageSquare, Users, BookOpen, Clock, ArrowRight,
 } from 'lucide-react';
-import { ChatAuditLog, AuditAnalyticsSummary, User } from '@/types/user';
+import { ChatAuditLog, AuditAnalyticsSummary, User, TopActiveUser } from '@/types/user';
 import MarkdownContent from '@/components/ui/MarkdownContent';
 import { useLanguage } from '@/context/LanguageContext';
 import { toast } from 'sonner';
 import UserAvatar from '@/components/ui/UserAvatar';
 
+/* ── Spensify Design Shared Styles ─── */
+const cardS: React.CSSProperties = {
+  backgroundColor: 'var(--bg-card)',
+  border: '1px solid var(--border-default)',
+  borderRadius: 'var(--radius-md)',
+  overflow: 'hidden',
+};
+const OL: React.CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  backgroundColor: 'rgba(0,0,0,0.45)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  zIndex: 9999,
+  padding: '1.5rem',
+};
+const INP: React.CSSProperties = {
+  width: '100%',
+  height: '34px',
+  padding: '0 12px',
+  borderRadius: '8px',
+  border: '1px solid var(--border-default)',
+  fontSize: '12.5px',
+  color: 'var(--text-primary)',
+  backgroundColor: 'var(--bg-card)',
+  outline: 'none',
+  boxSizing: 'border-box',
+};
+
+function PBtn({
+  children, onClick, disabled, active,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  active?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        height: '28px',
+        minWidth: '28px',
+        padding: '0 8px',
+        borderRadius: '6px',
+        border: '1px solid var(--border-default)',
+        backgroundColor: active ? 'var(--bg-subtle)' : 'transparent',
+        color: disabled ? 'var(--text-muted)' : 'var(--text-primary)',
+        fontSize: '12.5px',
+        fontWeight: active ? 600 : 400,
+        cursor: disabled ? 'default' : 'pointer',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '3px',
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function fmtDate(iso?: string | null) {
+  if (!iso) return '-';
+  return new Date(iso).toLocaleString('id-ID', {
+    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+}
+function fmtDateShort(iso?: string | null) {
+  if (!iso) return '-';
+  return new Date(iso).toLocaleString('id-ID', {
+    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+  });
+}
+
 export default function AuditLogsView() {
   const { language } = useLanguage();
 
+  const [activeTab, setActiveTab] = useState<'logs' | 'topUsers'>('logs');
   const [logs, setLogs] = useState<ChatAuditLog[]>([]);
   const [analytics, setAnalytics] = useState<AuditAnalyticsSummary | null>(null);
   const [usersList, setUsersList] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(true);
 
-  // Filters & Pagination
-  const [selectedUserFilter, setSelectedUserFilter] = useState<string>('all');
-  const [selectedDateRange, setSelectedDateRange] = useState<'today' | '7d' | '30d' | 'all'>('all');
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [totalPages, setTotalPages] = useState<number>(1);
-  const [totalLogs, setTotalLogs] = useState<number>(0);
-
-  // Detail Modal
-  const [inspectingLog, setInspectingLog] = useState<ChatAuditLog | null>(null);
-
-  const fetchAnalytics = useCallback(async () => {
-    setIsLoadingAnalytics(true);
-    try {
-      const res = await fetch('/api/audit-logs/analytics');
-      if (res.ok) {
-        const data = await res.json();
-        setAnalytics(data);
-      }
-    } catch (err: any) {
-      console.warn('[AuditLogs] Failed to fetch analytics:', err);
-    } finally {
-      setIsLoadingAnalytics(false);
-    }
-  }, []);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [userFilter, setUserFilter] = useState('all');
+  const [dateRange, setDateRange] = useState<'today' | '7d' | '30d' | 'all'>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalLogs, setTotalLogs] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const [inspecting, setInspecting] = useState<ChatAuditLog | null>(null);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -70,15 +119,30 @@ export default function AuditLogsView() {
     } catch {}
   }, []);
 
+  const fetchAnalytics = useCallback(async () => {
+    setIsLoadingAnalytics(true);
+    try {
+      const res = await fetch('/api/audit-logs/analytics');
+      if (res.ok) {
+        const data = await res.json();
+        setAnalytics(data);
+      }
+    } catch (err: any) {
+      console.warn('[AuditLogsView] Failed to load analytics:', err);
+    } finally {
+      setIsLoadingAnalytics(false);
+    }
+  }, []);
+
   const fetchLogs = useCallback(async () => {
     setIsLoading(true);
     try {
       const params = new URLSearchParams();
-      if (selectedUserFilter && selectedUserFilter !== 'all') params.set('userId', selectedUserFilter);
-      if (selectedDateRange && selectedDateRange !== 'all') params.set('dateRange', selectedDateRange);
+      if (userFilter !== 'all') params.set('userId', userFilter);
+      if (dateRange !== 'all') params.set('dateRange', dateRange);
       if (searchQuery.trim()) params.set('search', searchQuery.trim());
       params.set('page', String(currentPage));
-      params.set('limit', '10');
+      params.set('limit', String(pageSize));
 
       const res = await fetch(`/api/audit-logs?${params.toString()}`);
       if (res.ok) {
@@ -88,928 +152,784 @@ export default function AuditLogsView() {
         setTotalLogs(data.total || 0);
       }
     } catch (err: any) {
-      toast.error(
-        language === 'en'
-          ? 'Failed to load audit logs: ' + err.message
-          : 'Gagal memuat log audit: ' + err.message
-      );
+      toast.error('Gagal memuat log percakapan: ' + err.message);
     } finally {
       setIsLoading(false);
     }
-  }, [selectedUserFilter, selectedDateRange, searchQuery, currentPage, language]);
+  }, [userFilter, dateRange, searchQuery, currentPage, pageSize]);
 
   useEffect(() => {
-    fetchAnalytics();
     fetchUsers();
-  }, [fetchAnalytics, fetchUsers]);
+    fetchAnalytics();
+  }, [fetchUsers, fetchAnalytics]);
 
   useEffect(() => {
     fetchLogs();
   }, [fetchLogs]);
 
-  const handleExportCsv = () => {
+  const handleExport = () => {
     window.open('/api/audit-logs/export', '_blank');
-    toast.success(
-      language === 'en'
-        ? 'Downloading audit log (CSV)...'
-        : 'Mengunduh berkas log audit (CSV)...'
-    );
+    toast.success('Mengunduh log audit percakapan (CSV)...');
   };
 
-  // Compute total citations in loaded logs
-  const totalCitations = useMemo(() => {
-    return logs.reduce((acc, l) => acc + (l.retrieved_count || 0), 0);
-  }, [logs]);
+  const selectUserAndShowLogs = (userId: string) => {
+    setUserFilter(userId);
+    setActiveTab('logs');
+    setCurrentPage(1);
+  };
 
-  const dominantTopic =
-    analytics?.top_topics && analytics.top_topics.length > 0
-      ? analytics.top_topics[0].topic
-      : '-';
+  const dateRangeOptions: { value: typeof dateRange; label: string }[] = [
+    { value: 'all', label: 'Semua waktu' },
+    { value: 'today', label: 'Hari ini' },
+    { value: '7d', label: '7 hari terakhir' },
+    { value: '30d', label: '30 hari terakhir' },
+  ];
+
+  const selectedUserName = useMemo(() => {
+    if (userFilter === 'all') return null;
+    const found = usersList.find(u => u.id === userFilter);
+    return found ? found.name : 'User terpilih';
+  }, [userFilter, usersList]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      {/* ── Spensify Stat Summary Cards ── */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: '1rem',
-        }}
-      >
-        {/* Card 1: Total Questions */}
-        <div
-          style={{
-            backgroundColor: 'var(--bg-card)',
-            border: '1px solid var(--border-default)',
-            borderRadius: 'var(--radius-md)',
-            padding: '1.15rem 1.25rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div>
-            <span
-              style={{
-                fontSize: '12px',
-                fontWeight: 600,
-                color: 'var(--text-secondary)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-              }}
-            >
-              {language === 'en' ? 'Total Chat Queries' : 'Total Pertanyaan AI'}
-            </span>
-            <div
-              style={{
-                fontSize: '26px',
-                fontWeight: 800,
-                color: 'var(--text-primary)',
-                marginTop: '4px',
-                lineHeight: 1.1,
-              }}
-            >
-              {isLoadingAnalytics
-                ? '...'
-                : (analytics?.total_conversations ?? 0).toLocaleString(
-                    language === 'en' ? 'en-US' : 'id-ID'
-                  )}
-            </div>
-            <p style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px', margin: 0 }}>
-              {language === 'en' ? 'Recorded AI interactions' : 'Interaksi pertanyaan tercatat'}
-            </p>
-          </div>
-          <div
-            style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: 'var(--radius-sm)',
-              backgroundColor: 'var(--color-primary-subtle)',
-              color: 'var(--color-primary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <MessageSquare size={20} />
-          </div>
-        </div>
-
-        {/* Card 2: Active Users */}
-        <div
-          style={{
-            backgroundColor: 'var(--bg-card)',
-            border: '1px solid var(--border-default)',
-            borderRadius: 'var(--radius-md)',
-            padding: '1.15rem 1.25rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div>
-            <span
-              style={{
-                fontSize: '12px',
-                fontWeight: 600,
-                color: 'var(--text-secondary)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-              }}
-            >
-              {language === 'en' ? 'Active Users' : 'Pengguna Aktif'}
-            </span>
-            <div
-              style={{
-                fontSize: '26px',
-                fontWeight: 800,
-                color: 'var(--color-success)',
-                marginTop: '4px',
-                lineHeight: 1.1,
-              }}
-            >
-              {isLoadingAnalytics
-                ? '...'
-                : (analytics?.total_active_users ?? 0).toLocaleString(
-                    language === 'en' ? 'en-US' : 'id-ID'
-                  )}
-            </div>
-            <p style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px', margin: 0 }}>
-              {language === 'en' ? 'Accounts with queries' : 'Akun dengan riwayat chat'}
-            </p>
-          </div>
-          <div
-            style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: 'var(--radius-sm)',
-              backgroundColor: 'var(--color-success-subtle)',
-              color: 'var(--color-success)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Users size={20} />
-          </div>
-        </div>
-
-        {/* Card 3: Dominant Topic */}
-        <div
-          style={{
-            backgroundColor: 'var(--bg-card)',
-            border: '1px solid var(--border-default)',
-            borderRadius: 'var(--radius-md)',
-            padding: '1.15rem 1.25rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div style={{ minWidth: 0, paddingRight: '8px' }}>
-            <span
-              style={{
-                fontSize: '12px',
-                fontWeight: 600,
-                color: 'var(--text-secondary)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-              }}
-            >
-              {language === 'en' ? 'Dominant Topic' : 'Topik Utama'}
-            </span>
-            <div
-              style={{
-                fontSize: '18px',
-                fontWeight: 700,
-                color: 'var(--text-primary)',
-                marginTop: '6px',
-                lineHeight: 1.2,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
-              title={dominantTopic}
-            >
-              {isLoadingAnalytics ? '...' : dominantTopic}
-            </div>
-            <p style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px', margin: 0 }}>
-              {language === 'en' ? 'Most queried subject' : 'Kategori paling sering ditanyakan'}
-            </p>
-          </div>
-          <div
-            style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: 'var(--radius-sm)',
-              backgroundColor: 'var(--color-warning-subtle)',
-              color: 'var(--color-warning)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
-            <Tag size={20} />
-          </div>
-        </div>
-
-        {/* Card 4: Document Citations */}
-        <div
-          style={{
-            backgroundColor: 'var(--bg-card)',
-            border: '1px solid var(--border-default)',
-            borderRadius: 'var(--radius-md)',
-            padding: '1.15rem 1.25rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div>
-            <span
-              style={{
-                fontSize: '12px',
-                fontWeight: 600,
-                color: 'var(--text-secondary)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-              }}
-            >
-              {language === 'en' ? 'Citations Cited' : 'Sitasi Rujukan'}
-            </span>
-            <div
-              style={{
-                fontSize: '26px',
-                fontWeight: 800,
-                color: 'var(--text-primary)',
-                marginTop: '4px',
-                lineHeight: 1.1,
-              }}
-            >
-              {totalCitations.toLocaleString(language === 'en' ? 'en-US' : 'id-ID')}
-            </div>
-            <p style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px', margin: 0 }}>
-              {language === 'en' ? 'Cited page passages' : 'Halaman dokumen dirujuk AI'}
-            </p>
-          </div>
-          <div
-            style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: 'var(--radius-sm)',
-              backgroundColor: 'var(--bg-subtle)',
-              color: 'var(--text-secondary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <BookOpen size={20} />
-          </div>
-        </div>
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      {/* Page Header (Spensify style, outside card) */}
+      <div style={{ marginBottom: '1.25rem' }}>
+        <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+          Audit Log Percakapan
+        </h1>
+        <p style={{ fontSize: '13px', color: 'var(--color-primary)', margin: '3px 0 0' }}>
+          Pantau intensitas pertanyaan seluruh pengguna dan topik bahasan percakapan AI dari satu tempat.
+        </p>
       </div>
 
-      {/* ── Enterprise Activity Monitoring: Volume Pertanyaan Pengguna ── */}
-      <div
-        style={{
-          backgroundColor: 'var(--bg-card)',
-          border: '1px solid var(--border-default)',
-          borderRadius: 'var(--radius-md)',
-          padding: '1.25rem 1.5rem',
-        }}
-      >
+      {/* Main Card */}
+      <div style={cardS}>
+        {/* Card Top: Title & Actions */}
         <div
           style={{
+            padding: '1rem 1.5rem',
             display: 'flex',
-            alignItems: 'center',
+            alignItems: 'flex-start',
             justifyContent: 'space-between',
-            marginBottom: '1rem',
-            flexWrap: 'wrap',
-            gap: '8px',
-          }}
-        >
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Activity size={17} style={{ color: 'var(--color-primary)' }} />
-              <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-                {language === 'en' ? 'User Chat Activity & Topic Distribution' : 'Volume Pertanyaan per Pengguna'}
-              </h2>
-            </div>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '2px 0 0' }}>
-              {language === 'en'
-                ? 'Overview of user interaction intensity and frequently consulted topics.'
-                : 'Distribusi intensitas interaksi chat seluruh pengguna dan topik bahasan yang sering dikonsultasikan.'}
-            </p>
-          </div>
-
-          {selectedUserFilter !== 'all' && (
-            <button
-              onClick={() => {
-                setSelectedUserFilter('all');
-                setCurrentPage(1);
-              }}
-              className="btn btn-outline btn-sm"
-              style={{ fontSize: '12px', padding: '4px 10px' }}
-            >
-              <X size={13} />
-              <span>{language === 'en' ? 'Reset User Filter' : 'Reset Filter Pengguna'}</span>
-            </button>
-          )}
-        </div>
-
-        {isLoadingAnalytics ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-            <div
-              className="animate-spin"
-              style={{
-                width: '22px',
-                height: '22px',
-                border: '2px solid var(--border-default)',
-                borderTopColor: 'var(--color-primary)',
-                borderRadius: '50%',
-                margin: '0 auto 8px',
-              }}
-            />
-            <span style={{ fontSize: '12.5px' }}>
-              {language === 'en' ? 'Loading activity...' : 'Memuat data aktivitas...'}
-            </span>
-          </div>
-        ) : !analytics || analytics.top_users.length === 0 ? (
-          <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
-            {language === 'en'
-              ? 'No user chat interactions recorded yet.'
-              : 'Belum ada data aktivitas percakapan pengguna.'}
-          </div>
-        ) : (
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-              gap: '1rem',
-            }}
-          >
-            {analytics.top_users.map((u) => {
-              const isFiltered = selectedUserFilter === u.user_id;
-
-              return (
-                <div
-                  key={u.user_id}
-                  style={{
-                    backgroundColor: isFiltered ? 'var(--color-primary-subtle)' : 'var(--bg-subtle)',
-                    border: `1px solid ${isFiltered ? 'var(--color-primary)' : 'var(--border-default)'}`,
-                    borderRadius: 'var(--radius-md)',
-                    padding: '1rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    gap: '10px',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                      <UserAvatar name={u.name} size={36} />
-                      <div style={{ minWidth: 0 }}>
-                        <div
-                          style={{
-                            fontWeight: 600,
-                            fontSize: '13.5px',
-                            color: 'var(--text-primary)',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                          }}
-                        >
-                          {u.name}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: '12px',
-                            color: 'var(--text-secondary)',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                          }}
-                        >
-                          {u.department || 'General'} · {u.role_name || 'Member'}
-                        </div>
-                      </div>
-                    </div>
-
-                    <span className="badge badge-accent font-mono" style={{ flexShrink: 0 }}>
-                      {u.total_queries} {language === 'en' ? 'queries' : 'pertanyaan'}
-                    </span>
-                  </div>
-
-                  {/* Frequent Topics */}
-                  {u.top_topics && u.top_topics.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                      {u.top_topics.map((tp, i) => (
-                        <span
-                          key={i}
-                          style={{
-                            fontSize: '11px',
-                            padding: '2px 7px',
-                            borderRadius: 'var(--radius-xs)',
-                            backgroundColor: 'var(--bg-card)',
-                            border: '1px solid var(--border-subtle)',
-                            color: 'var(--text-secondary)',
-                            fontWeight: 500,
-                          }}
-                        >
-                          {tp}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Filter Action */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginTop: '2px' }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedUserFilter(isFiltered ? 'all' : u.user_id);
-                        setCurrentPage(1);
-                      }}
-                      className={`btn btn-sm ${isFiltered ? 'btn-primary' : 'btn-outline'}`}
-                      style={{ fontSize: '12px', padding: '4px 10px' }}
-                    >
-                      <span>
-                        {isFiltered
-                          ? language === 'en'
-                            ? 'Active Filter'
-                            : 'Aktif Difilter'
-                          : language === 'en'
-                          ? 'Filter Logs'
-                          : 'Filter Log Pengguna'}
-                      </span>
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* ── Spensify Single Unified Card Container ("Riwayat Log Percakapan") ── */}
-      <div
-        style={{
-          backgroundColor: 'var(--bg-card)',
-          border: '1px solid var(--border-default)',
-          borderRadius: 'var(--radius-md)',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        {/* Card Header with Spensify TableCardHeading */}
-        <div
-          style={{
-            padding: '1.25rem 1.5rem',
-            borderBottom: '1px solid var(--border-default)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
             gap: '1rem',
+            flexWrap: 'wrap',
           }}
         >
           <div>
-            <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-              {language === 'en' ? 'Chat Audit Log Records' : 'Riwayat Log Percakapan'}
+            <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>
+              {activeTab === 'logs' ? 'Daftar riwayat percakapan' : 'Pengguna paling aktif'}
             </h2>
-            <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: '2px 0 0' }}>
-              {language === 'en'
-                ? 'Detailed historical queries, conversation context, and verified document citations.'
-                : 'Seluruh rekaman interaksi pengguna ke AI Chatbot beserta kutipan dokumen yang dirujuk.'}
+            <p style={{ margin: '2px 0 0', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+              {activeTab === 'logs'
+                ? `${totalLogs.toLocaleString('id-ID')} percakapan tercatat di database`
+                : `${analytics?.top_users?.length || 0} pengguna dengan aktivitas percakapan terbanyak`}
             </p>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button
               type="button"
-              onClick={handleExportCsv}
-              className="btn btn-outline btn-sm"
-              title={language === 'en' ? 'Export CSV' : 'Ekspor CSV'}
+              onClick={handleExport}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                height: '36px',
+                padding: '0 14px',
+                backgroundColor: 'transparent',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-default)',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: 500,
+                cursor: 'pointer',
+              }}
             >
               <Download size={14} />
-              <span>{language === 'en' ? 'Export CSV' : 'Ekspor CSV'}</span>
-            </button>
-            <button
-              type="button"
-              onClick={fetchLogs}
-              disabled={isLoading}
-              className="btn btn-outline btn-sm"
-              title={language === 'en' ? 'Refresh' : 'Perbarui'}
-            >
-              <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
-              <span className="hidden sm:inline">{language === 'en' ? 'Refresh' : 'Perbarui'}</span>
+              <span>Export CSV</span>
             </button>
           </div>
         </div>
 
-        {/* Filter Toolbar (Spensify style) */}
+        {/* Tab Selection Bar (Spensify sub-navigation style) */}
         <div
           style={{
-            padding: '0.85rem 1.5rem',
-            borderBottom: '1px solid var(--border-default)',
-            backgroundColor: 'var(--bg-card)',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '0.75rem',
-            flexWrap: 'wrap',
+            gap: '4px',
+            padding: '0 1.5rem',
+            borderTop: '1px solid var(--border-default)',
+            borderBottom: '1px solid var(--border-default)',
+            backgroundColor: 'var(--bg-subtle)',
           }}
         >
-          {/* Search box */}
-          <div style={{ position: 'relative', flex: 1, minWidth: '220px', maxWidth: '360px' }}>
-            <Search
-              size={15}
+          <button
+            type="button"
+            onClick={() => setActiveTab('logs')}
+            style={{
+              padding: '10px 14px',
+              fontSize: '13px',
+              fontWeight: activeTab === 'logs' ? 600 : 500,
+              color: activeTab === 'logs' ? 'var(--color-primary)' : 'var(--text-secondary)',
+              border: 'none',
+              background: 'none',
+              borderBottom: activeTab === 'logs' ? '2px solid var(--color-primary)' : '2px solid transparent',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              marginBottom: '-1px',
+            }}
+          >
+            <MessageSquare size={14} />
+            <span>Semua Percakapan</span>
+            <span
               style={{
-                position: 'absolute',
-                left: '12px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: 'var(--text-muted)',
-              }}
-            />
-            <input
-              type="text"
-              placeholder={language === 'en' ? 'Search query or keyword...' : 'Cari teks pertanyaan...'}
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="input-text"
-              style={{
-                paddingLeft: '36px',
-                height: '36px',
-                fontSize: '13px',
-                borderRadius: 'var(--radius-sm)',
-              }}
-            />
-          </div>
-
-          {/* Filters right group */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            {/* User Select Filter */}
-            <select
-              value={selectedUserFilter}
-              onChange={(e) => {
-                setSelectedUserFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="input-text"
-              style={{
-                height: '36px',
-                fontSize: '13px',
-                borderRadius: 'var(--radius-sm)',
-                padding: '0 10px',
-                minWidth: '160px',
+                fontSize: '11px',
+                padding: '1px 6px',
+                borderRadius: '999px',
+                backgroundColor: activeTab === 'logs' ? 'var(--color-primary-subtle, #eff6ff)' : 'var(--border-default)',
+                color: activeTab === 'logs' ? 'var(--color-primary)' : 'var(--text-muted)',
               }}
             >
-              <option value="all">{language === 'en' ? 'All Users' : 'Semua Pengguna'}</option>
-              {usersList.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name} ({u.department || 'General'})
-                </option>
-              ))}
-            </select>
+              {totalLogs}
+            </span>
+          </button>
 
-            {/* Date Range Selector Pills */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('topUsers')}
+            style={{
+              padding: '10px 14px',
+              fontSize: '13px',
+              fontWeight: activeTab === 'topUsers' ? 600 : 500,
+              color: activeTab === 'topUsers' ? 'var(--color-primary)' : 'var(--text-secondary)',
+              border: 'none',
+              background: 'none',
+              borderBottom: activeTab === 'topUsers' ? '2px solid var(--color-primary)' : '2px solid transparent',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              marginBottom: '-1px',
+            }}
+          >
+            <Users size={14} />
+            <span>Pengguna Paling Aktif</span>
+            {analytics?.top_users?.length ? (
+              <span
+                style={{
+                  fontSize: '11px',
+                  padding: '1px 6px',
+                  borderRadius: '999px',
+                  backgroundColor: activeTab === 'topUsers' ? 'var(--color-primary-subtle, #eff6ff)' : 'var(--border-default)',
+                  color: activeTab === 'topUsers' ? 'var(--color-primary)' : 'var(--text-muted)',
+                }}
+              >
+                {analytics.top_users.length}
+              </span>
+            ) : null}
+          </button>
+        </div>
+
+        {/* ── TAB 1: SEMUA PERCAKAPAN ── */}
+        {activeTab === 'logs' && (
+          <>
+            {/* Filter Bar */}
             <div
               style={{
-                display: 'inline-flex',
-                backgroundColor: 'var(--bg-subtle)',
-                padding: '2px',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--border-default)',
+                padding: '0.75rem 1.5rem',
+                borderBottom: '1px solid var(--border-default)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                flexWrap: 'wrap',
               }}
             >
-              {(['all', 'today', '7d', '30d'] as const).map((rng) => {
-                const label =
-                  rng === 'all'
-                    ? language === 'en'
-                      ? 'All'
-                      : 'Semua'
-                    : rng === 'today'
-                    ? language === 'en'
-                      ? 'Today'
-                      : 'Hari Ini'
-                    : rng === '7d'
-                    ? language === 'en'
-                      ? '7 Days'
-                      : '7 Hari'
-                    : language === 'en'
-                    ? '30 Days'
-                    : '30 Hari';
+              {/* Search */}
+              <div style={{ position: 'relative', minWidth: '240px', flex: 1, maxWidth: '340px' }}>
+                <Search
+                  size={14}
+                  style={{
+                    position: 'absolute',
+                    left: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: 'var(--text-muted)',
+                    pointerEvents: 'none',
+                  }}
+                />
+                <input
+                  type="text"
+                  placeholder="Cari pertanyaan, user, topik..."
+                  value={searchQuery}
+                  onChange={e => {
+                    setSearchQuery(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  style={{ ...INP, paddingLeft: '32px' }}
+                />
+              </div>
 
-                const isSelected = selectedDateRange === rng;
+              {/* User filter */}
+              <div style={{ position: 'relative' }}>
+                <select
+                  value={userFilter}
+                  onChange={e => {
+                    setUserFilter(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  style={{
+                    height: '34px',
+                    padding: '0 28px 0 10px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-default)',
+                    fontSize: '12.5px',
+                    appearance: 'none',
+                    backgroundColor: 'var(--bg-card)',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer',
+                    minWidth: '150px',
+                  }}
+                >
+                  <option value="all">Semua user</option>
+                  {usersList.map(u => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown
+                  size={12}
+                  style={{
+                    position: 'absolute',
+                    right: '8px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    pointerEvents: 'none',
+                    color: 'var(--text-muted)',
+                  }}
+                />
+              </div>
 
-                return (
+              {/* Date range filter pills */}
+              <div
+                style={{
+                  display: 'inline-flex',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-default)',
+                  overflow: 'hidden',
+                }}
+              >
+                {dateRangeOptions.map((opt, i) => {
+                  const isA = dateRange === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        setDateRange(opt.value);
+                        setCurrentPage(1);
+                      }}
+                      style={{
+                        padding: '5px 12px',
+                        fontSize: '12.5px',
+                        fontWeight: isA ? 600 : 400,
+                        border: 'none',
+                        borderLeft: i > 0 ? '1px solid var(--border-default)' : 'none',
+                        backgroundColor: isA ? 'var(--bg-subtle)' : 'transparent',
+                        color: isA ? 'var(--text-primary)' : 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Active user badge filter */}
+              {userFilter !== 'all' && (
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    backgroundColor: 'var(--color-primary-subtle, #eff6ff)',
+                    border: '1px solid var(--color-primary)',
+                    fontSize: '12px',
+                    color: 'var(--color-primary)',
+                  }}
+                >
+                  <span>Filter: {selectedUserName}</span>
                   <button
-                    key={rng}
                     type="button"
                     onClick={() => {
-                      setSelectedDateRange(rng);
+                      setUserFilter('all');
                       setCurrentPage(1);
                     }}
                     style={{
+                      background: 'none',
                       border: 'none',
-                      backgroundColor: isSelected ? 'var(--bg-card)' : 'transparent',
-                      color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
-                      boxShadow: isSelected ? 'var(--shadow-xs)' : 'none',
-                      borderRadius: 'var(--radius-xs)',
-                      padding: '4px 10px',
-                      fontSize: '12px',
-                      fontWeight: 600,
                       cursor: 'pointer',
-                      transition: 'all 0.15s ease',
+                      padding: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      color: 'var(--color-primary)',
                     }}
                   >
-                    {label}
+                    <X size={12} />
                   </button>
-                );
-              })}
+                </div>
+              )}
             </div>
-          </div>
-        </div>
 
-        {/* ── Table Content (Spensify style) ── */}
-        {isLoading ? (
-          <div style={{ padding: '4rem 0', textAlign: 'center', color: 'var(--text-secondary)' }}>
+            {/* Table */}
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ backgroundColor: 'var(--bg-subtle)' }}>
+                    {['Pengguna', 'Pertanyaan & Topik', 'Jawaban AI', 'Sumber Rujukan', 'Waktu', 'Aksi'].map(
+                      (h, i) => (
+                        <th
+                          key={h}
+                          style={{
+                            padding: '9px 1rem',
+                            fontWeight: 600,
+                            fontSize: '12px',
+                            color: 'var(--text-secondary)',
+                            textAlign: i === 3 || i === 5 ? 'center' : 'left',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {h}
+                        </th>
+                      )
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {isLoading ? (
+                    <tr>
+                      <td colSpan={6} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                          <Loader2 size={16} className="animate-spin" color="var(--color-primary)" />
+                          <span>Memuat log percakapan...</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : logs.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                        <MessageSquare size={28} style={{ margin: '0 auto 8px', display: 'block', color: 'var(--border-default)' }} />
+                        <p style={{ margin: 0, fontWeight: 600, color: 'var(--text-primary)' }}>
+                          {searchQuery || userFilter !== 'all' ? 'Tidak ada log yang cocok' : 'Belum ada percakapan tercatat'}
+                        </p>
+                        <p style={{ margin: '4px 0 0', fontSize: '12px' }}>
+                          {searchQuery || userFilter !== 'all' ? 'Coba ubah atau reset filter pencarian.' : 'Aktivitas chat pengguna akan muncul di sini.'}
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
+                    logs.map(log => (
+                      <tr
+                        key={log.id}
+                        style={{ borderTop: '1px solid var(--border-subtle)', transition: 'background 0.12s' }}
+                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--bg-subtle)')}
+                        onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+                      >
+                        {/* Pengguna */}
+                        <td style={{ padding: '10px 1rem', whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <UserAvatar name={log.user_name || 'User'} size={30} />
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)' }}>
+                                {log.user_name || '-'}
+                              </div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                {log.user_department || log.user_email || '-'}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Pertanyaan & Topik */}
+                        <td style={{ padding: '10px 1rem', maxWidth: '320px' }}>
+                          <div
+                            style={{
+                              fontWeight: 500,
+                              fontSize: '12.5px',
+                              color: 'var(--text-primary)',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              maxWidth: '300px',
+                            }}
+                            title={log.query_text}
+                          >
+                            {log.query_text || '-'}
+                          </div>
+                          {log.topic && (
+                            <span
+                              style={{
+                                display: 'inline-block',
+                                marginTop: '3px',
+                                fontSize: '11px',
+                                padding: '1px 7px',
+                                borderRadius: '4px',
+                                backgroundColor: 'var(--bg-subtle)',
+                                border: '1px solid var(--border-default)',
+                                color: 'var(--text-secondary)',
+                                maxWidth: '280px',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {log.topic}
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Jawaban AI Excerpt */}
+                        <td style={{ padding: '10px 1rem', maxWidth: '280px' }}>
+                          <div
+                            style={{
+                              fontSize: '12px',
+                              color: 'var(--text-secondary)',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              maxWidth: '260px',
+                            }}
+                            title={log.answer_excerpt || ''}
+                          >
+                            {log.answer_excerpt || <span style={{ color: 'var(--text-muted)' }}>-</span>}
+                          </div>
+                        </td>
+
+                        {/* Sumber dikutip */}
+                        <td style={{ padding: '10px 1rem', textAlign: 'center' }}>
+                          <span
+                            style={{
+                              fontSize: '12.5px',
+                              fontWeight: 600,
+                              color: (log.retrieved_count || 0) > 0 ? 'var(--color-primary)' : 'var(--text-muted)',
+                            }}
+                          >
+                            {log.retrieved_count ?? 0}
+                          </span>
+                        </td>
+
+                        {/* Waktu */}
+                        <td style={{ padding: '10px 1rem', fontSize: '12px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                          {fmtDateShort(log.created_at)}
+                        </td>
+
+                        {/* Aksi */}
+                        <td style={{ padding: '10px 1rem', textAlign: 'center' }}>
+                          <button
+                            type="button"
+                            title="Lihat detail percakapan"
+                            onClick={() => setInspecting(log)}
+                            style={{
+                              width: '30px',
+                              height: '30px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--border-default)',
+                              background: 'none',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              color: 'var(--text-secondary)',
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--bg-subtle)')}
+                            onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+                          >
+                            <Eye size={13} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Footer */}
             <div
-              className="animate-spin"
               style={{
-                width: '26px',
-                height: '26px',
-                border: '2px solid var(--border-default)',
-                borderTopColor: 'var(--color-primary)',
-                borderRadius: '50%',
-                margin: '0 auto 12px',
-              }}
-            />
-            <p style={{ fontSize: '13.5px', fontWeight: 500 }}>
-              {language === 'en' ? 'Loading audit records...' : 'Memuat rekaman log audit...'}
-            </p>
-          </div>
-        ) : logs.length === 0 ? (
-          <div style={{ padding: '4rem 0', textAlign: 'center', color: 'var(--text-secondary)' }}>
-            <div
-              style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '50%',
-                backgroundColor: 'var(--bg-subtle)',
+                padding: '0.75rem 1.5rem',
+                borderTop: '1px solid var(--border-default)',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 12px',
-                color: 'var(--text-muted)',
+                justifyContent: 'space-between',
+                fontSize: '12.5px',
+                color: 'var(--text-secondary)',
+                flexWrap: 'wrap',
+                gap: '8px',
               }}
             >
-              <MessageSquare size={24} />
+              <span>
+                Halaman {currentPage} / {totalPages} ({totalLogs.toLocaleString('id-ID')} percakapan)
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>Baris per halaman</span>
+                  <div style={{ position: 'relative' }}>
+                    <select
+                      value={pageSize}
+                      onChange={e => {
+                        setPageSize(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      style={{
+                        height: '28px',
+                        padding: '0 24px 0 8px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-default)',
+                        fontSize: '12.5px',
+                        appearance: 'none',
+                        backgroundColor: 'var(--bg-card)',
+                        color: 'var(--text-primary)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {[10, 25, 50].map(n => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown
+                      size={11}
+                      style={{
+                        position: 'absolute',
+                        right: '6px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        pointerEvents: 'none',
+                        color: 'var(--text-muted)',
+                      }}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <PBtn onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1}>
+                    <ChevronLeft size={13} />
+                    Prev Page
+                  </PBtn>
+                  {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map(pg => (
+                    <PBtn key={pg} onClick={() => setCurrentPage(pg)} active={currentPage === pg}>
+                      {pg}
+                    </PBtn>
+                  ))}
+                  <PBtn onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages}>
+                    Next Page
+                    <ChevronRight size={13} />
+                  </PBtn>
+                </div>
+              </div>
             </div>
-            <p style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary)' }}>
-              {searchQuery
-                ? language === 'en'
-                  ? 'No matching logs found'
-                  : 'Tidak ada log yang cocok'
-                : language === 'en'
-                ? 'No audit records found'
-                : 'Belum ada rekaman log audit'}
-            </p>
-            <p style={{ fontSize: '13px', marginTop: '4px', maxWidth: '340px', margin: '4px auto 0' }}>
-              {language === 'en'
-                ? 'Try adjusting your filters or date range.'
-                : 'Coba sesuaikan kata kunci pencarian atau rentang waktu.'}
-            </p>
-          </div>
-        ) : (
-          <div className="table-wrapper">
-            <table>
+          </>
+        )}
+
+        {/* ── TAB 2: PENGGUNA PALING AKTIF ── */}
+        {activeTab === 'topUsers' && (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
-                <tr>
-                  <th style={{ padding: '12px 1.5rem', width: '16%' }}>
-                    {language === 'en' ? 'Timestamp' : 'Waktu'}
-                  </th>
-                  <th style={{ padding: '12px 1rem', width: '20%' }}>
-                    {language === 'en' ? 'User' : 'Pengguna'}
-                  </th>
-                  <th style={{ padding: '12px 1rem', width: '16%' }}>
-                    {language === 'en' ? 'Topic' : 'Topik Bahasan'}
-                  </th>
-                  <th style={{ padding: '12px 1rem' }}>
-                    {language === 'en' ? 'Question' : 'Pertanyaan'}
-                  </th>
-                  <th style={{ padding: '12px 1rem', width: '12%' }}>
-                    {language === 'en' ? 'Sources' : 'Rujukan'}
-                  </th>
-                  <th style={{ padding: '12px 1.5rem', textAlign: 'right', width: '10%' }}>
-                    {language === 'en' ? 'Action' : 'Aksi'}
-                  </th>
+                <tr style={{ backgroundColor: 'var(--bg-subtle)' }}>
+                  {['Peringkat', 'Pengguna', 'Departemen', 'Total Pertanyaan', 'Topik yang Sering Ditanyakan', 'Terakhir Aktif', 'Aksi'].map(
+                    (h, i) => (
+                      <th
+                        key={h}
+                        style={{
+                          padding: '9px 1rem',
+                          fontWeight: 600,
+                          fontSize: '12px',
+                          color: 'var(--text-secondary)',
+                          textAlign: i === 0 || i === 3 ? 'center' : i === 6 ? 'right' : 'left',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {h}
+                      </th>
+                    )
+                  )}
                 </tr>
               </thead>
               <tbody>
-                {logs.map((log) => {
-                  const formattedDate = new Date(log.created_at).toLocaleDateString(
-                    language === 'en' ? 'en-US' : 'id-ID',
-                    {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    }
-                  );
-
-                  return (
+                {isLoadingAnalytics ? (
+                  <tr>
+                    <td colSpan={7} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                        <Loader2 size={16} className="animate-spin" color="var(--color-primary)" />
+                        <span>Menganalisis aktivitas pengguna...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : !analytics || analytics.top_users.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      <Users size={28} style={{ margin: '0 auto 8px', display: 'block', color: 'var(--border-default)' }} />
+                      <p style={{ margin: 0, fontWeight: 600, color: 'var(--text-primary)' }}>Belum ada data aktivitas chat pengguna</p>
+                      <p style={{ margin: '4px 0 0', fontSize: '12px' }}>Daftar pengguna teraktif akan diperbarui otomatis saat ada percakapan.</p>
+                    </td>
+                  </tr>
+                ) : (
+                  analytics.top_users.map((u, idx) => (
                     <tr
-                      key={log.id}
-                      style={{
-                        borderBottom: '1px solid var(--border-subtle)',
-                        transition: 'background-color 0.15s ease',
-                      }}
-                      className="hover:bg-subtle"
+                      key={u.user_id || idx}
+                      style={{ borderTop: '1px solid var(--border-subtle)', transition: 'background 0.12s' }}
+                      onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--bg-subtle)')}
+                      onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
-                      {/* Timestamp */}
-                      <td style={{ padding: '13px 1.5rem', color: 'var(--text-secondary)', fontSize: '12.5px', whiteSpace: 'nowrap' }}>
-                        {formattedDate}
+                      {/* Peringkat */}
+                      <td style={{ padding: '10px 1rem', textAlign: 'center' }}>
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '22px',
+                            height: '22px',
+                            borderRadius: '50%',
+                            fontSize: '11.5px',
+                            fontWeight: 700,
+                            backgroundColor: idx === 0 ? 'var(--color-primary)' : 'var(--bg-subtle)',
+                            color: idx === 0 ? '#fff' : 'var(--text-secondary)',
+                            border: idx === 0 ? 'none' : '1px solid var(--border-default)',
+                          }}
+                        >
+                          {idx + 1}
+                        </span>
                       </td>
 
-                      {/* User Avatar + Name */}
-                      <td style={{ padding: '13px 1rem' }}>
+                      {/* Pengguna */}
+                      <td style={{ padding: '10px 1rem', whiteSpace: 'nowrap' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <UserAvatar name={log.user_name} size={28} />
-                          <div style={{ minWidth: 0 }}>
-                            <div
-                              style={{
-                                fontWeight: 600,
-                                fontSize: '13px',
-                                color: 'var(--text-primary)',
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                              }}
-                            >
-                              {log.user_name || 'Anonymous'}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: '11.5px',
-                                color: 'var(--text-muted)',
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                              }}
-                            >
-                              {log.user_department || 'General'}
-                            </div>
+                          <UserAvatar name={u.name || 'User'} size={32} />
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)' }}>{u.name}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{u.email}</div>
                           </div>
                         </div>
                       </td>
 
-                      {/* Topic */}
-                      <td style={{ padding: '13px 1rem' }}>
-                        <span className="badge badge-neutral" style={{ fontSize: '11.5px' }}>
-                          {log.topic || (language === 'en' ? 'General' : 'Umum')}
+                      {/* Departemen */}
+                      <td style={{ padding: '10px 1rem', fontSize: '12.5px', color: 'var(--text-primary)' }}>
+                        {u.department || '-'}
+                      </td>
+
+                      {/* Total Pertanyaan */}
+                      <td style={{ padding: '10px 1rem', textAlign: 'center' }}>
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            padding: '3px 10px',
+                            borderRadius: '999px',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            backgroundColor: 'var(--color-primary-subtle, #eff6ff)',
+                            color: 'var(--color-primary)',
+                            border: '1px solid var(--border-default)',
+                          }}
+                        >
+                          {u.total_queries} pertanyaan
                         </span>
                       </td>
 
-                      {/* Question Text */}
-                      <td style={{ padding: '13px 1rem', maxWidth: '340px' }}>
-                        <div
-                          style={{
-                            fontSize: '13px',
-                            color: 'var(--text-primary)',
-                            fontWeight: 500,
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                          }}
-                          title={log.query_text}
-                        >
-                          {log.query_text}
+                      {/* Topik yang Sering Ditanyakan */}
+                      <td style={{ padding: '10px 1rem', maxWidth: '300px' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                          {u.top_topics && u.top_topics.length > 0 ? (
+                            u.top_topics.slice(0, 3).map((tp, tidx) => (
+                              <span
+                                key={tidx}
+                                style={{
+                                  fontSize: '11px',
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  backgroundColor: 'var(--bg-subtle)',
+                                  border: '1px solid var(--border-default)',
+                                  color: 'var(--text-secondary)',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {tp}
+                              </span>
+                            ))
+                          ) : (
+                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>-</span>
+                          )}
                         </div>
                       </td>
 
-                      {/* Cited Sources */}
-                      <td style={{ padding: '13px 1rem' }}>
-                        {log.retrieved_count > 0 ? (
-                          <span className="badge badge-accent font-mono" style={{ fontSize: '11.5px' }}>
-                            {log.retrieved_count} {language === 'en' ? 'sources' : 'sumber'}
-                          </span>
-                        ) : (
-                          <span className="badge badge-neutral" style={{ fontSize: '11.5px' }}>
-                            {language === 'en' ? 'Direct' : 'Langsung'}
-                          </span>
-                        )}
+                      {/* Terakhir Aktif */}
+                      <td style={{ padding: '10px 1rem', fontSize: '12px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                        {fmtDateShort(u.last_active)}
                       </td>
 
-                      {/* Action */}
-                      <td style={{ padding: '13px 1.5rem', textAlign: 'right' }}>
-                        <button
-                          type="button"
-                          onClick={() => setInspectingLog(log)}
-                          className="btn btn-outline btn-sm"
-                          style={{ padding: '4px 10px', fontSize: '12px' }}
-                          title={language === 'en' ? 'View Details' : 'Lihat Detail'}
-                        >
-                          <Eye size={13} />
-                          <span>{language === 'en' ? 'Detail' : 'Detail'}</span>
-                        </button>
+                      {/* Aksi: Filter percakapan user */}
+                      <td style={{ padding: '10px 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        {u.user_id ? (
+                          <button
+                            type="button"
+                            onClick={() => selectUserAndShowLogs(u.user_id)}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '5px 10px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--border-default)',
+                              backgroundColor: 'transparent',
+                              fontSize: '12px',
+                              fontWeight: 500,
+                              color: 'var(--color-primary)',
+                              cursor: 'pointer',
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--bg-subtle)')}
+                            onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+                          >
+                            <span>Lihat percakapan</span>
+                            <ArrowRight size={12} />
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>-</span>
+                        )}
                       </td>
                     </tr>
-                  );
-                })}
+                  ))
+                )}
               </tbody>
             </table>
           </div>
         )}
-
-        {/* Spensify Card Footer with Pagination */}
-        <div
-          style={{
-            padding: '12px 1.5rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            borderTop: '1px solid var(--border-default)',
-            backgroundColor: 'var(--bg-subtle)',
-          }}
-        >
-          <span style={{ fontSize: '12.5px', color: 'var(--text-secondary)' }}>
-            {language === 'en'
-              ? `Showing page ${currentPage} of ${totalPages} (${totalLogs} records)`
-              : `Halaman ${currentPage} dari ${totalPages} (Total ${totalLogs} rekaman)`}
-          </span>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <button
-              type="button"
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage <= 1}
-              className="btn btn-outline btn-sm"
-              style={{ padding: '4px 8px' }}
-              aria-label="Previous page"
-            >
-              <ChevronLeft size={14} />
-            </button>
-            <span
-              style={{
-                fontSize: '12.5px',
-                fontWeight: 600,
-                padding: '0 8px',
-                color: 'var(--text-primary)',
-              }}
-            >
-              {currentPage} / {totalPages}
-            </span>
-            <button
-              type="button"
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage >= totalPages}
-              className="btn btn-outline btn-sm"
-              style={{ padding: '4px 8px' }}
-              aria-label="Next page"
-            >
-              <ChevronRight size={14} />
-            </button>
-          </div>
-        </div>
       </div>
 
-      {/* ── Spensify Detail Inspection Modal Dialog ── */}
-      {inspectingLog && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: '1.5rem',
-          }}
-          onClick={() => setInspectingLog(null)}
-        >
+      {/* MODAL: Detail Percakapan */}
+      {inspecting && (
+        <div style={OL} onClick={() => setInspecting(null)}>
           <div
             style={{
               backgroundColor: 'var(--bg-card)',
               border: '1px solid var(--border-default)',
-              borderRadius: 'var(--radius-md)',
-              maxWidth: '740px',
+              borderRadius: 'var(--radius-lg)',
               width: '100%',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              boxShadow: 'var(--shadow-xl)',
+              maxWidth: '640px',
+              display: 'flex',
+              flexDirection: 'column',
+              maxHeight: '88vh',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.18)',
             }}
-            onClick={(e) => e.stopPropagation()}
+            onClick={e => e.stopPropagation()}
           >
             {/* Modal Header */}
             <div
@@ -1017,248 +937,234 @@ export default function AuditLogsView() {
                 padding: '1.25rem 1.5rem',
                 borderBottom: '1px solid var(--border-default)',
                 display: 'flex',
-                alignItems: 'center',
                 justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                flexShrink: 0,
               }}
             >
-              <div>
-                <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-                  {language === 'en' ? 'Audit Log Record Details' : 'Detail Rekaman Log Audit'}
-                </h3>
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                  {new Date(inspectingLog.created_at).toLocaleString(
-                    language === 'en' ? 'en-US' : 'id-ID'
-                  )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <UserAvatar name={inspecting.user_name || 'User'} size={36} />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary)' }}>
+                    {inspecting.user_name || '-'}
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                    {inspecting.user_department ? `${inspecting.user_department} • ` : ''}
+                    {fmtDate(inspecting.created_at)}
+                  </div>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setInspectingLog(null)}
-                className="btn btn-ghost btn-sm"
-                style={{ padding: '6px' }}
-                aria-label="Close dialog"
+                onClick={() => setInspecting(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-muted)',
+                  padding: '2px',
+                }}
               >
                 <X size={18} />
               </button>
             </div>
 
-            {/* Modal Content */}
-            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              {/* User Metadata Strip */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  backgroundColor: 'var(--bg-subtle)',
-                  padding: '10px 14px',
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1px solid var(--border-default)',
-                }}
-              >
-                <UserAvatar name={inspectingLog.user_name} size={34} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {inspectingLog.user_name || 'Anonymous'}{' '}
-                    <span style={{ fontSize: '12px', fontWeight: 400, color: 'var(--text-secondary)' }}>
-                      ({inspectingLog.user_email || '-'})
-                    </span>
-                  </div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                    {inspectingLog.user_department || 'General'} · Topik: {inspectingLog.topic || 'Umum'}
-                  </div>
-                </div>
-              </div>
-
-              {/* User Question */}
-              <div>
-                <span
-                  style={{
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    color: 'var(--text-secondary)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                  }}
-                >
-                  {language === 'en' ? 'User Question' : 'Pertanyaan Pengguna'}
-                </span>
-                <div
-                  style={{
-                    marginTop: '6px',
-                    backgroundColor: 'var(--bg-subtle)',
-                    border: '1px solid var(--border-default)',
-                    borderRadius: 'var(--radius-sm)',
-                    padding: '12px 14px',
-                    fontSize: '13.5px',
-                    color: 'var(--text-primary)',
-                    lineHeight: '1.5',
-                  }}
-                >
-                  {inspectingLog.query_text}
-                </div>
-              </div>
-
-              {/* AI Answer */}
-              <div>
-                <span
-                  style={{
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    color: 'var(--text-secondary)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                  }}
-                >
-                  {language === 'en' ? 'AI Response Excerpt' : 'Kutipan Jawaban AI'}
-                </span>
-                <div
-                  style={{
-                    marginTop: '6px',
-                    backgroundColor: 'var(--bg-app)',
-                    border: '1px solid var(--border-default)',
-                    borderRadius: 'var(--radius-sm)',
-                    padding: '14px 16px',
-                    fontSize: '13.5px',
-                    color: 'var(--text-primary)',
-                    maxHeight: '260px',
-                    overflowY: 'auto',
-                    lineHeight: '1.6',
-                  }}
-                >
-                  <MarkdownContent content={inspectingLog.answer_excerpt || (language === 'en' ? 'No response text recorded.' : 'Tidak ada rekaman teks jawaban.')} />
-                </div>
-              </div>
-
-              {/* Cited Documents / Sources */}
-              <div>
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: '6px',
-                  }}
-                >
-                  <span
+            {/* Modal Scrollable Body */}
+            <div
+              style={{
+                flex: 1,
+                overflowY: 'auto',
+                padding: '1.25rem 1.5rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '14px',
+              }}
+            >
+              {/* Stat row */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                {[
+                  { l: 'TOPIK', v: inspecting.topic || 'Umum' },
+                  { l: 'SUMBER DIKUTIP', v: String(inspecting.retrieved_count ?? 0) },
+                  { l: 'SESSION ID', v: inspecting.session_id ? inspecting.session_id.slice(-8) : '-' },
+                ].map(({ l, v }) => (
+                  <div
+                    key={l}
                     style={{
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      color: 'var(--text-secondary)',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.04em',
+                      border: '1px solid var(--border-default)',
+                      borderRadius: '8px',
+                      padding: '10px 12px',
                     }}
                   >
-                    {language === 'en' ? 'Cited Document Passages' : 'Kutipan Sumber Rujukan'}
-                  </span>
-                  <span className="badge badge-neutral font-mono" style={{ fontSize: '11px' }}>
-                    {inspectingLog.sources_used?.length || 0} {language === 'en' ? 'passages' : 'kutipan'}
+                    <div
+                      style={{
+                        fontSize: '10px',
+                        fontWeight: 700,
+                        color: 'var(--text-muted)',
+                        letterSpacing: '0.06em',
+                        textTransform: 'uppercase',
+                        marginBottom: '4px',
+                      }}
+                    >
+                      {l}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        color: 'var(--text-primary)',
+                        wordBreak: 'break-all',
+                      }}
+                    >
+                      {v}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Pertanyaan */}
+              <div style={{ border: '1px solid var(--border-default)', borderRadius: '10px', overflow: 'hidden' }}>
+                <div
+                  style={{
+                    padding: '10px 14px',
+                    backgroundColor: 'var(--bg-subtle)',
+                    borderBottom: '1px solid var(--border-default)',
+                  }}
+                >
+                  <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text-primary)' }}>
+                    Pertanyaan Pengguna
                   </span>
                 </div>
+                <div style={{ padding: '14px', fontSize: '13.5px', color: 'var(--text-primary)', lineHeight: 1.65 }}>
+                  {inspecting.query_text || <span style={{ color: 'var(--text-muted)' }}>Tidak tersedia</span>}
+                </div>
+              </div>
 
-                {!inspectingLog.sources_used || inspectingLog.sources_used.length === 0 ? (
+              {/* Jawaban AI */}
+              {inspecting.answer_excerpt && (
+                <div style={{ border: '1px solid var(--border-default)', borderRadius: '10px', overflow: 'hidden' }}>
                   <div
                     style={{
-                      padding: '1rem',
-                      textAlign: 'center',
+                      padding: '10px 14px',
                       backgroundColor: 'var(--bg-subtle)',
-                      borderRadius: 'var(--radius-sm)',
-                      fontSize: '12.5px',
-                      color: 'var(--text-muted)',
+                      borderBottom: '1px solid var(--border-default)',
                     }}
                   >
-                    {language === 'en'
-                      ? 'No document passages were directly retrieved for this conversation.'
-                      : 'Pertanyaan ini dijawab langsung tanpa sitasi spesifik kutipan dokumen.'}
+                    <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text-primary)' }}>
+                      Jawaban AI
+                    </span>
+                    <span style={{ marginLeft: '8px', fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                      (cuplikan)
+                    </span>
                   </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '220px', overflowY: 'auto' }}>
-                    {inspectingLog.sources_used.map((c: any, idx: number) => (
-                      <div
-                        key={idx}
-                        style={{
-                          backgroundColor: 'var(--bg-subtle)',
-                          border: '1px solid var(--border-subtle)',
-                          borderRadius: 'var(--radius-sm)',
-                          padding: '10px 12px',
-                        }}
-                      >
+                  <div
+                    style={{
+                      padding: '14px',
+                      fontSize: '13px',
+                      color: 'var(--text-secondary)',
+                      lineHeight: 1.7,
+                      maxHeight: '220px',
+                      overflowY: 'auto',
+                    }}
+                  >
+                    <MarkdownContent content={inspecting.answer_excerpt} />
+                  </div>
+                </div>
+              )}
+
+              {/* Sumber dokumen */}
+              {inspecting.sources_used && inspecting.sources_used.length > 0 && (
+                <div style={{ border: '1px solid var(--border-default)', borderRadius: '10px', overflow: 'hidden' }}>
+                  <div
+                    style={{
+                      padding: '10px 14px',
+                      backgroundColor: 'var(--bg-subtle)',
+                      borderBottom: '1px solid var(--border-default)',
+                    }}
+                  >
+                    <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text-primary)' }}>
+                      Sumber Dokumen yang Dikutip
+                    </span>
+                    <span style={{ marginLeft: '8px', fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                      ({inspecting.sources_used.length} dokumen)
+                    </span>
+                  </div>
+                  <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {inspecting.sources_used.map((src: any, idx: number) => {
+                      const title = typeof src === 'string' ? src : (src.document_title || src.title || `Dokumen ${idx + 1}`);
+                      const snippet = typeof src === 'object' ? (src.passage_snippet || src.snippet || src.text) : null;
+                      return (
                         <div
+                          key={idx}
                           style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            marginBottom: '4px',
-                            gap: '8px',
+                            padding: '8px 10px',
+                            borderRadius: '8px',
+                            border: '1px solid var(--border-default)',
+                            backgroundColor: 'var(--bg-subtle)',
+                            fontSize: '12.5px',
+                            color: 'var(--text-primary)',
                           }}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-                            <FileText size={13} style={{ color: 'var(--color-primary)' }} />
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span
                               style={{
-                                fontSize: '12.5px',
-                                fontWeight: 600,
-                                color: 'var(--text-primary)',
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
+                                width: '20px',
+                                height: '20px',
+                                borderRadius: '50%',
+                                backgroundColor: 'var(--bg-card)',
+                                border: '1px solid var(--border-default)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                color: 'var(--text-muted)',
+                                flexShrink: 0,
                               }}
                             >
-                              {c.document_title || c.title || 'Dokumen'}
+                              {idx + 1}
+                            </span>
+                            <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {title}
                             </span>
                           </div>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-                            {c.page_number && (
-                              <span className="badge badge-outline" style={{ fontSize: '10.5px' }}>
-                                Hal. {c.page_number}
-                              </span>
-                            )}
-                            {c.similarity_score && (
-                              <span className="badge badge-accent font-mono" style={{ fontSize: '10.5px' }}>
-                                Match {(c.similarity_score * 100).toFixed(0)}%
-                              </span>
-                            )}
-                          </div>
+                          {snippet && (
+                            <div style={{ marginTop: '4px', fontSize: '11.5px', color: 'var(--text-muted)', fontStyle: 'italic', paddingLeft: '28px' }}>
+                              &quot;{snippet.slice(0, 140)}...&quot;
+                            </div>
+                          )}
                         </div>
-
-                        {(c.passage_snippet || c.snippet || c.text) && (
-                          <p
-                            style={{
-                              fontSize: '12px',
-                              color: 'var(--text-secondary)',
-                              lineHeight: '16px',
-                              margin: '4px 0 0',
-                              fontStyle: 'italic',
-                            }}
-                          >
-                            &quot;{c.passage_snippet || c.snippet || c.text}&quot;
-                          </p>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
             {/* Modal Footer */}
             <div
               style={{
-                padding: '12px 1.5rem',
+                padding: '1rem 1.5rem',
                 borderTop: '1px solid var(--border-default)',
-                backgroundColor: 'var(--bg-subtle)',
                 display: 'flex',
-                alignItems: 'center',
                 justifyContent: 'flex-end',
+                flexShrink: 0,
               }}
             >
               <button
                 type="button"
-                onClick={() => setInspectingLog(null)}
-                className="btn btn-outline btn-sm"
+                onClick={() => setInspecting(null)}
+                style={{
+                  height: '36px',
+                  padding: '0 18px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-default)',
+                  background: 'none',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  color: 'var(--text-primary)',
+                }}
               >
-                {language === 'en' ? 'Close' : 'Tutup'}
+                Tutup
               </button>
             </div>
           </div>

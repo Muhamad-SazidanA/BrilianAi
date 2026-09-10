@@ -264,7 +264,7 @@ export default function RolesPermissionsView() {
           {canManage && (
             <button type="button" onClick={openCreate}
               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', height: '36px', padding: '0 14px', backgroundColor: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-              <Plus size={15} /><span>+ Role baru</span>
+              <Plus size={15} /><span>Role baru</span>
             </button>
           )}
         </div>
