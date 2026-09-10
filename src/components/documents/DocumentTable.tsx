@@ -24,6 +24,7 @@ interface DocumentTableProps {
   onDelete: (batchId: string, filename: string) => Promise<void>;
   onRename: (batchId: string, newFilename: string) => Promise<void>;
   onToggleActive: (batchId: string, active: boolean) => Promise<void>;
+  onActivateAll?: () => Promise<void>;
 }
 
 export default function DocumentTable({
@@ -33,11 +34,15 @@ export default function DocumentTable({
   onDelete,
   onRename,
   onToggleActive,
+  onActivateAll,
 }: DocumentTableProps) {
   const { language, t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterActive, setFilterActive] = useState<'all' | 'active' | 'inactive'>('all');
   const [selectedForRename, setSelectedForRename] = useState<UploadBatch | null>(null);
+  const [isActivatingAll, setIsActivatingAll] = useState(false);
+
+  const inactiveCount = batches.filter((b) => !b.is_active_knowledge).length;
 
   // Filter batches
   const filteredBatches = batches.filter((batch) => {
@@ -120,11 +125,38 @@ export default function DocumentTable({
             </button>
           </div>
 
-          {/* Refresh Action */}
-          <button onClick={onRefresh} disabled={isLoading} className="btn btn-outline btn-sm">
-            <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
-            <span>{t('table.refresh')}</span>
-          </button>
+          {/* Action Group: Activate All & Refresh */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {onActivateAll && inactiveCount > 0 && (
+              <button
+                onClick={async () => {
+                  setIsActivatingAll(true);
+                  try {
+                    await onActivateAll();
+                  } finally {
+                    setIsActivatingAll(false);
+                  }
+                }}
+                disabled={isLoading || isActivatingAll}
+                className="btn btn-primary btn-sm"
+                style={{ fontWeight: 600 }}
+                title="Aktifkan seluruh dokumen yang masih Standby agar dapat langsung dijawab oleh AI Chatbot"
+              >
+                <CheckCircle2 size={14} className={isActivatingAll ? 'animate-spin' : ''} />
+                <span>
+                  {language === 'en'
+                    ? `Activate All (${inactiveCount})`
+                    : `Aktifkan Semua (${inactiveCount})`}
+                </span>
+              </button>
+            )}
+
+            {/* Refresh Action */}
+            <button onClick={onRefresh} disabled={isLoading} className="btn btn-outline btn-sm">
+              <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
+              <span>{t('table.refresh')}</span>
+            </button>
+          </div>
         </div>
       </div>
 

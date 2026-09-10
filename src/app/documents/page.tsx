@@ -119,6 +119,28 @@ export default function DocumentsPage() {
     );
   };
 
+  const handleActivateAll = async () => {
+    toast.promise(
+      async () => {
+        const res = await fetch('/api/documents', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ activateAll: true }),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || 'Gagal mengaktifkan seluruh dokumen');
+        }
+        await fetchBatches();
+      },
+      {
+        loading: language === 'en' ? 'Activating all documents...' : 'Mengaktifkan seluruh dokumen...',
+        success: language === 'en' ? 'All documents activated for AI Chatbot!' : 'Seluruh dokumen berhasil diaktifkan untuk AI Chatbot!',
+        error: (err) => err.message,
+      }
+    );
+  };
+
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
 
   const filteredBatches = useMemo(() => {
@@ -143,31 +165,34 @@ export default function DocumentsPage() {
         <div style={{ display: 'flex', gap: '8px' }}>
           <Link href="/upload" className="btn btn-primary btn-sm">
             <UploadCloud size={15} />
-            <span>{t('header.upload_btn')}</span>
+            <span>{t('dash.upload_new')}</span>
           </Link>
           <Link href="/chat" className="btn btn-outline btn-sm">
             <MessageSquare size={15} />
-            <span>{t('header.chat_btn')}</span>
+            <span>Tanya Dokumen</span>
           </Link>
         </div>
       }
     >
-      {/* ── Top Metric Cards (Matches Reference Image) ──────────── */}
-      <DocumentStatsCards
-        batches={batches}
-        activeFilter={selectedFilter}
-        onSelectFilter={setSelectedFilter}
-      />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        {/* Document Stats Cards */}
+        <DocumentStatsCards
+          batches={batches}
+          selectedFilter={selectedFilter}
+          onSelectFilter={setSelectedFilter}
+        />
 
-      {/* ── Document Table ─────────────────────────────────────── */}
-      <DocumentTable
-        batches={filteredBatches}
-        isLoading={isLoading}
-        onRefresh={fetchBatches}
-        onDelete={handleDelete}
-        onRename={handleRename}
-        onToggleActive={handleToggleActive}
-      />
+        {/* Document Table */}
+        <DocumentTable
+          batches={filteredBatches}
+          isLoading={isLoading}
+          onRefresh={fetchBatches}
+          onDelete={handleDelete}
+          onRename={handleRename}
+          onToggleActive={handleToggleActive}
+          onActivateAll={handleActivateAll}
+        />
+      </div>
     </AppShell>
   );
 }

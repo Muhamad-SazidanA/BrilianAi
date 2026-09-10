@@ -264,6 +264,25 @@ export async function toggleBatchKnowledgeBase(
 }
 
 /**
+ * Mengaktifkan atau menonaktifkan seluruh dokumen yang memiliki chunk sebagai basis pengetahuan AI Chatbot.
+ */
+export async function activateAllBatches(active: boolean = true): Promise<number> {
+  const pool = getPool();
+  try {
+    const sql = `
+      UPDATE upload_batches
+      SET is_active_knowledge = $1
+      WHERE chunk_count > 0;
+    `;
+    const res = await pool.query(sql, [active]);
+    return res.rowCount || 0;
+  } catch (err) {
+    console.error('[VectorStore] Error activateAllBatches:', err);
+    throw err;
+  }
+}
+
+/**
  * Deletes an upload batch by ID.
  * Cascades to document_chunks and curated_insights automatically.
  */

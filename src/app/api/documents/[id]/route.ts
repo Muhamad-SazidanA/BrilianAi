@@ -51,10 +51,9 @@ export async function PATCH(
     if (typeof isActiveKnowledge === 'boolean') {
       if (isActiveKnowledge) {
         const rawChunks = await listChunks(id);
-        const curated = await listCuratedInsights(id);
-        if (rawChunks.length === 0 || curated.length < rawChunks.length) {
+        if (rawChunks.length === 0) {
           return NextResponse.json(
-            { error: 'Dokumen hanya dapat diaktifkan sebagai Basis Pengetahuan AI jika Kurasi Insight telah 100% selesai.' },
+            { error: 'Dokumen tidak memiliki potongan teks (chunk) yang valid untuk diaktifkan.' },
             { status: 400 }
           );
         }

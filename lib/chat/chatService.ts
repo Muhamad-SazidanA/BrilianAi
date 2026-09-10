@@ -3,6 +3,8 @@ import {
   searchSimilarChunks,
   searchSimilarCuratedInsights,
   getBatchById,
+  listBatches,
+  UploadBatch,
   SimilarChunkResult,
   SimilarCuratedResult,
 } from '../db/vectorStore';
@@ -11,6 +13,7 @@ import {
   runRagSynthesizer,
   runSafetyEvaluator,
 } from '../ai/multiAgentClient';
+import { generateChatResponse } from '../ai/chatClient';
 import { isDataNotFoundAnswer } from './chatUtils';
 import {
   getCachedChatResponse,
@@ -76,7 +79,7 @@ export async function askDocumentChat(
       const batch = await getBatchById(options.documentId);
       if (batch && !batch.is_active_knowledge) {
         return {
-          answer: `Dokumen "${batch.original_filename}" belum diaktifkan sebagai basis pengetahuan AI Chatbot. Dokumen baru dapat dibaca dan ditanyakan setelah proses Kurasi Insight mencapai 100% dan diaktifkan melalui tombol "Aktifkan sebagai Basis Pengetahuan AI".`,
+          answer: `Dokumen "${batch.original_filename}" saat ini berstatus non-aktif (standby) untuk AI Chatbot. Anda dapat mengaktifkannya melalui menu Knowledge Base atau Document Studio.`,
           sources: [],
           allowPublicKnowledge,
           retrievedCount: 0,
@@ -91,8 +94,8 @@ export async function askDocumentChat(
   // Hanya digunakan jika database belum memiliki batch/dokumen aktif (misal saat cold-start / unit testing)
   if (isStandardFisioterapiQuery(trimmedQuery)) {
     try {
-      const batches = await listBatches();
-      const hasRealActiveDoc = batches.some((b) => (b.chunk_count || 0) > 0 && b.is_active_knowledge);
+      const batches: UploadBatch[] = await listBatches();
+      const hasRealActiveDoc = batches.some((b: UploadBatch) => (b.chunk_count || 0) > 0 && b.is_active_knowledge);
       if (!hasRealActiveDoc) {
         return {
           answer: GOLDEN_FISIOTERAPI_ANSWER,
