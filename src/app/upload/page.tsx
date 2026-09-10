@@ -20,8 +20,8 @@ const INITIAL_STEPS: PipelineStep[] = [
   },
   {
     number: '2',
-    title: 'Agent 1: Vision Ingestion',
-    description: 'Google Gemini Flash-Lite Vision mengekstrak teks & tabel',
+    title: 'Vision Ingestion Engine',
+    description: 'Vision OCR Engine mengekstrak teks & tabel presisi tinggi',
     status: 'idle',
   },
   {
@@ -32,8 +32,8 @@ const INITIAL_STEPS: PipelineStep[] = [
   },
   {
     number: '4',
-    title: 'Agent 2: Dense Embedding',
-    description: 'OpenAI text-embedding-3-small disimpan ke pgvector',
+    title: 'Dense Vector Embedding',
+    description: 'Vektor dense embedding 1024-dimensi disimpan ke pgvector',
     status: 'idle',
   },
 ];
@@ -79,7 +79,7 @@ export default function UploadPage() {
             status: idx === 0 ? 'done' : idx === 1 ? 'running' : 'idle',
           }))
         );
-        setCurrentStepMessage('Agent 1 (Google Gemini Vision) mengekstrak teks tiap halaman...');
+        setCurrentStepMessage('Vision OCR Engine mengekstrak teks tiap halaman...');
       }, 3500);
 
       const timer2 = setTimeout(() => {
@@ -99,7 +99,7 @@ export default function UploadPage() {
             status: idx <= 2 ? 'done' : idx === 3 ? 'running' : 'idle',
           }))
         );
-        setCurrentStepMessage('Agent 2 (OpenAI text-embedding-3-small) menyimpan ke pgvector...');
+        setCurrentStepMessage('Dense Vector Embedding menyimpan vektor ke pgvector...');
       }, 11000);
 
       const res = await fetch('/api/documents/upload', {

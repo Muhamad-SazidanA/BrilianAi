@@ -167,7 +167,7 @@ export default function RawChunksTab({
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span className="badge badge-neutral font-mono" style={{ fontSize: '11px' }}>
-                      BGE-M3 (1024-dim)
+                      Dense Vector (1024-dim)
                     </span>
                     <button
                       onClick={() => handleCopy(chunk.id, chunk.content)}

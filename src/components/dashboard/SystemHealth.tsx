@@ -15,13 +15,13 @@ export default function SystemHealth({ stats }: SystemHealthProps) {
 
   const pipelines = [
     {
-      name: 'MuPDF WASM',
+      name: 'Document Buffer Renderer',
       role: 'In-Memory Renderer',
       status: 'Active',
       color: 'var(--color-primary)',
     },
     {
-      name: health?.visionModel || 'qwen2.5vl:3b',
+      name: health?.visionModel || 'Brilian Vision OCR Engine',
       role: language === 'en' ? 'Vision OCR (per page)' : 'Vision OCR (per halaman)',
       status: health?.ollama ? 'Online' : 'Standby',
       color: health?.ollama ? 'var(--color-success)' : 'var(--color-warning)',
@@ -33,7 +33,7 @@ export default function SystemHealth({ stats }: SystemHealthProps) {
       color: 'var(--color-primary)',
     },
     {
-      name: health?.embeddingModel || 'bge-m3',
+      name: health?.embeddingModel || 'Dense Vector Embedding (1024-dim)',
       role: 'Dense Vector 1024-dim',
       status: health?.ollama ? 'Online' : 'Standby',
       color: health?.ollama ? 'var(--color-success)' : 'var(--color-warning)',

@@ -53,8 +53,8 @@ export async function GET() {
       systemHealth: {
         postgres: true,
         ollama: allAiOnline,
-        visionModel: 'Gemini Flash-Lite Vision (gemini-2.0-flash-lite)',
-        embeddingModel: 'text-embedding-3-small (OpenAI)',
+        visionModel: 'Brilian Vision OCR Engine',
+        embeddingModel: 'Dense Vector Embedding (1024-dim)',
         multiAgent: {
           geminiVision: geminiActive,
           openAiEmbedding: openAiActive,
@@ -80,8 +80,8 @@ export async function GET() {
       systemHealth: {
         postgres: false,
         ollama: allAiOnline,
-        visionModel: 'Gemini Flash-Lite Vision (gemini-2.0-flash-lite)',
-        embeddingModel: 'text-embedding-3-small (OpenAI)',
+        visionModel: 'Brilian Vision OCR Engine',
+        embeddingModel: 'Dense Vector Embedding (1024-dim)',
         multiAgent: {
           geminiVision: geminiActive,
           openAiEmbedding: openAiActive,

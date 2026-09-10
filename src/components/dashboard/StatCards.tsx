@@ -51,7 +51,7 @@ export default function StatCards({ stats, isLoading }: StatCardsProps) {
       icon: FileCode,
       iconBg: 'var(--color-warning-subtle)',
       iconColor: 'var(--color-warning)',
-      badge: 'Qwen 2.5',
+      badge: 'Vision OCR',
       badgeVariant: 'badge-warning',
     },
   ];

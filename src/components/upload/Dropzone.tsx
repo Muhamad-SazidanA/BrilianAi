@@ -80,7 +80,7 @@ export default function Dropzone({ onUpload, isUploading, uploadError }: Dropzon
             Unggah Dokumen PDF
           </h2>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-            Setiap halaman diekstrak oleh Agent 1 (Google Gemini Flash-Lite Vision) & diindeks oleh Agent 2 (OpenAI)
+            Setiap halaman diekstrak oleh Vision OCR Engine & diindeks ke representasi vektor
           </p>
         </div>
         <span className="badge badge-accent" style={{ fontSize: '11px', padding: '3px 9px' }}>

@@ -41,10 +41,10 @@ export default function MetadataTab({ batch, chunks }: MetadataTabProps) {
           ? `${avgChars} characters (Sliding Window Target: 800)`
           : `${avgChars} karakter (Sliding Window Target: 800)`,
     },
-    { label: t('meta.vision'), value: 'Qwen 2.5 VL (In-memory page scan)' },
+    { label: t('meta.vision'), value: 'Vision OCR Engine (In-memory page scan)' },
     {
       label: t('meta.embedding'),
-      value: language === 'en' ? 'BGE-M3 · 1024 Dimensions (Dense Vector)' : 'BGE-M3 · 1024 Dimensi (Dense Vector)',
+      value: language === 'en' ? 'Dense Vector · 1024 Dimensions' : 'Vektor Padat · 1024 Dimensi',
     },
     { label: t('meta.vector_db'), value: 'pgvector (HNSW Index cosine similarity)' },
   ];
