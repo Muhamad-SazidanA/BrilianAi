@@ -39,23 +39,11 @@ export async function GET() {
     `;
     const recentResult = await pool.query(recentQuery);
 
-    // 3. Check Ollama connectivity
-    let ollamaUrl = process.env.OLLAMA_BASE_URL || process.env.OLLAMA_ENDPOINT || 'http://localhost:11434';
-    if (ollamaUrl.includes('://ollama:') && !process.env.DOCKER_CONTAINER) {
-      ollamaUrl = ollamaUrl.replace('://ollama:', '://localhost:');
-    }
-    let ollamaOnline = false;
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000);
-      const ollamaRes = await fetch(`${ollamaUrl}/api/version`, {
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      ollamaOnline = ollamaRes.ok;
-    } catch {
-      ollamaOnline = false;
-    }
+    // 3. Multi-Agent Cloud status
+    const geminiActive = Boolean(process.env.GEMINI_API_KEY);
+    const openAiActive = Boolean(process.env.OPENAI_API_KEY);
+    const deepseekActive = Boolean(process.env.DEEPSEEK_API_KEY);
+    const allAiOnline = geminiActive && openAiActive && deepseekActive;
 
     return NextResponse.json({
       totalDocuments: row.total_documents,
@@ -64,30 +52,44 @@ export async function GET() {
       activeKnowledgeCount: row.active_knowledge_count,
       systemHealth: {
         postgres: true,
-        ollama: ollamaOnline,
-        visionModel: process.env.VISION_MODEL_NAME || 'qwen2.5vl:3b',
-        embeddingModel: process.env.EMBEDDING_MODEL_NAME || 'bge-m3',
+        ollama: allAiOnline,
+        visionModel: 'Gemini Flash-Lite Vision (gemini-2.0-flash-lite)',
+        embeddingModel: 'text-embedding-3-small (OpenAI)',
+        multiAgent: {
+          geminiVision: geminiActive,
+          openAiEmbedding: openAiActive,
+          deepseekSynthesizer: deepseekActive,
+        },
       },
       recentBatches: recentResult.rows,
     });
   } catch (error: any) {
-    console.error('[API /api/stats] Error fetching stats:', error);
-    return NextResponse.json(
-      {
-        totalDocuments: 0,
-        totalChunks: 0,
-        totalPages: 0,
-        activeKnowledgeCount: 0,
-        systemHealth: {
-          postgres: false,
-          ollama: false,
-          visionModel: process.env.VISION_MODEL_NAME || 'qwen2.5vl:3b',
-          embeddingModel: process.env.EMBEDDING_MODEL_NAME || 'bge-m3',
+    console.warn('[API /api/stats] Database offline/not ready:', error?.message);
+
+    const geminiActive = Boolean(process.env.GEMINI_API_KEY);
+    const openAiActive = Boolean(process.env.OPENAI_API_KEY);
+    const deepseekActive = Boolean(process.env.DEEPSEEK_API_KEY);
+    const allAiOnline = geminiActive && openAiActive && deepseekActive;
+
+    // Graceful response so dashboard UI remains fully functional even before DB migration
+    return NextResponse.json({
+      totalDocuments: 0,
+      totalChunks: 0,
+      totalPages: 0,
+      activeKnowledgeCount: 0,
+      systemHealth: {
+        postgres: false,
+        ollama: allAiOnline,
+        visionModel: 'Gemini Flash-Lite Vision (gemini-2.0-flash-lite)',
+        embeddingModel: 'text-embedding-3-small (OpenAI)',
+        multiAgent: {
+          geminiVision: geminiActive,
+          openAiEmbedding: openAiActive,
+          deepseekSynthesizer: deepseekActive,
         },
-        recentBatches: [],
-        error: error.message || 'Database error',
       },
-      { status: 500 }
-    );
+      recentBatches: [],
+      error: error.message || 'Database error',
+    });
   }
 }

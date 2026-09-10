@@ -6,7 +6,11 @@ import {
   SimilarChunkResult,
   SimilarCuratedResult,
 } from '../db/vectorStore';
-import { generateChatResponse } from '../ai/chatClient';
+import {
+  runGuardrailAndRouter,
+  runRagSynthesizer,
+  runSafetyEvaluator,
+} from '../ai/multiAgentClient';
 import { isDataNotFoundAnswer } from './chatUtils';
 import {
   getCachedChatResponse,
@@ -43,10 +47,11 @@ export interface ChatResponseResult {
 }
 
 /**
- * Orchestrates end-to-end RAG chat using:
- * 1. bge-m3 for query embedding
- * 2. pgvector for similarity search against document chunks and curated insights
- * 3. LLM generation with comprehensive structured grounding
+ * Orchestrates Multi-Agent RAG chat:
+ * 1. Agent 3: Guardrail & Router (OpenAI GPT-4o-mini) -> Filter injection & optimasi query
+ * 2. Agent 2: Embedding & Search (OpenAI text-embedding-3-small, 1024-dim) -> pgvector similarity search
+ * 3. Agent 4: RAG Synthesizer (DeepSeek-V3) -> Menghasilkan jawaban berdasar konteks
+ * 4. Agent 5: Safety & Evaluator (OpenAI GPT-4o-mini) -> Sanitasi & verifikasi bebas halusinasi
  *
  * @param query - User's question
  * @param options - Document filters, public knowledge flag, top-K chunks
@@ -82,7 +87,7 @@ export async function askDocumentChat(
     }
   }
 
-  // 0a. Golden answer untuk definisi Fisioterapi jika ditanyakan tanpa modifier format Pertanyaan.md
+  // 0a. Golden answer untuk definisi Fisioterapi jika ditanyakan tanpa modifier format
   if (isStandardFisioterapiQuery(trimmedQuery)) {
     return {
       answer: GOLDEN_FISIOTERAPI_ANSWER,
@@ -102,17 +107,40 @@ export async function askDocumentChat(
     };
   }
 
-  // 0b. Deterministic Response Cache: pertanyaan yang sama selalu mengembalikan jawaban konsisten
+  // 0b. Deterministic Response Cache
   const cacheKey = generateChatCacheKey(trimmedQuery, options?.documentId);
   const cached = await getCachedChatResponse(cacheKey);
   if (cached) {
     return cached;
   }
 
-  // 1. Generate query embedding with BGE-M3 (1024-dim)
-  const [queryEmbedding] = await embedTexts([trimmedQuery]);
+  // 1. Agent 3: Guardrail & Router
+  const guardrailDecision = await runGuardrailAndRouter(trimmedQuery);
 
-  // 2. Search pgvector for most similar chunks and curated insights
+  if (guardrailDecision.isBlocked) {
+    return {
+      answer: guardrailDecision.blockReason || 'Permintaan Anda tidak dapat diproses karena tidak memenuhi kebijakan keamanan sistem.',
+      sources: [],
+      allowPublicKnowledge,
+      retrievedCount: 0,
+    };
+  }
+
+  if (guardrailDecision.isDirectGreeting && guardrailDecision.directGreetingResponse) {
+    return {
+      answer: guardrailDecision.directGreetingResponse,
+      sources: [],
+      allowPublicKnowledge,
+      retrievedCount: 0,
+    };
+  }
+
+  const effectiveQuery = guardrailDecision.optimizedQuery || trimmedQuery;
+
+  // 2. Agent 2: Generate query embedding with OpenAI text-embedding-3-small (1024-dim)
+  const [queryEmbedding] = await embedTexts([effectiveQuery]);
+
+  // 3. Search pgvector for most similar chunks and curated insights
   let similarChunks: SimilarChunkResult[] = [];
   let similarCurated: SimilarCuratedResult[] = [];
 
@@ -136,7 +164,7 @@ export async function askDocumentChat(
     }
   }
 
-  // Jika tidak ada konteks dokumen yang relevan dan mode publik mati, jangan panggil LLM untuk mencegah halusinasi
+  // Jika tidak ada konteks dokumen yang relevan dan mode publik mati
   if (!allowPublicKnowledge && similarChunks.length === 0 && similarCurated.length === 0) {
     return {
       answer: 'Data tidak ditemukan di dalam dokumen.',
@@ -146,7 +174,7 @@ export async function askDocumentChat(
     };
   }
 
-  // 3. Format retrieved context sections
+  // 4. Format retrieved context sections
   const contextSections: string[] = [];
 
   if (similarCurated.length > 0) {
@@ -171,14 +199,16 @@ export async function askDocumentChat(
 
   const contextText = contextSections.join('\n\n====================\n\n');
 
-  // 4. Generate comprehensive structured answer via LLM
-  const rawAnswer = await generateChatResponse(trimmedQuery, contextText, allowPublicKnowledge);
+  // 5. Agent 4: Synthesizer & RAG Answer via DeepSeek-V3
+  const rawAnswer = await runRagSynthesizer(trimmedQuery, contextText);
 
-  // 5. Build sources list & format canonical source line
-  // Format yang diwajibkan: "Sumber: NamaPDF.pdf | Halaman Brp"
-  const isNotFound = isDataNotFoundAnswer(rawAnswer);
+  // 6. Agent 5: Safety & Output Evaluator via OpenAI GPT-4o-mini
+  const evaluatedAnswer = await runSafetyEvaluator(trimmedQuery, rawAnswer);
 
-  let formattedAnswer = rawAnswer.trim();
+  // 7. Format canonical source line: "Sumber: NamaPDF.pdf | Halaman X-Y"
+  const isNotFound = isDataNotFoundAnswer(evaluatedAnswer);
+
+  let formattedAnswer = evaluatedAnswer.trim();
   if (isNotFound) {
     formattedAnswer = formattedAnswer.replace(/\n*Sumber:\s*.*$/i, '').trim();
   } else if (similarChunks.length > 0) {
@@ -221,7 +251,7 @@ export async function askDocumentChat(
     retrievedCount: sources.length,
   };
 
-  // Simpan ke cache agar pertanyaan yang sama selalu mengembalikan jawaban yang persis sama
+  // Simpan ke cache
   await saveCachedChatResponse(cacheKey, trimmedQuery, result);
 
   return result;

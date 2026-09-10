@@ -15,13 +15,13 @@ const INITIAL_STEPS: PipelineStep[] = [
   {
     number: '1',
     title: 'In-Memory Render',
-    description: 'PDF dirender ke gambar tanpa disimpan ke disk',
+    description: 'PDF diekstrak & dirender tanpa simpan ke disk',
     status: 'idle',
   },
   {
     number: '2',
-    title: 'Vision OCR (Qwen 2.5)',
-    description: 'AI Vision mengekstrak teks tiap halaman',
+    title: 'Agent 1: Vision Ingestion',
+    description: 'Google Gemini Flash-Lite Vision mengekstrak teks & tabel',
     status: 'idle',
   },
   {
@@ -32,8 +32,8 @@ const INITIAL_STEPS: PipelineStep[] = [
   },
   {
     number: '4',
-    title: 'Dense Embedding (BGE-M3)',
-    description: 'Vector 1024-dim disimpan ke pgvector',
+    title: 'Agent 2: Dense Embedding',
+    description: 'OpenAI text-embedding-3-small disimpan ke pgvector',
     status: 'idle',
   },
 ];
@@ -65,7 +65,7 @@ export default function UploadPage() {
         status: idx === 0 ? 'running' : 'idle',
       }))
     );
-    setCurrentStepMessage('Merender halaman PDF ke gambar buffer in-memory via MuPDF...');
+    setCurrentStepMessage('Memeriksa halaman PDF via streaming engine...');
 
     try {
       const formData = new FormData();
@@ -79,7 +79,7 @@ export default function UploadPage() {
             status: idx === 0 ? 'done' : idx === 1 ? 'running' : 'idle',
           }))
         );
-        setCurrentStepMessage('Model AI Vision (Qwen 2.5 VL) memindai teks setiap halaman slide/dokumen...');
+        setCurrentStepMessage('Agent 1 (Google Gemini Vision) mengekstrak teks tiap halaman...');
       }, 3500);
 
       const timer2 = setTimeout(() => {
@@ -89,7 +89,7 @@ export default function UploadPage() {
             status: idx <= 1 ? 'done' : idx === 2 ? 'running' : 'idle',
           }))
         );
-        setCurrentStepMessage('Memotong teks menjadi chunk sliding-window dengan offset nomor halaman...');
+        setCurrentStepMessage('Memotong teks menjadi chunk sliding-window...');
       }, 7500);
 
       const timer3 = setTimeout(() => {
@@ -99,7 +99,7 @@ export default function UploadPage() {
             status: idx <= 2 ? 'done' : idx === 3 ? 'running' : 'idle',
           }))
         );
-        setCurrentStepMessage('Membuat dense embedding 1024-dim via BGE-M3 dan menyimpan ke pgvector...');
+        setCurrentStepMessage('Agent 2 (OpenAI text-embedding-3-small) menyimpan ke pgvector...');
       }, 11000);
 
       const res = await fetch('/api/documents/upload', {

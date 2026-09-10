@@ -44,24 +44,14 @@ Hasilkan HANYA output JSON valid tanpa teks penjelasan tambahan dengan skema:
 }`;
 
 /**
- * Curates a single raw text chunk using Llama 3.2 (3B) into clean, structured insight.
+ * Curates a single raw text chunk using OpenAI GPT-4o-mini into clean, structured insight.
  */
 export async function curateRawText(
   rawContent: string,
   pageRange: string = ''
 ): Promise<CurationResultPayload> {
-  const model =
-    process.env.CURATION_MODEL_NAME ||
-    process.env.CURATION_MODEL ||
-    'llama3.2:3b';
-  const baseUrl = process.env.OLLAMA_ENDPOINT || process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
-
-  const client = new ChatOllama({
-    model,
-    baseUrl,
-    temperature: 0.1,
-    format: 'json',
-  });
+  const openAiApiKey = process.env.OPENAI_API_KEY;
+  const deepseekApiKey = process.env.DEEPSEEK_API_KEY;
 
   const prompt = `Berikut potongan teks mentah dari dokumen${pageRange ? ` (${pageRange})` : ''}:
 """
@@ -70,29 +60,49 @@ ${rawContent}
 
 Ubah menjadi JSON Insight Kurasi sesuai format yang telah ditentukan.`;
 
-  try {
-    const response = await client.invoke([
-      new SystemMessage(SYSTEM_CURATION_PROMPT),
-      new HumanMessage(prompt),
-    ]);
+  // 1. Primary: OpenAI GPT-4o-mini with native JSON mode
+  if (openAiApiKey) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
 
-    const rawOutput = typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
-    
-    // Parse JSON safely
-    const jsonStart = rawOutput.indexOf('{');
-    const jsonEnd = rawOutput.lastIndexOf('}');
-    if (jsonStart !== -1 && jsonEnd !== -1) {
-      const parsed = JSON.parse(rawOutput.substring(jsonStart, jsonEnd + 1));
-      return {
-        title: parsed.title || 'Insight Dokumen',
-        content: parsed.content || rawContent,
-        importance: ['high', 'medium', 'low'].includes(parsed.importance) ? parsed.importance : 'medium',
-        category: parsed.category || 'track1_financial',
-        tags: Array.isArray(parsed.tags) && parsed.tags.length > 0 ? parsed.tags : ['Umum'],
-      };
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${openAiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: SYSTEM_CURATION_PROMPT },
+            { role: 'user', content: prompt },
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0.1,
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const data = await res.json();
+        const rawOutput = data?.choices?.[0]?.message?.content;
+        if (rawOutput) {
+          const parsed = JSON.parse(rawOutput);
+          return {
+            title: parsed.title || 'Insight Dokumen',
+            content: parsed.content || rawContent,
+            importance: ['high', 'medium', 'low'].includes(parsed.importance) ? parsed.importance : 'medium',
+            category: parsed.category || 'track1_financial',
+            tags: Array.isArray(parsed.tags) && parsed.tags.length > 0 ? parsed.tags : ['Umum'],
+          };
+        }
+      }
+    } catch (err: any) {
+      console.warn('[CurationService] OpenAI curation error:', err?.message);
     }
-  } catch (error) {
-    console.warn('[CurationService] AI JSON parse fallback:', error);
   }
 
   // Fallback if AI fails or returns invalid format

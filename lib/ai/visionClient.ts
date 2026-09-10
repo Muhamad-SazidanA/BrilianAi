@@ -1,42 +1,23 @@
-import { ChatOllama } from '@langchain/ollama';
-import { HumanMessage, SystemMessage } from '@langchain/core/messages';
-
-// Configure Node.js undici dispatcher timeout to allow long AI/LLM inferences without UND_ERR_HEADERS_TIMEOUT
-try {
-  const { setGlobalDispatcher, Agent } = require('undici');
-  setGlobalDispatcher(
-    new Agent({
-      headersTimeout: 600000, // 10 menit
-      bodyTimeout: 600000,
-      connectTimeout: 60000,
-    })
-  );
-} catch {
-  // Ignore if undici is not directly loaded in current environment
-}
-
 export interface VisionClientOptions {
   model?: string;
-  baseUrl?: string;
   maxRetries?: number;
   timeoutMs?: number;
   initialBackoffMs?: number;
 }
 
 export const SYSTEM_VISION_PROMPT =
-  'Ekstrak SELURUH konten substantif dari gambar halaman dokumen ini: judul, penjelasan, poin-poin, teks dalam diagram/tabel/kotak. Tuliskan dalam urutan baca yang logis. ABAIKAN logo, watermark kecil yang berulang di pojok/footer, nomor halaman, dan elemen dekoratif murni. Tulis sebagai teks naratif yang mengalir, BUKAN daftar mentah per elemen visual.';
+  'Ekstrak SELURUH konten substantif dari gambar halaman dokumen ini: judul, penjelasan, poin-poin, serta teks dan angka dalam diagram/tabel/grafik. Tuliskan dalam urutan baca yang logis. ABAIKAN logo dekoratif dan watermark kecil di pojok. Tulis teks naratif dan representasikan tabel dalam format tabel Markdown yang rapi.';
 
 /**
- * Extracts substantive text from a page image Buffer using Ollama AI Vision (Qwen2.5-VL).
+ * Agent 1: Vision Ingestion Agent
+ * Ekstraksi teks & tabel dari gambar halaman PDF.
+ * Terkunci EKSKLUSIF pada model ID yang ditentukan (tanpa fallback diam-diam ke model lain).
+ * Jika model tidak tersedia atau dinonaktifkan oleh provider, sistem akan melempar error (Fail-Fast)
+ * agar tidak ada tagihan token membengkak di luar perhitungan anggaran.
  *
- * - Sends the image as base64 in the message payload.
- * - Applies exponential backoff retry (up to 3x) on failure/timeout.
- * - Enforces a 60-second timeout per attempt.
- * - Returns an empty string on complete failure rather than throwing, to protect batch ingestion.
- *
- * @param imageBuffer - In-memory Buffer of the page PNG image
- * @param options - Optional client configuration (baseUrl, model, retries, etc.)
- * @returns Promise<string> - Extracted text content or empty string on failure
+ * @param imageBuffer - Buffer gambar halaman PNG
+ * @param options - Konfigurasi opsional (model, retries, timeout)
+ * @returns Promise<string> - Teks hasil ekstraksi dokumen
  */
 export async function extractPageText(
   imageBuffer: Buffer,
@@ -46,84 +27,86 @@ export async function extractPageText(
     return '';
   }
 
-  const model =
-    options?.model ||
-    process.env.VISION_MODEL_NAME ||
-    process.env.VISION_MODEL ||
-    'qwen2.5vl:3b';
-  const baseUrl =
-    options?.baseUrl ||
-    process.env.OLLAMA_ENDPOINT ||
-    process.env.OLLAMA_BASE_URL ||
-    'http://localhost:11434';
-  const maxRetries = options?.maxRetries ?? 3;
-  const timeoutMs = options?.timeoutMs ?? 300000; // 5 menit timeout per halaman untuk CPU
-  const initialBackoffMs = options?.initialBackoffMs ?? 1000;
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  if (!geminiApiKey) {
+    throw new Error('[Agent 1: Vision Ingestion] GEMINI_API_KEY tidak ditemukan di environment variables.');
+  }
+
+  // Model ID terkunci eksklusif: TIDAK ADA fallback ke model lain
+  const modelName = options?.model || process.env.GEMINI_MODEL || 'gemini-2.0-flash-lite';
+  const maxRetries = options?.maxRetries ?? 2;
+  const timeoutMs = options?.timeoutMs ?? 45000;
+  let delay = options?.initialBackoffMs ?? 1000;
 
   const base64Image = imageBuffer.toString('base64');
-
-  const messages = [
-    new SystemMessage(SYSTEM_VISION_PROMPT),
-    new HumanMessage({
-      content: [
-        {
-          type: 'text',
-          text: 'Berikut adalah gambar halaman dokumen yang perlu diekstrak:',
-        },
-        {
-          type: 'image_url',
-          image_url: {
-            url: `data:image/png;base64,${base64Image}`,
-          },
-        },
-      ],
-      additional_kwargs: {
-        images: [base64Image],
-      },
-    }),
-  ];
-
   let attempt = 0;
-  let delay = initialBackoffMs;
 
   while (attempt <= maxRetries) {
     try {
-      const client = new ChatOllama({
-        model,
-        baseUrl,
-        numCtx: 4096,
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiApiKey}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: SYSTEM_VISION_PROMPT },
+                {
+                  inline_data: {
+                    mime_type: 'image/png',
+                    data: base64Image,
+                  },
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 4096,
+          },
+        }),
+        signal: controller.signal,
       });
 
-      const response = await client.invoke(messages, {
-        signal: AbortSignal.timeout(timeoutMs),
-      });
-      const content = response.content;
+      clearTimeout(timeoutId);
 
-      if (typeof content === 'string') {
-        return content.trim();
-      } else if (Array.isArray(content)) {
-        return content
-          .map((c) => (typeof c === 'string' ? c : 'text' in c ? (c as { text: string }).text : ''))
-          .join('\n')
-          .trim();
+      if (res.ok) {
+        const data = await res.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text && typeof text === 'string') {
+          return text.trim();
+        }
+        return '';
       }
 
-      return String(content || '').trim();
-    } catch (error) {
+      // Jika error 404 (model tidak valid / dihentikan Google), langsung STOP dan gagalkan tanpa retry
+      const errorBody = await res.text().catch(() => '');
+      if (res.status === 404) {
+        throw new Error(
+          `[Agent 1: Vision Ingestion] Model "${modelName}" TIDAK TERSEDIA atau telah dihentikan oleh Google (HTTP 404). Detail: ${errorBody}`
+        );
+      }
+
+      throw new Error(`[Agent 1: Vision Ingestion] Google API HTTP ${res.status}: ${errorBody}`);
+    } catch (error: any) {
       attempt++;
-      const cause = error instanceof Error && (error as any).cause ? ` (Detail: ${(error as any).cause})` : '';
-      const errorMessage = `${error instanceof Error ? error.message : String(error)}${cause}`;
+      // Jika model 404, langsung gagalkan proses agar developer tahu dan tidak membakar token
+      if (error?.message?.includes('HTTP 404') || error?.message?.includes('TIDAK TERSEDIA')) {
+        console.error(error.message);
+        throw error;
+      }
 
       if (attempt <= maxRetries) {
-        console.warn(
-          `[VisionClient] Percobaan ${attempt}/${maxRetries} gagal: ${errorMessage}. Menunggu ${delay}ms sebelum mencoba lagi...`
-        );
+        console.warn(`[Agent 1: Vision Ingestion] Percobaan ${attempt}/${maxRetries} gagal: ${error?.message}. Menunggu ${delay}ms...`);
         await new Promise((resolve) => setTimeout(resolve, delay));
-        delay *= 2; // exponential backoff
+        delay *= 2;
       } else {
-        console.error(
-          `[VisionClient] Gagal mengekstrak teks setelah ${maxRetries} kali percobaan: ${errorMessage}. Mengembalikan string kosong.`
-        );
+        console.error(`[Agent 1: Vision Ingestion] Gagal mengekstrak teks dengan model "${modelName}": ${error?.message}`);
+        throw error;
       }
     }
   }

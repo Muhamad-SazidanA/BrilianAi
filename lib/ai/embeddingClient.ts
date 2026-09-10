@@ -1,30 +1,16 @@
-import { OllamaEmbeddings } from '@langchain/ollama';
-
-// Configure Node.js undici dispatcher timeout to allow long AI/LLM inferences without UND_ERR_HEADERS_TIMEOUT
-try {
-  const { setGlobalDispatcher, Agent } = require('undici');
-  setGlobalDispatcher(
-    new Agent({
-      headersTimeout: 600000, // 10 menit
-      bodyTimeout: 600000,
-      connectTimeout: 60000,
-    })
-  );
-} catch {
-  // Ignore if undici is not directly loaded in current environment
-}
-
 export interface EmbeddingClientOptions {
   model?: string;
-  baseUrl?: string;
+  dimensions?: number;
 }
 
 /**
- * Generates vector embeddings for a batch of text strings using Ollama (model: bge-m3, 1024 dimensions).
+ * Agent 2: Embedding & Indexing Agent (serta Vektor Search)
+ * Menghasilkan representasi vektor semantik berdimensi 1024 menggunakan
+ * OpenAI text-embedding-3-small (dengan Matryoshka Representation Learning dimension reduction: 1024).
  *
- * @param texts - Array of string chunks to embed
- * @param options - Optional configuration (baseUrl, model)
- * @returns Promise<number[][]> - Array of 1024-dimensional embedding vectors
+ * @param texts - Array potongan teks (chunks) atau query pencarian
+ * @param options - Konfigurasi model & dimensi
+ * @returns Promise<number[][]> - Array vektor embedding 1024-dimensi
  */
 export async function embedTexts(
   texts: string[],
@@ -34,43 +20,80 @@ export async function embedTexts(
     return [];
   }
 
-  const model = options?.model || 'bge-m3';
-  const baseUrl =
-    options?.baseUrl ||
-    process.env.OLLAMA_ENDPOINT ||
-    process.env.OLLAMA_BASE_URL ||
-    'http://localhost:11434';
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY tidak ditemukan di environment variables.');
+  }
 
-  const maxRetries = 2;
-  let attempt = 0;
-  let delay = 1000;
+  const model = options?.model || process.env.EMBEDDING_MODEL || 'text-embedding-3-small';
+  const dimensions = options?.dimensions || Number(process.env.EMBEDDING_DIM) || 1024;
 
-  while (attempt <= maxRetries) {
-    try {
-      const client = new OllamaEmbeddings({
-        model,
-        baseUrl,
-      });
+  // OpenAI supports max 2048 inputs per batch
+  const BATCH_SIZE = 100;
+  const allEmbeddings: number[][] = [];
 
-      const embeddings = await client.embedDocuments(texts);
-      return embeddings;
-    } catch (error) {
-      attempt++;
-      const cause = error instanceof Error && (error as any).cause ? ` (Detail: ${(error as any).cause})` : '';
-      const errorMessage = `${error instanceof Error ? error.message : String(error)}${cause}`;
+  for (let i = 0; i < texts.length; i += BATCH_SIZE) {
+    const chunkBatch = texts.slice(i, i + BATCH_SIZE);
+    
+    // Replace newline noise with spaces as recommended by OpenAI embedding guidelines
+    const sanitizedBatch = chunkBatch.map((t) => (t || '').replace(/\r\n|\r|\n/g, ' ').trim());
 
-      if (attempt <= maxRetries) {
-        console.warn(
-          `[EmbeddingClient] Percobaan ${attempt}/${maxRetries} gagal: ${errorMessage}. Menunggu ${delay}ms sebelum mencoba lagi...`
-        );
-        await new Promise((resolve) => setTimeout(resolve, delay));
-        delay *= 2;
-      } else {
-        console.error(`[EmbeddingClient] Gagal setelah ${maxRetries} kali percobaan: ${errorMessage}`);
-        throw error;
+    let attempt = 0;
+    const maxRetries = 3;
+    let delay = 1000;
+    let success = false;
+
+    while (attempt <= maxRetries && !success) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+
+        const response = await fetch('https://api.openai.com/v1/embeddings', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model,
+            input: sanitizedBatch,
+            dimensions,
+          }),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`OpenAI Embedding API error HTTP ${response.status}: ${errText}`);
+        }
+
+        const data = await response.json();
+        if (data && data.data && Array.isArray(data.data)) {
+          // Sort by index to maintain exact original ordering
+          const sorted = data.data.sort((a: any, b: any) => a.index - b.index);
+          const batchVectors = sorted.map((item: any) => item.embedding as number[]);
+          allEmbeddings.push(...batchVectors);
+          success = true;
+        } else {
+          throw new Error('Format response OpenAI embedding tidak terduga.');
+        }
+      } catch (error: any) {
+        attempt++;
+        if (attempt <= maxRetries) {
+          console.warn(
+            `[Agent 2: Embedding] Percobaan ${attempt}/${maxRetries} gagal: ${error?.message}. Menunggu ${delay}ms...`
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          delay *= 2;
+        } else {
+          console.error(`[Agent 2: Embedding] Gagal total membuat embedding batch: ${error?.message}`);
+          throw error;
+        }
       }
     }
   }
 
-  return [];
+  return allEmbeddings;
 }

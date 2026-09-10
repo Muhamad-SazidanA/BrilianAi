@@ -66,7 +66,7 @@ export async function ingestPdf(
   // 4. Batch generate embeddings for all chunks in safe micro-batches of 10
   let embeddings: number[][] = [];
   if (chunkCount > 0) {
-    console.log(`[IngestPipeline] 🧠 3/4 Membuat embedding vector 1024-dim (BGE-M3) untuk ${chunkCount} chunks...`);
+    console.log(`[IngestPipeline] 🧠 3/4 Membuat embedding vector 1024-dim (OpenAI text-embedding-3-small) untuk ${chunkCount} chunks...`);
     const chunkContents = chunks.map((c) => c.content);
     
     // Process embeddings in micro-batches of 10 chunks to prevent HeadersTimeoutError
