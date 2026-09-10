@@ -6,7 +6,6 @@ import {
   Plus,
   ArrowUp,
   Mic,
-  ChevronDown,
   Loader2,
   RefreshCw,
 } from 'lucide-react';
@@ -673,31 +672,6 @@ export default function ChatWorkspace() {
         >
           {/* Centered Pill Capsule Search Prompt Bar */}
           <div className="chat-pill-bar">
-            {/* Plus Action Button */}
-            <button
-              type="button"
-              onClick={() => router.push('/upload')}
-              aria-label="Add context or documents"
-              title={language === 'en' ? 'Add context or documents' : 'Unggah dokumen baru'}
-              style={{
-                width: '36px',
-                height: '36px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '50%',
-                color: 'var(--text-secondary)',
-                border: 'none',
-                backgroundColor: 'transparent',
-                cursor: 'pointer',
-                flexShrink: 0,
-                transition: 'background-color 0.15s ease',
-              }}
-              className="hover:bg-slate-100 dark:hover:bg-slate-800"
-            >
-              <Plus size={20} />
-            </button>
-
             {/* Input Query Field */}
             <input
               ref={inputRef}
@@ -727,39 +701,6 @@ export default function ChatWorkspace() {
 
             {/* Right Trailing Controls */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-              {/* Model Selector Pill with Green Active Dot */}
-              <button
-                type="button"
-                onClick={handleToggleModel}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '5px 12px',
-                  borderRadius: '9999px',
-                  backgroundColor: 'var(--bg-subtle)',
-                  border: 'none',
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  color: 'var(--text-secondary)',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
-                className="hover:bg-slate-100 dark:hover:bg-slate-800"
-                title="Model Selection"
-              >
-                <span
-                  style={{
-                    width: '6px',
-                    height: '6px',
-                    borderRadius: '50%',
-                    backgroundColor: '#10B981',
-                  }}
-                />
-                <span>Pro</span>
-                <ChevronDown size={13} style={{ color: 'var(--text-muted)', marginLeft: '-2px' }} />
-              </button>
-
               {/* Voice Input Icon */}
               <button
                 type="button"

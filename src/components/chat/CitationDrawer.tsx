@@ -44,7 +44,7 @@ export default function CitationDrawer({ source, isOpen, onClose }: CitationDraw
           flexDirection: 'column',
           padding: '1.5rem',
           gap: '1.25rem',
-          overflowY: 'auto',
+          overflow: 'hidden',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -96,7 +96,7 @@ export default function CitationDrawer({ source, isOpen, onClose }: CitationDraw
         </div>
 
         {/* Exact chunk text */}
-        <div>
+        <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
           <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
             {t('chat.original_text')}
           </div>
@@ -106,7 +106,8 @@ export default function CitationDrawer({ source, isOpen, onClose }: CitationDraw
               border: '1px solid var(--border-default)',
               borderRadius: 'var(--radius-sm)',
               padding: '14px',
-              maxHeight: '420px',
+              flex: 1,
+              minHeight: 0,
               overflowY: 'auto',
             }}
           >
