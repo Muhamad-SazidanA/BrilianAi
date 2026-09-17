@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Cpu, Database, CheckCircle2, ShieldCheck, Layers, Zap } from 'lucide-react';
+import { Database, CheckCircle2, ShieldCheck, Zap } from 'lucide-react';
 import { DashboardStats } from '@/types/stats';
 import { useLanguage } from '@/context/LanguageContext';
 

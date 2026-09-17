@@ -17,14 +17,15 @@ import { UploadBatch } from '@/types/document';
 import RenameModal from './RenameModal';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserSession } from '@/context/UserSessionContext';
+import { formatDateTime } from '@lib/utils/formatters';
 
 interface DocumentTableProps {
   batches: UploadBatch[];
   isLoading: boolean;
   onRefresh: () => Promise<void>;
-  onDelete: (batchId: string, filename: string) => Promise<void>;
-  onRename: (batchId: string, newFilename: string) => Promise<void>;
-  onToggleActive: (batchId: string, active: boolean) => Promise<void>;
+  onDelete: (_batchId: string, _filename: string) => Promise<void>;
+  onRename: (_batchId: string, _newFilename: string) => Promise<void>;
+  onToggleActive: (_batchId: string, _active: boolean) => Promise<void>;
   onActivateAll?: () => Promise<void>;
 }
 
@@ -229,18 +230,7 @@ export default function DocumentTable({
               </thead>
               <tbody>
                 {filteredBatches.map((batch) => {
-                  const formattedDate = new Date(batch.uploaded_at).toLocaleDateString(
-                    language === 'en' ? 'en-US' : 'id-ID',
-                    {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    }
-                  );
-
-                  const isCurated = (batch.curated_count || 0) > 0;
+                  const formattedDate = formatDateTime(batch.uploaded_at, language);
 
                   return (
                     <tr

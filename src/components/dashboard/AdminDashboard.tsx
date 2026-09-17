@@ -9,8 +9,6 @@ import {
   ShieldCheck,
   ScrollText,
   MessageSquare,
-  Activity,
-  Layers,
   ArrowRight,
 } from 'lucide-react';
 import StatCards from '@/components/dashboard/StatCards';
@@ -34,7 +32,7 @@ export default function AdminDashboard({
   canSwitchToUser = true,
 }: AdminDashboardProps) {
   const { t } = useLanguage();
-  const { currentUser, hasPermission } = useUserSession();
+  const { hasPermission } = useUserSession();
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>

@@ -1,5 +1,5 @@
 import { getPool } from './dbClient';
-import { ChatSource, ChatResponseResult } from '../chat/chatService';
+import { ChatResponseResult } from '../chat/chatService';
 import { parseUserFormattingInstruction } from '../chat/chatUtils';
 
 export const GOLDEN_FISIOTERAPI_ANSWER = `Fisioterapi adalah profesi kesehatan holistik yang berfokus pada gerak dan fungsi manusia sepanjang rentang kehidupan. Profesi ini mempertimbangkan hubungan antara gangguan tubuh, keterbatasan aktivitas, dan hambatan partisipasi, dengan selalu memperhitungkan faktor personal dan lingkungan.

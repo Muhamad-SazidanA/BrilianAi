@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { FileText, Layers, BookCheck, FileCode, ArrowUpRight } from 'lucide-react';
+import { FileText, Layers, BookCheck, FileCode } from 'lucide-react';
 import { DashboardStats } from '@/types/stats';
 import { useLanguage } from '@/context/LanguageContext';
 

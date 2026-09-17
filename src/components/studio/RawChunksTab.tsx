@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, Layers, Copy, Check, FileText, Sparkles, ArrowRight } from 'lucide-react';
+import { Search, Layers, Copy, Check, Sparkles, ArrowRight } from 'lucide-react';
 import { DocumentChunk } from '@/types/document';
 import { useLanguage } from '@/context/LanguageContext';
 import { toast } from 'sonner';

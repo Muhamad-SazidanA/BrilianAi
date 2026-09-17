@@ -1,9 +1,9 @@
 'use client';
 
 import React from 'react';
-import { FileText, Cpu, Database, Calendar, Layers, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { UploadBatch, DocumentChunk } from '@/types/document';
 import { useLanguage } from '@/context/LanguageContext';
+import { formatDateTime } from '@lib/utils/formatters';
 
 interface MetadataTabProps {
   batch: UploadBatch | null;
@@ -18,8 +18,7 @@ export default function MetadataTab({ batch, chunks }: MetadataTabProps) {
   const avgChars = chunks.length > 0 ? Math.round(totalChars / chunks.length) : 0;
   const chunkPerRatio = batch.page_count > 0 ? (chunks.length / batch.page_count).toFixed(1) : '0';
 
-  const locale = language === 'en' ? 'en-US' : 'id-ID';
-  const formattedDate = new Date(batch.uploaded_at).toLocaleString(locale, {
+  const formattedDate = formatDateTime(batch.uploaded_at, language, {
     dateStyle: 'full',
     timeStyle: 'medium',
   });

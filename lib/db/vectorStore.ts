@@ -324,16 +324,6 @@ export async function updateUploadBatchFilename(
 }
 
 /**
- * Deletes all upload batches and their cascading chunks (Purge all documents).
- */
-export async function deleteAllUploadBatches(): Promise<number> {
-  const pool = getPool();
-  const sql = `DELETE FROM upload_batches;`;
-  const result = await pool.query(sql);
-  return result.rowCount ?? 0;
-}
-
-/**
  * Lists all document chunks for a specific batch ID, ordered by chunk_index ascending.
  *
  * @param batchId - UUID of the upload batch

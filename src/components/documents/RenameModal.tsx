@@ -9,7 +9,7 @@ interface RenameModalProps {
   batch: UploadBatch | null;
   isOpen: boolean;
   onClose: () => void;
-  onSave: (batchId: string, newFilename: string) => Promise<void>;
+  onSave: (_batchId: string, _newFilename: string) => Promise<void>;
 }
 
 export default function RenameModal({ batch, isOpen, onClose, onSave }: RenameModalProps) {

@@ -43,7 +43,7 @@ export default function ChatWorkspace({
 
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { language, t } = useLanguage();
+  const { language } = useLanguage();
   const { currentUser, hasPermission, isLoading: isUserLoading } = useUserSession();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -52,7 +52,6 @@ export default function ChatWorkspace({
   const [activeQueryText, setActiveQueryText] = useState('');
   const [allowPublicKnowledge, setAllowPublicKnowledge] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [isRestored, setIsRestored] = useState(false);
   const [sessionTitle, setSessionTitle] = useState('Chat Baru');
   const [loadedSessionId, setLoadedSessionId] = useState<string | null>(
     sessionId ? null : 'idle'
@@ -100,6 +99,7 @@ export default function ChatWorkspace({
   const isFirstMessageRef = useRef<boolean>(true);
   const sessionIdRef = useRef<string | undefined>(sessionId);
   const isCreatingSessionRef = useRef(false);
+  const executeAiResponseRef = useRef<((queryText: string, targetMessageId?: string, isRetry?: boolean) => Promise<void>) | null>(null);
 
   // ── Load sesi dari DB saat sessionId atau shareId berubah ─────────
   useEffect(() => {
@@ -107,7 +107,6 @@ export default function ChatWorkspace({
 
     if (!sessionId && !shareId) {
       setMessages([]);
-      setIsRestored(true);
       setLoadedSessionId('idle');
       setSessionLoadError(null);
       setSessionTitle('Chat Baru');
@@ -117,7 +116,6 @@ export default function ChatWorkspace({
     }
 
     let cancelled = false;
-    setIsRestored(false);
     setLoadedSessionId(null);
     setSessionLoadError(null);
     setMessages([]);
@@ -191,7 +189,7 @@ export default function ChatWorkspace({
             const lastMsg = loadedMessages[loadedMessages.length - 1];
             if (lastMsg && lastMsg.sender === 'user') {
               setTimeout(() => {
-                if (!cancelled) executeAiResponse(lastMsg.text);
+                if (!cancelled) executeAiResponseRef.current?.(lastMsg.text);
               }, 120);
             }
             setLoadedSessionId(sessionId);
@@ -204,8 +202,6 @@ export default function ChatWorkspace({
           );
           console.warn('[ChatWorkspace] loadData error:', err);
         }
-      } finally {
-        if (!cancelled) setIsRestored(true);
       }
     }
 
@@ -315,8 +311,6 @@ export default function ChatWorkspace({
       const sources = data.sources || [];
       const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-      let updatedMessages: ChatMessage[] = [];
-
       if (targetMessageId) {
         // Regenerate/retry: append new variant to target message
         setMessages((prev) => {
@@ -328,57 +322,32 @@ export default function ChatWorkspace({
                 : [{ text: msg.text, sources: msg.sources, timestamp: msg.timestamp }];
             const newVariant: ChatMessageVariant = { text: answerText, sources, timestamp };
             const updatedVariants = [...existingVariants, newVariant];
-            const newIndex = updatedVariants.length - 1;
             return {
               ...msg,
+              variants: updatedVariants,
+              currentVariantIndex: updatedVariants.length - 1,
               text: answerText,
               sources,
               timestamp,
-              isError: false,
-              variants: updatedVariants,
-              currentVariantIndex: newIndex,
             };
           });
-          updatedMessages = next;
           scheduleSave(next);
           return next;
         });
-        toast.success(
-          language === 'en' ? 'Regenerated new response' : 'Jawaban baru berhasil dibuat'
-        );
       } else {
-        const initialVariant: ChatMessageVariant = { text: answerText, sources, timestamp };
+        // First-time response: append AI message to list
         const aiMessage: ChatMessage = {
           id: `ai-${Date.now()}`,
           sender: 'ai',
           text: answerText,
           sources,
-          timestamp,
-          variants: [initialVariant],
+          variants: [{ text: answerText, sources, timestamp }],
           currentVariantIndex: 0,
+          timestamp,
         };
 
         setMessages((prev) => {
           const next = [...prev, aiMessage];
-          updatedMessages = next;
-          scheduleSave(next);
-          return next;
-        });
-      }
-    } catch (err: any) {
-      if (targetMessageId) {
-        toast.error(err.message || 'Gagal menyusun ulang jawaban AI');
-      } else {
-        const errorMessage: ChatMessage = {
-          id: `err-${Date.now()}`,
-          sender: 'ai',
-          text: `Terjadi kesalahan: ${err.message || 'Gagal menghubungi server'}`,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          isError: true,
-        };
-        setMessages((prev) => {
-          const next = [...prev, errorMessage];
-          scheduleSave(next);
           return next;
         });
       }
@@ -639,22 +608,6 @@ export default function ChatWorkspace({
     } catch {
       setIsListening(false);
     }
-  };
-
-  const handleToggleModel = () => {
-    setAllowPublicKnowledge((prev) => {
-      const next = !prev;
-      toast.info(
-        next
-          ? language === 'en'
-            ? 'Model: Pro (Internal Documents + Public Knowledge)'
-            : 'Model: Pro (Dokumen Internal + Pengetahuan Umum)'
-          : language === 'en'
-          ? 'Model: Pro (Strict Isolated Internal Documents)'
-          : 'Model: Pro (Terisolasi Dokumen Internal)'
-      );
-      return next;
-    });
   };
 
   const hasMessages = messages.length > 0;

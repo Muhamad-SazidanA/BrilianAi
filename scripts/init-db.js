@@ -1,11 +1,9 @@
 const { Client } = require('pg');
 require('dotenv').config();
+const { getConnectionString } = require('./get-db-url');
 
 async function init() {
-  let connectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/brilian_db';
-  if (connectionString.includes('@postgres:') && !process.env.DOCKER_CONTAINER) {
-    connectionString = connectionString.replace('@postgres:', '@localhost:');
-  }
+  const connectionString = getConnectionString();
 
   const client = new Client({ connectionString });
   await client.connect();

@@ -11,7 +11,7 @@ interface ChatHistoryItemProps {
   isActive: boolean;
   isCollapsed: boolean;
   onClick: () => void;
-  onRename: (newTitle: string) => void;
+  onRename: (_newTitle: string) => void;
   onPin: () => void;
   onDelete: () => void;
 }

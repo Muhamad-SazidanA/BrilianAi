@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden: AI Assistant access required.' }, { status: 403 });
     }
     const body = await request.json();
-    const { query, documentId, allowPublicKnowledge, topK, minSimilarity, bypassCache, user, sessionId } = body;
+    const { query, documentId, allowPublicKnowledge, topK, minSimilarity, bypassCache, sessionId } = body;
 
     if (!query || typeof query !== 'string' || query.trim().length === 0) {
       return NextResponse.json(

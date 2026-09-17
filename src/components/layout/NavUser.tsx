@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import {
   CircleUser,
   Palette,
@@ -42,7 +41,6 @@ export default function NavUser({
   version = 'Brilian.Ai v1.0.0',
   isCollapsed = false,
 }: NavUserProps) {
-  const router = useRouter();
   const { language, setLanguage, t } = useLanguage();
   const { currentUser, allUsers, switchUser, logout } = useUserSession();
   const [isOpen, setIsOpen] = useState(false);
@@ -55,7 +53,6 @@ export default function NavUser({
 
   const activeName = currentUser?.name || user.name;
   const activeEmail = currentUser?.email || user.email;
-  const activeColor = currentUser?.avatar_color || '#2563EB';
 
   const containerRef = useRef<HTMLDivElement | null>(null);
 

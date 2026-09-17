@@ -2,13 +2,12 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import Image from 'next/image';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Loader2, KeyRound } from 'lucide-react';
 import { useUserSession } from '@/context/UserSessionContext';
 import { toast } from 'sonner';
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const redirectUrl = searchParams.get('redirect') || '/';
 

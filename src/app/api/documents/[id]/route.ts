@@ -4,7 +4,6 @@ import {
   updateUploadBatchFilename,
   toggleBatchKnowledgeBase,
   listChunks,
-  listCuratedInsights,
 } from '@lib/db/vectorStore';
 import { abortCuration } from '@lib/curation/curationService';
 

@@ -6,18 +6,25 @@ dotenv.config();
 let poolInstance: Pool | null = null;
 
 /**
+ * Resolves PostgreSQL connection URL, seamlessly handling Docker vs Localhost hostname.
+ */
+export function getResolvedDatabaseUrl(): string {
+  let connectionString =
+    process.env.DATABASE_URL ||
+    'postgresql://postgres:postgres@localhost:5432/brilian_db';
+
+  if (connectionString.includes('@postgres:') && !process.env.DOCKER_CONTAINER) {
+    connectionString = connectionString.replace('@postgres:', '@localhost:');
+  }
+  return connectionString;
+}
+
+/**
  * Returns a singleton connection pool for PostgreSQL.
  */
 export function getPool(): Pool {
   if (!poolInstance) {
-    let connectionString =
-      process.env.DATABASE_URL ||
-      'postgresql://postgres:postgres@localhost:5432/brilian_db';
-
-    // Jika berjalan lokal (di luar docker) dan URL mengarah ke hostname 'postgres', fallback otomatis ke localhost
-    if (connectionString.includes('@postgres:') && !process.env.DOCKER_CONTAINER) {
-      connectionString = connectionString.replace('@postgres:', '@localhost:');
-    }
+    const connectionString = getResolvedDatabaseUrl();
 
     poolInstance = new Pool({
       connectionString,

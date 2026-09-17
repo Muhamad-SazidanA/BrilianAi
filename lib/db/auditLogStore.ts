@@ -10,7 +10,7 @@ export function _resetAuditTableInitializedForTesting(): void {
 /**
  * Ekstraksi topik percakapan secara cerdas dari teks pertanyaan pengguna.
  */
-export function extractTopicFromQuery(query: string, answer?: string): string {
+export function extractTopicFromQuery(query: string, _answer?: string): string {
   const q = query.toLowerCase();
 
   // Fisioterapi domain

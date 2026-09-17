@@ -56,6 +56,16 @@ describe('User Management, RBAC & Chat Audit Logs', () => {
     });
   });
 
+  const mockTableInit = () => {
+    mockPool.query
+      .mockResolvedValueOnce({ rows: [] }) // 1. create roles
+      .mockResolvedValueOnce({ rows: [] }) // 2. insert roles
+      .mockResolvedValueOnce({ rows: [] }) // 3. create users
+      .mockResolvedValueOnce({ rows: [] }) // 4. insert superadmin
+      .mockResolvedValueOnce({ rows: [] }) // 5. delete dummy users
+      .mockResolvedValueOnce({ rows: [] }); // 6. create chat_audit_logs
+  };
+
   describe('2. User Store Operations', () => {
     it('should list users with mapped roles and question counts', async () => {
       const mockUserRows = [
@@ -78,14 +88,8 @@ describe('User Management, RBAC & Chat Audit Logs', () => {
         },
       ];
 
-      // Table initialization queries
-      mockPool.query
-        .mockResolvedValueOnce({ rows: [] }) // create roles
-        .mockResolvedValueOnce({ rows: [] }) // insert roles
-        .mockResolvedValueOnce({ rows: [] }) // create users
-        .mockResolvedValueOnce({ rows: [] }) // insert superadmin
-        .mockResolvedValueOnce({ rows: [] }) // delete dummy users
-        .mockResolvedValueOnce({ rows: mockUserRows }); // listUsers select
+      mockTableInit();
+      mockPool.query.mockResolvedValueOnce({ rows: mockUserRows }); // listUsers select
 
       const users = await listUsers();
 
@@ -107,12 +111,8 @@ describe('User Management, RBAC & Chat Audit Logs', () => {
         avatar_color: '#10B981',
       };
 
+      mockTableInit();
       mockPool.query
-        .mockResolvedValueOnce({ rows: [] }) // create roles
-        .mockResolvedValueOnce({ rows: [] }) // insert roles
-        .mockResolvedValueOnce({ rows: [] }) // create users
-        .mockResolvedValueOnce({ rows: [] }) // insert superadmin
-        .mockResolvedValueOnce({ rows: [] }) // delete dummy users
         .mockResolvedValueOnce({ rows: [mockCreatedRow] }) // INSERT
         .mockResolvedValueOnce({
           rows: [
@@ -149,12 +149,8 @@ describe('User Management, RBAC & Chat Audit Logs', () => {
         avatar_color: '#2563EB',
       };
 
+      mockTableInit();
       mockPool.query
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [mockPendingRow] }) // INSERT
         .mockResolvedValueOnce({
           rows: [
@@ -203,12 +199,7 @@ describe('User Management, RBAC & Chat Audit Logs', () => {
     });
 
     it('should prevent deleting the primary system Super Admin', async () => {
-      mockPool.query
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] });
+      mockTableInit();
 
       await expect(deleteUser('a0000000-0000-0000-0000-000000000001')).rejects.toThrow(
         'Akun Super Administrator utama sistem tidak dapat dihapus'
@@ -237,13 +228,8 @@ describe('User Management, RBAC & Chat Audit Logs', () => {
         },
       ];
 
-      mockPool.query
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: mockRoles });
+      mockTableInit();
+      mockPool.query.mockResolvedValueOnce({ rows: mockRoles });
 
       const roles = await listRoles();
       expect(roles).toHaveLength(2);

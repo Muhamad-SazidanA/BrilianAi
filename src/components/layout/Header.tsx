@@ -93,6 +93,11 @@ export default function Header({ title, subtitle, actions }: HeaderProps) {
             {title}
           </h1>
         )}
+        {subtitle && (
+          <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+            {subtitle}
+          </p>
+        )}
       </div>
 
       {/* Right: Actions */}

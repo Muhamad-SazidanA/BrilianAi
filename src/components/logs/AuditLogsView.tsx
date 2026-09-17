@@ -4,11 +4,10 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Search, Download, X, Loader2,
   ChevronLeft, ChevronRight, ChevronDown, Eye,
-  MessageSquare, Users, BookOpen, Clock, ArrowRight,
+  MessageSquare, Users, ArrowRight,
 } from 'lucide-react';
-import { ChatAuditLog, AuditAnalyticsSummary, User, TopActiveUser } from '@/types/user';
+import { ChatAuditLog, AuditAnalyticsSummary, User } from '@/types/user';
 import MarkdownContent from '@/components/ui/MarkdownContent';
-import { useLanguage } from '@/context/LanguageContext';
 import { toast } from 'sonner';
 import UserAvatar from '@/components/ui/UserAvatar';
 
@@ -91,8 +90,6 @@ function fmtDateShort(iso?: string | null) {
 }
 
 export default function AuditLogsView() {
-  const { language } = useLanguage();
-
   const [activeTab, setActiveTab] = useState<'logs' | 'topUsers'>('logs');
   const [logs, setLogs] = useState<ChatAuditLog[]>([]);
   const [analytics, setAnalytics] = useState<AuditAnalyticsSummary | null>(null);

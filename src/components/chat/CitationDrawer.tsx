@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { X, FileText, Layers, Percent, ExternalLink } from 'lucide-react';
+import { X, FileText } from 'lucide-react';
 import { ChatSource } from '@/types/chat';
 import MarkdownContent from '@/components/ui/MarkdownContent';
 import { useLanguage } from '@/context/LanguageContext';

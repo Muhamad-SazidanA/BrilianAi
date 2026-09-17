@@ -1,15 +1,10 @@
-import { ChatOllama } from '@langchain/ollama';
-import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { embedTexts } from '../ai/embeddingClient';
 import {
   listChunks,
   insertCuratedInsights,
   listCuratedInsights,
-  updateCuratedInsight,
   deduplicateCuratedInsights,
   CuratedInsight,
-  CuratedInsightInput,
-  DocumentChunk,
 } from '../db/vectorStore';
 
 export interface CurationResultPayload {
@@ -261,7 +256,7 @@ export function isBatchCurating(batchId: string): boolean {
 async function curateBatchInternal(
   batchId: string,
   limit: number = 25,
-  onProgress?: (curatedChunk: CuratedInsight, processedIndex: number, totalToProcess: number) => void
+  onProgress?: (_curatedChunk: CuratedInsight, _processedIndex: number, _totalToProcess: number) => void
 ): Promise<CuratedInsight[]> {
   const rawChunks = await listChunks(batchId);
   if (rawChunks.length === 0) {

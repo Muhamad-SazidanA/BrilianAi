@@ -20,6 +20,22 @@ import {
 import { POST as handleChatRoute } from '../src/app/api/chat/route';
 import { NextRequest } from 'next/server';
 
+vi.mock('../lib/auth/serverAuth', () => ({
+  getAuthenticatedUser: vi.fn().mockResolvedValue({
+    id: 'user-superadmin',
+    name: 'Super Admin',
+    email: 'admin@brilian.ai',
+    department: 'IT',
+    role_id: 'superadmin',
+    status: 'active',
+  }),
+  hasServerPermission: vi.fn().mockResolvedValue(true),
+}));
+
+vi.mock('../lib/db/auditLogStore', () => ({
+  saveAuditLog: vi.fn().mockResolvedValue(true),
+}));
+
 describe('AI Chatbot Service (Llama 3.2 3B & pgvector RAG)', () => {
   const mockPool = {
     query: vi.fn(),

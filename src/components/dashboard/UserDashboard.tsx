@@ -5,22 +5,20 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   MessageSquare,
-  FolderTree,
   BookOpen,
   Sparkles,
   ArrowRight,
   FileText,
   Clock,
-  HelpCircle,
   Search,
   CheckCircle2,
-  FileQuestion,
   Layers,
   ArrowUpRight,
   Lightbulb,
 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserSession } from '@/context/UserSessionContext';
+import { formatDateOnly } from '@lib/utils/formatters';
 import { UploadBatch } from '@/types/document';
 import { ChatSession } from '@/types/chat';
 
@@ -77,7 +75,7 @@ export default function UserDashboard({
   canSwitchToAdmin = false,
 }: UserDashboardProps) {
   const router = useRouter();
-  const { language, t } = useLanguage();
+  const { language } = useLanguage();
   const { currentUser } = useUserSession();
 
   const [batches, setBatches] = useState<UploadBatch[]>([]);
@@ -544,11 +542,7 @@ export default function UserDashboard({
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {activeBatches.slice(0, 5).map((batch) => {
-                const dateStr = new Date(batch.uploaded_at).toLocaleDateString('id-ID', {
-                  day: 'numeric',
-                  month: 'short',
-                  year: 'numeric',
-                });
+                const dateStr = formatDateOnly(batch.uploaded_at, language);
 
                 return (
                   <div

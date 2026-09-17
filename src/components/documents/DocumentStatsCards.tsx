@@ -8,7 +8,7 @@ import { useLanguage } from '@/context/LanguageContext';
 interface DocumentStatsCardsProps {
   batches: UploadBatch[];
   activeFilter?: string | null;
-  onSelectFilter?: (filter: string | null) => void;
+  onSelectFilter?: (_filter: string | null) => void;
 }
 
 export default function DocumentStatsCards({

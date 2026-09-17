@@ -2,9 +2,10 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { FileText, ArrowRight, CheckCircle2, Clock, ChevronRight } from 'lucide-react';
+import { FileText, CheckCircle2, Clock, ChevronRight } from 'lucide-react';
 import { UploadBatch } from '@/types/document';
 import { useLanguage } from '@/context/LanguageContext';
+import { formatDateTime } from '@lib/utils/formatters';
 
 interface RecentBatchesProps {
   batches: UploadBatch[];
@@ -78,16 +79,7 @@ export default function RecentBatches({ batches, isLoading }: RecentBatchesProps
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {batches.map((batch) => {
-            const formattedDate = new Date(batch.uploaded_at).toLocaleDateString(
-              language === 'en' ? 'en-US' : 'id-ID',
-              {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              }
-            );
+            const formattedDate = formatDateTime(batch.uploaded_at, language);
 
             return (
               <Link

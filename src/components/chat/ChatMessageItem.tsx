@@ -20,9 +20,9 @@ import { toast } from 'sonner';
 
 interface ChatMessageItemProps {
   message: ChatMessage;
-  onSelectCitation: (source: ChatSource) => void;
+  onSelectCitation: (_source: ChatSource) => void;
   onRetry?: () => void;
-  onSwitchVariant?: (newIndex: number) => void;
+  onSwitchVariant?: (_newIndex: number) => void;
 }
 
 export default function ChatMessageItem({
