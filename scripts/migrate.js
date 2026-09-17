@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { Client } = require('pg');
-require('dotenv').config();
+try { require('dotenv').config(); } catch {}
 const { getConnectionString } = require('./get-db-url');
 
 async function runMigration() {

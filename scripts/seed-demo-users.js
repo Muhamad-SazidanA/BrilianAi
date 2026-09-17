@@ -1,5 +1,5 @@
 const { Client } = require('pg');
-require('dotenv').config();
+try { require('dotenv').config(); } catch {}
 const { getConnectionString } = require('./get-db-url');
 
 const DEMO_USERS = [
