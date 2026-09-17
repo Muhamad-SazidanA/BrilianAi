@@ -12,7 +12,7 @@ export function getPool(): Pool {
   if (!poolInstance) {
     let connectionString =
       process.env.DATABASE_URL ||
-      'postgresql://postgres:postgres@localhost:5432/brilian_ai';
+      'postgresql://postgres:postgres@localhost:5432/brilian_db';
 
     // Jika berjalan lokal (di luar docker) dan URL mengarah ke hostname 'postgres', fallback otomatis ke localhost
     if (connectionString.includes('@postgres:') && !process.env.DOCKER_CONTAINER) {

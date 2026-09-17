@@ -6,12 +6,15 @@ import { Users, MessageSquare } from 'lucide-react';
 import AppShell from '@/components/layout/AppShell';
 import RolesPermissionsView from '@/components/roles/RolesPermissionsView';
 import { useLanguage } from '@/context/LanguageContext';
+import { useUserSession } from '@/context/UserSessionContext';
 
 export default function RolesPage() {
   const { language } = useLanguage();
+  const { hasPermission } = useUserSession();
 
   return (
     <AppShell
+      requiredPermission="roles:manage"
       title={language === 'en' ? 'Roles & Permissions (RBAC)' : 'Role & Hak Akses (RBAC)'}
       subtitle={
         language === 'en'
@@ -20,14 +23,18 @@ export default function RolesPage() {
       }
       actions={
         <div style={{ display: 'flex', gap: '8px' }}>
-          <Link href="/users" className="btn btn-outline btn-sm">
-            <Users size={15} />
-            <span>{language === 'en' ? 'Manage Users' : 'Kelola Pengguna'}</span>
-          </Link>
-          <Link href="/logs" className="btn btn-outline btn-sm">
-            <MessageSquare size={15} />
-            <span>{language === 'en' ? 'Audit Logs' : 'Log Percakapan'}</span>
-          </Link>
+          {hasPermission('users:manage') && (
+            <Link href="/users" className="btn btn-outline btn-sm">
+              <Users size={15} />
+              <span>{language === 'en' ? 'Manage Users' : 'Kelola Pengguna'}</span>
+            </Link>
+          )}
+          {hasPermission('audit:read') && (
+            <Link href="/logs" className="btn btn-outline btn-sm">
+              <MessageSquare size={15} />
+              <span>{language === 'en' ? 'Audit Logs' : 'Log Percakapan'}</span>
+            </Link>
+          )}
         </div>
       }
     >

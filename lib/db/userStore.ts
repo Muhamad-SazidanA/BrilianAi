@@ -53,6 +53,20 @@ export async function ensureUsersAndRolesTables(): Promise<void> {
               'Hak akses standar untuk membaca dokumen aktif dan bertanya pada AI Chatbot RAG.',
               true,
               '["documents:read", "chat:query", "chat:export"]'::jsonb
+          ),
+          (
+              'chat_only',
+              'Chatbot Specialist',
+              'Hak akses khusus percakapan: hanya dapat bertanya dan berdiskusi dengan AI Chatbot RAG.',
+              false,
+              '["chat:query", "chat:export"]'::jsonb
+          ),
+          (
+              'knowledge_only',
+              'Knowledge Viewer',
+              'Hak akses khusus pembaca: hanya dapat membuka dan mempelajari repositori dokumen pengetahuan.',
+              false,
+              '["documents:read"]'::jsonb
           )
       ON CONFLICT (id) DO NOTHING;
     `);
@@ -77,20 +91,52 @@ export async function ensureUsersAndRolesTables(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_users_status ON users (status);
     `);
 
-    // Seed default users if empty
-    const checkUsers = await pool.query('SELECT COUNT(*) FROM users');
-    if (parseInt(checkUsers.rows[0].count, 10) === 0) {
-      await pool.query(`
-        INSERT INTO users (id, name, email, role_id, status, department, avatar_color, last_login_at)
-        VALUES
-            ('a0000000-0000-0000-0000-000000000001', 'Muhammad Sazidan', 'admin@brilian.ai', 'admin', 'active', 'IT & Architecture', '#2563EB', now()),
-            ('a0000000-0000-0000-0000-000000000002', 'Budi Pratama', 'budi.editor@brilian.ai', 'editor', 'active', 'Clinical & Research', '#10B981', now() - INTERVAL '2 hours'),
-            ('a0000000-0000-0000-0000-000000000003', 'Siti Rahmawati', 'siti.member@brilian.ai', 'member', 'active', 'Medical Staff', '#8B5CF6', now() - INTERVAL '5 hours'),
-            ('a0000000-0000-0000-0000-000000000004', 'Ahmad Fauzi', 'ahmad.fauzi@brilian.ai', 'member', 'active', 'Compliance & Audit', '#F59E0B', now() - INTERVAL '1 day'),
-            ('a0000000-0000-0000-0000-000000000005', 'Rian Hidayat', 'rian.inactive@brilian.ai', 'member', 'inactive', 'Internship', '#6B7280', now() - INTERVAL '7 days')
-        ON CONFLICT (email) DO NOTHING;
-      `);
-    }
+    // Seed initial Super Admin and demo RBAC accounts
+    const superadminEmail = (process.env.SUPERADMIN_EMAIL || 'superadmin@brilian.ai').trim().toLowerCase();
+
+    await pool.query(`
+      INSERT INTO users (id, name, email, role_id, status, department, avatar_color, last_login_at)
+      VALUES
+          ('a0000000-0000-0000-0000-000000000001', 'Super Admin', $1, 'admin', 'active', 'System Administration', '#2563EB', now()),
+          ('b0000000-0000-0000-0000-000000000002', 'Budi Editor', 'editor@brilian.ai', 'editor', 'active', 'Editorial & Knowledge', '#0891B2', now()),
+          ('c0000000-0000-0000-0000-000000000003', 'Siti Member', 'member@brilian.ai', 'member', 'active', 'Operations', '#16A34A', now()),
+          ('d0000000-0000-0000-0000-000000000004', 'Dedi Chat Only', 'chatonly@brilian.ai', 'chat_only', 'active', 'Customer Support', '#9333EA', now()),
+          ('e0000000-0000-0000-0000-000000000005', 'Rina Knowledge Only', 'knowledgeonly@brilian.ai', 'knowledge_only', 'active', 'Research & Library', '#D97706', now())
+      ON CONFLICT (id) DO UPDATE 
+        SET email = EXCLUDED.email, name = EXCLUDED.name, role_id = EXCLUDED.role_id, status = 'active';
+    `, [superadminEmail]);
+
+    // Clean up outdated dummy users if any
+    await pool.query(`
+      DELETE FROM users 
+      WHERE email IN (
+        'ahmad.fauzi@brilian.ai',
+        'rian.inactive@brilian.ai',
+        'admin@brilian.ai'
+      ) AND email != $1;
+    `, [superadminEmail]);
+
+    // 3. Table chat_audit_logs
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS chat_audit_logs (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          session_id VARCHAR(100) NOT NULL,
+          user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+          user_name VARCHAR(120),
+          user_email VARCHAR(150),
+          user_department VARCHAR(100),
+          query_text TEXT NOT NULL,
+          topic VARCHAR(200),
+          answer_excerpt TEXT,
+          sources_used JSONB NOT NULL DEFAULT '[]',
+          retrieved_count INT NOT NULL DEFAULT 0,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS idx_chat_audit_user_id ON chat_audit_logs (user_id);
+      CREATE INDEX IF NOT EXISTS idx_chat_audit_created_at ON chat_audit_logs (created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_chat_audit_topic ON chat_audit_logs (topic);
+      CREATE INDEX IF NOT EXISTS idx_chat_audit_session ON chat_audit_logs (session_id);
+    `);
 
     isUserTableInitialized = true;
   } catch (err) {
@@ -157,7 +203,7 @@ export async function listUsers(options?: {
     paramIdx++;
   }
 
-  queryText += ` ORDER BY u.created_at ASC`;
+  queryText += ` ORDER BY (CASE WHEN u.status = 'pending_approval' THEN 0 ELSE 1 END), u.created_at ASC`;
 
   const res = await pool.query(queryText, params);
 
@@ -207,6 +253,113 @@ export async function getUserById(id: string): Promise<User | null> {
     WHERE u.id = $1
     `,
     [id]
+  );
+
+  if (res.rows.length === 0) return null;
+  const row = res.rows[0];
+
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    role_id: row.role_id,
+    status: row.status,
+    department: row.department,
+    avatar_color: row.avatar_color,
+    last_login_at: row.last_login_at,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    question_count: parseInt(row.question_count, 10) || 0,
+    role: {
+      id: row.role_id,
+      name: row.role_name || row.role_id,
+      description: row.role_desc || '',
+      is_system: row.role_is_system ?? true,
+      permissions: Array.isArray(row.role_permissions) ? row.role_permissions : [],
+    },
+  };
+}
+
+/**
+ * Mengambil satu user berdasarkan Email (case-insensitive).
+ */
+export async function getUserByEmail(email: string): Promise<User | null> {
+  await ensureUsersAndRolesTables();
+  const pool = getPool();
+
+  const res = await pool.query(
+    `
+    SELECT 
+      u.id, u.name, u.email, u.role_id, u.status, u.department, u.avatar_color,
+      u.last_login_at, u.created_at, u.updated_at,
+      r.name as role_name, r.description as role_desc, r.is_system as role_is_system, r.permissions as role_permissions,
+      COALESCE(log_agg.question_count, 0) as question_count
+    FROM users u
+    LEFT JOIN roles r ON u.role_id = r.id
+    LEFT JOIN (
+      SELECT user_id, COUNT(*) as question_count
+      FROM chat_audit_logs
+      GROUP BY user_id
+    ) log_agg ON u.id = log_agg.user_id
+    WHERE LOWER(u.email) = LOWER($1)
+    LIMIT 1
+    `,
+    [email.trim().toLowerCase()]
+  );
+
+  if (res.rows.length === 0) return null;
+  const row = res.rows[0];
+
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    role_id: row.role_id,
+    status: row.status,
+    department: row.department,
+    avatar_color: row.avatar_color,
+    last_login_at: row.last_login_at,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    question_count: parseInt(row.question_count, 10) || 0,
+    role: {
+      id: row.role_id,
+      name: row.role_name || row.role_id,
+      description: row.role_desc || '',
+      is_system: row.role_is_system ?? true,
+      permissions: Array.isArray(row.role_permissions) ? row.role_permissions : [],
+    },
+  };
+}
+
+/**
+ * Mengambil satu user berdasarkan Email atau Username (case-insensitive).
+ */
+export async function getUserByEmailOrUsername(identifier: string): Promise<User | null> {
+  await ensureUsersAndRolesTables();
+  const pool = getPool();
+  const cleanId = identifier.trim().toLowerCase();
+
+  const res = await pool.query(
+    `
+    SELECT 
+      u.id, u.name, u.email, u.role_id, u.status, u.department, u.avatar_color,
+      u.last_login_at, u.created_at, u.updated_at,
+      r.name as role_name, r.description as role_desc, r.is_system as role_is_system, r.permissions as role_permissions,
+      COALESCE(log_agg.question_count, 0) as question_count
+    FROM users u
+    LEFT JOIN roles r ON u.role_id = r.id
+    LEFT JOIN (
+      SELECT user_id, COUNT(*) as question_count
+      FROM chat_audit_logs
+      GROUP BY user_id
+    ) log_agg ON u.id = log_agg.user_id
+    WHERE LOWER(u.email) = $1 
+       OR LOWER(u.name) = $1 
+       OR LOWER(SPLIT_PART(u.email, '@', 1)) = $1
+    LIMIT 1
+    `,
+    [cleanId]
   );
 
   if (res.rows.length === 0) return null;

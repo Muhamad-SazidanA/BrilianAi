@@ -1,18 +1,20 @@
 services:
   postgres:
-    image: pgvector/pgvector:pg16
-    container_name: brilian_postgres
+    image: ${POSTGRES_IMAGE:-pgvector/pgvector:pg16}
+    container_name: ${POSTGRES_CONTAINER_NAME:-brilian_postgres}
     restart: unless-stopped
+    env_file:
+      - .env
     # Port TIDAK di-expose ke host — hanya internal antar service di compose ini
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-brilian_ai}
+      POSTGRES_DB: ${POSTGRES_DB:-brilian_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./db/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-brilian_ai}"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-brilian_db}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -20,9 +22,11 @@ services:
       - brilian_internal
 
   redis:
-    image: redis:7-alpine
-    container_name: brilian_redis
+    image: ${REDIS_IMAGE:-redis:7-alpine}
+    container_name: ${REDIS_CONTAINER_NAME:-brilian_redis}
     restart: unless-stopped
+    env_file:
+      - .env
     # Port TIDAK di-expose ke host — hanya internal
     volumes:
       - redis_data:/data
@@ -35,13 +39,15 @@ services:
       - brilian_internal
 
   ollama:
-    image: ollama/ollama:latest
-    container_name: brilian_ollama
+    image: ${OLLAMA_IMAGE:-ollama/ollama:latest}
+    container_name: ${OLLAMA_CONTAINER_NAME:-brilian_ollama}
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      - OLLAMA_KEEP_ALIVE=24h
-      - OLLAMA_NUM_PARALLEL=1
-      - OLLAMA_FLASH_ATTENTION=1
+      - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-24h}
+      - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-1}
+      - OLLAMA_FLASH_ATTENTION=${OLLAMA_FLASH_ATTENTION:-1}
     # Port TIDAK di-expose ke host — hanya internal
     volumes:
       - ollama_data:/root/.ollama
@@ -57,25 +63,41 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: brilian_app
+    container_name: ${APP_CONTAINER_NAME:-brilian_app}
     restart: unless-stopped
     ports:
-      # Port 9000 di host → 3000 di container (hindari konflik dengan app lain)
-      - "9000:3000"
+      # Port host → Port internal container
+      - "${APP_PORT:-9000}:${PORT:-3000}"
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-brilian_ai}
-      REDIS_URL: redis://redis:6379
-      REDIS_HOST: redis
-      REDIS_PORT: "6379"
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-brilian_db}}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      OLLAMA_ENDPOINT: ${OLLAMA_ENDPOINT:-http://ollama:11434}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      CHAT_MODEL_NAME: ${CHAT_MODEL_NAME:-llama3.2:3b}
+      VISION_MODEL_NAME: ${VISION_MODEL_NAME:-qwen2.5vl:3b}
+      EMBEDDING_MODEL_NAME: ${EMBEDDING_MODEL_NAME:-bge-m3}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
-      EMBEDDING_DIM: ${EMBEDDING_DIM:-1024}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash-lite}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
-      NODE_ENV: production
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-1024}
+      CHUNK_SIZE: ${CHUNK_SIZE:-800}
+      CHUNK_OVERLAP: ${CHUNK_OVERLAP:-150}
+      SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-superadmin@brilian.ai}
+      SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-admin123}
+      APP_URL: ${APP_URL:-https://brilian.uti.co.id}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI}
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${PORT:-3000}
       # Menandai bahwa app berjalan di dalam Docker — dbClient tidak akan mengganti hostname 'postgres' → 'localhost'
       DOCKER_CONTAINER: "true"
     depends_on:
@@ -84,7 +106,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -94,7 +116,7 @@ services:
 
 networks:
   brilian_internal:
-    name: brilian_internal
+    name: ${DOCKER_NETWORK_NAME:-brilian_internal}
     driver: bridge
 
 volumes:

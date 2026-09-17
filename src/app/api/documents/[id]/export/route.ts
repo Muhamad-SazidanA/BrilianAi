@@ -15,6 +15,34 @@ export async function GET(
     const rawChunks = await listChunks(id);
     const curatedInsights = await listCuratedInsights(id);
 
+    const { searchParams } = new URL(request.url);
+    const format = searchParams.get('format') === 'csv' ? 'csv' : 'json';
+
+    if (format === 'csv') {
+      const csvHeader = ['ID', 'Title', 'Category', 'Importance', 'Source Pages', 'Tags', 'Content'];
+      const escapeCsv = (val: any) => `"${String(val ?? '').replace(/"/g, '""')}"`;
+
+      const rows = curatedInsights.map((i) => [
+        escapeCsv(i.id),
+        escapeCsv(i.title),
+        escapeCsv(i.category),
+        escapeCsv(i.importance),
+        escapeCsv(i.source_pages),
+        escapeCsv(Array.isArray(i.tags) ? i.tags.join(', ') : i.tags),
+        escapeCsv(i.content),
+      ]);
+
+      const csvContent = [csvHeader.join(','), ...rows.map((r) => r.join(','))].join('\n');
+
+      return new NextResponse('\uFEFF' + csvContent, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="knowledge_${id.substring(0, 8)}.csv"`,
+        },
+      });
+    }
+
     const exportData = {
       batch: batch || { id },
       exportedAt: new Date().toISOString(),

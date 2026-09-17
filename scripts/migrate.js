@@ -4,7 +4,7 @@ const { Client } = require('pg');
 require('dotenv').config();
 
 async function runMigration() {
-  let connectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/brilian_ai';
+  let connectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/brilian_db';
   if (connectionString.includes('@postgres:') && !process.env.DOCKER_CONTAINER) {
     connectionString = connectionString.replace('@postgres:', '@localhost:');
   }

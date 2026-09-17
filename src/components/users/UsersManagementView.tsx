@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Plus, Search, Eye, Pencil, RotateCcw, X, Loader2, ChevronLeft, ChevronRight, ChevronDown, Save } from 'lucide-react';
+import { Plus, Search, Eye, Pencil, RotateCcw, X, Loader2, ChevronLeft, ChevronRight, ChevronDown, Save, CheckCircle2, Clock, ShieldCheck, UserCheck } from 'lucide-react';
 import { User, Role } from '@/types/user';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserSession } from '@/context/UserSessionContext';
@@ -25,7 +25,15 @@ function BOX(w = 520): React.CSSProperties { return { backgroundColor: 'var(--bg
 const LBL: React.CSSProperties = { display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '6px' };
 const INP: React.CSSProperties = { width: '100%', height: '38px', padding: '0 12px', borderRadius: '8px', border: '1px solid var(--border-default)', fontSize: '13.5px', color: 'var(--text-primary)', backgroundColor: 'var(--bg-card)', outline: 'none', boxSizing: 'border-box' };
 
-function StatusBadge({ status }: { status: 'active' | 'inactive' }) {
+function StatusBadge({ status }: { status: 'active' | 'inactive' | 'pending_approval' }) {
+  if (status === 'pending_approval') {
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 9px', borderRadius: '9999px', fontSize: '11.5px', fontWeight: 600, backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }}>
+        <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: '#f59e0b' }} />
+        menunggu approval
+      </span>
+    );
+  }
   const ok = status === 'active';
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 9px', borderRadius: '9999px', fontSize: '11.5px', fontWeight: 600, backgroundColor: ok ? '#f0fdf4' : 'var(--bg-subtle)', color: ok ? '#16a34a' : 'var(--text-muted)', border: `1px solid ${ok ? '#bbf7d0' : 'var(--border-default)'}` }}>
@@ -72,7 +80,7 @@ export default function UsersManagementView() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending_approval' | 'active' | 'inactive'>('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -81,7 +89,13 @@ export default function UsersManagementView() {
   const [detailUser, setDetailUser] = useState<User | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
+  const [approvingUser, setApprovingUser] = useState<User | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
+
+  // Approve form
+  const [aRoleId, setARoleId] = useState('member');
+  const [aDept, setADept] = useState('Google Account');
 
   // Create form
   const [cName, setCName] = useState('');
@@ -96,7 +110,7 @@ export default function UsersManagementView() {
   const [eEmail, setEEmail] = useState('');
   const [eDept, setEDept] = useState('');
   const [eRoleId, setERoleId] = useState('member');
-  const [eStatus, setEStatus] = useState<'active' | 'inactive'>('active');
+  const [eStatus, setEStatus] = useState<'active' | 'inactive' | 'pending_approval'>('active');
 
   const canManage = hasPermission('users:manage');
 
@@ -127,8 +141,39 @@ export default function UsersManagementView() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated = useMemo(() => { const s = (page - 1) * pageSize; return filtered.slice(s, s + pageSize); }, [filtered, page, pageSize]);
 
+  const pendingUsers = useMemo(() => users.filter(u => u.status === 'pending_approval'), [users]);
+
   const openCreate = () => { setCName(''); setCEmail(''); setCDept(''); setCPassword(''); setCRoleId(roles[0]?.id || 'member'); setCActive(true); setShowCreate(true); };
   const openEdit = (u: User) => { setEName(u.name); setEEmail(u.email); setEDept(u.department || ''); setERoleId(u.role_id); setEStatus(u.status); setDetailUser(null); setEditingUser(u); };
+  const openApprove = (u: User) => { setApprovingUser(u); setARoleId(u.role_id || 'member'); setADept(u.department || 'Google Account'); };
+
+  const handleApprove = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!approvingUser) return;
+    setIsApproving(true);
+    try {
+      const res = await fetch(`/api/users/${approvingUser.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'active',
+          role_id: aRoleId,
+          department: aDept,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal menyetujui akun');
+      const roleObj = roles.find(r => r.id === aRoleId);
+      toast.success(`Akun ${approvingUser.name} berhasil disetujui dengan peran ${roleObj?.name || aRoleId}`);
+      setApprovingUser(null);
+      await fetchUsers();
+      await refreshSessionUsers();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsApproving(false);
+    }
+  };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -214,18 +259,49 @@ export default function UsersManagementView() {
               style={{ ...INP, paddingLeft: '32px', height: '34px', fontSize: '12.5px' }} />
           </div>
           <div style={{ display: 'inline-flex', borderRadius: '8px', border: '1px solid var(--border-default)', overflow: 'hidden' }}>
-            {(['all', 'active', 'inactive'] as const).map(s => {
+            {(['all', 'pending_approval', 'active', 'inactive'] as const).map(s => {
               const isA = statusFilter === s;
-              const txt = s === 'all' ? 'Semua' : s === 'active' ? 'aktif' : 'nonaktif';
+              const txt = s === 'all' ? 'Semua' : s === 'pending_approval' ? 'Menunggu Approval' : s === 'active' ? 'Aktif' : 'Nonaktif';
+              const count = s === 'pending_approval' ? pendingUsers.length : undefined;
               return (
                 <button key={s} type="button" onClick={() => { setStatusFilter(s); setPage(1); }}
-                  style={{ padding: '5px 16px', fontSize: '13px', fontWeight: isA ? 600 : 400, border: 'none', borderLeft: s !== 'all' ? '1px solid var(--border-default)' : 'none', backgroundColor: isA ? 'var(--bg-subtle)' : 'transparent', color: isA ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: 'pointer' }}>
-                  {txt}
+                  style={{ padding: '5px 14px', fontSize: '13px', fontWeight: isA ? 600 : 400, border: 'none', borderLeft: s !== 'all' ? '1px solid var(--border-default)' : 'none', backgroundColor: isA ? 'var(--bg-subtle)' : 'transparent', color: isA ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <span>{txt}</span>
+                  {count !== undefined && count > 0 && (
+                    <span style={{ fontSize: '11px', fontWeight: 700, backgroundColor: '#f59e0b', color: '#ffffff', borderRadius: '9999px', padding: '1px 6px', minWidth: '16px', textAlign: 'center' }}>
+                      {count}
+                    </span>
+                  )}
                 </button>
               );
             })}
           </div>
         </div>
+
+        {/* Pending Users Notification Banner */}
+        {pendingUsers.length > 0 && statusFilter !== 'pending_approval' && (
+          <div style={{ margin: '0 1.5rem 1rem', padding: '12px 16px', borderRadius: '10px', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Clock size={20} color="#D97706" style={{ flexShrink: 0 }} />
+              <div>
+                <div style={{ fontWeight: 600, fontSize: '13px', color: '#92400E' }}>
+                  Terdapat {pendingUsers.length} akun Google baru yang menunggu persetujuan
+                </div>
+                <div style={{ fontSize: '12px', color: '#B45309' }}>
+                  Tinjau akun dan tetapkan hak akses (Role) sebelum pengguna dapat masuk ke sistem.
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setStatusFilter('pending_approval'); setPage(1); }}
+              style={{ padding: '5px 12px', borderRadius: '6px', backgroundColor: '#D97706', color: '#fff', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+            >
+              <UserCheck size={14} />
+              Tinjau Sekarang ({pendingUsers.length})
+            </button>
+          </div>
+        )}
 
         {/* Table */}
         <div style={{ overflowX: 'auto' }}>
@@ -276,14 +352,46 @@ export default function UsersManagementView() {
                     </td>
                     <td style={{ padding: '10px 1rem' }}><StatusBadge status={u.status} /></td>
                     <td style={{ padding: '10px 1rem' }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        {u.status === 'pending_approval' && canManage ? (
+                          <button
+                            type="button"
+                            onClick={() => openApprove(u)}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              backgroundColor: '#2563EB',
+                              color: '#FFFFFF',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              boxShadow: '0 1px 2px rgba(37,99,235,0.2)',
+                            }}
+                          >
+                            <CheckCircle2 size={13} />
+                            Setujui Akun
+                          </button>
+                        ) : null}
                         <IBtn title="Lihat detail" onClick={() => setDetailUser(u)}><Eye size={13} /></IBtn>
                         {canManage && <IBtn title="Edit user" onClick={() => openEdit(u)}><Pencil size={13} /></IBtn>}
                         {canManage && !isSA && <IBtn title="Revoke sesi" onClick={() => toast.info('Fitur revoke sesi belum tersedia')}><RotateCcw size={13} /></IBtn>}
-                        {canManage && !isSA && (
+                        {canManage && !isSA && u.status !== 'pending_approval' && (
                           <button type="button" onClick={() => toggleStatus(u)}
                             style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid var(--border-default)', backgroundColor: 'transparent', cursor: 'pointer', fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>
                             {u.status === 'active' ? 'Nonaktifkan' : 'Aktifkan'}
+                          </button>
+                        )}
+                        {canManage && !isSA && u.status === 'pending_approval' && (
+                          <button
+                            type="button"
+                            onClick={() => setDeletingUser(u)}
+                            style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #fecaca', backgroundColor: '#fef2f2', cursor: 'pointer', fontSize: '12px', color: '#dc2626', fontWeight: 500 }}
+                          >
+                            Tolak
                           </button>
                         )}
                       </div>
@@ -467,6 +575,7 @@ export default function UsersManagementView() {
                 <span style={LBL}>Status akun</span>
                 <select value={eStatus} onChange={e => setEStatus(e.target.value as any)} style={INP}>
                   <option value="active">Aktif</option>
+                  <option value="pending_approval">Menunggu Approval</option>
                   <option value="inactive">Nonaktif</option>
                 </select>
               </div>
@@ -475,6 +584,122 @@ export default function UsersManagementView() {
                 <button type="submit" disabled={isSubmitting} style={{ height: '36px', padding: '0 16px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--color-primary)', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px', opacity: isSubmitting ? 0.7 : 1 }}>
                   {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}Simpan perubahan
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Persetujuan Akun Google */}
+      {approvingUser && (
+        <div style={OL} onClick={() => setApprovingUser(null)}>
+          <div style={BOX(500)} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '38px', height: '38px', borderRadius: '50%', backgroundColor: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <UserCheck size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: 'var(--text-primary)' }}>Persetujuan Akun Google</h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '12.5px', color: 'var(--text-secondary)' }}>Verifikasi dan tentukan hak akses (Role) pengguna.</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setApprovingUser(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={18} /></button>
+            </div>
+
+            {/* User Profile Summary */}
+            <div style={{ backgroundColor: 'var(--bg-subtle)', border: '1px solid var(--border-default)', borderRadius: '10px', padding: '12px 14px', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <UserAvatar name={approvingUser.name} size={42} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>{approvingUser.name}</div>
+                <div style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>{approvingUser.email}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                  Mendaftar via Google • {fmtDate(approvingUser.created_at)}
+                </div>
+              </div>
+              <span style={{ fontSize: '11.5px', fontWeight: 600, color: '#B45309', backgroundColor: '#FEF3C7', padding: '3px 8px', borderRadius: '9999px', border: '1px solid #FDE68A' }}>
+                Pending
+              </span>
+            </div>
+
+            <form onSubmit={handleApprove}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={LBL}>
+                  Pilih Role Akses (Hak Akses Pengguna) <span style={{ color: '#dc2626' }}>*</span>
+                </label>
+                <select
+                  value={aRoleId}
+                  onChange={e => setARoleId(e.target.value)}
+                  style={{ ...INP, fontWeight: 500 }}
+                  required
+                >
+                  {roles.map(r => (
+                    <option key={r.id} value={r.id}>
+                      {r.name} ({r.id}) — {r.description?.slice(0, 50)}...
+                    </option>
+                  ))}
+                </select>
+                <p style={{ margin: '4px 0 0', fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                  Hak akses menu dokumen, kurasi AI, chatbot, dan administrasi akan mengikuti role ini.
+                </p>
+              </div>
+
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={LBL}>Departemen / Unit Kerja</label>
+                <input
+                  type="text"
+                  value={aDept}
+                  onChange={e => setADept(e.target.value)}
+                  placeholder="Contoh: Operasional, IT, Medis, dll."
+                  style={INP}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = approvingUser;
+                    setApprovingUser(null);
+                    setDeletingUser(target);
+                  }}
+                  style={{ height: '36px', padding: '0 12px', borderRadius: '8px', border: '1px solid #FECACA', backgroundColor: '#FEF2F2', color: '#DC2626', fontSize: '12.5px', fontWeight: 500, cursor: 'pointer' }}
+                >
+                  Tolak Akun
+                </button>
+
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setApprovingUser(null)}
+                    style={{ height: '36px', padding: '0 14px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'none', fontSize: '13px', cursor: 'pointer', color: 'var(--text-primary)' }}
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isApproving}
+                    style={{
+                      height: '36px',
+                      padding: '0 18px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      backgroundColor: '#2563EB',
+                      color: '#fff',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      opacity: isApproving ? 0.7 : 1,
+                      boxShadow: '0 1px 3px rgba(37,99,235,0.25)',
+                    }}
+                  >
+                    {isApproving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                    Setujui & Berikan Akses
+                  </button>
+                </div>
               </div>
             </form>
           </div>

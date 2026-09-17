@@ -66,6 +66,7 @@ const translations: Record<Language, Record<string, string>> = {
     'profile.vector_val': 'pgvector 1024-d Cosine',
     'profile.status': 'Status Akun',
     'profile.status_val': 'Aktif & Terverifikasi',
+    'profile.status_pending': 'Menunggu Persetujuan Super Admin',
 
     // Help Center Modal
     'help.title': 'Pusat Bantuan & Panduan',
@@ -109,11 +110,11 @@ const translations: Record<Language, Record<string, string>> = {
     'table.col_actions': 'Aksi',
     'table.status_active': 'Aktif',
     'table.status_inactive': 'Standby',
-    'table.status_active_rag': 'Aktif (RAG)',
+    'table.status_active_rag': 'Aktif',
     'table.status_standby': 'Standby',
     'table.action_activate': 'Aktifkan Dokumen',
     'table.action_deactivate': 'Nonaktifkan',
-    'table.curated_badge': 'Terkurasi',
+    'table.curated_badge': 'Terkurasi', 
     'table.uncurated_badge': 'Belum Dikurasi',
     'table.toggle_tooltip': 'Klik untuk mengubah status dokumen dalam pencarian RAG Chatbot',
     'table.rename_tooltip': 'Ubah nama dokumen',
@@ -154,6 +155,15 @@ const translations: Record<Language, Record<string, string>> = {
     'chat.reset_btn': 'Reset Chat',
     'chat.reset_confirm': 'Bersihkan riwayat percakapan?',
     'chat.reset_msg': 'Riwayat percakapan telah dibersihkan. Silakan ajukan pertanyaan baru.',
+    'chat.new_chat': 'Chat baru',
+    'chat.recents': 'Recent',
+    'chat.no_recents': 'Belum ada percakapan',
+    'chat.rename': 'Ganti nama',
+    'chat.pin': 'Pin chat',
+    'chat.unpin': 'Lepas pin',
+    'chat.delete': 'Hapus chat',
+    'chat.options': 'Opsi percakapan',
+    'chat.loading_history': 'Memuat percakapan...',
     'chat.placeholder': 'Tanyakan informasi seputar dokumen yang telah ter-ingest... (Tekan Enter)',
     'chat.send': 'Kirim',
     'chat.thinking': 'AI sedang mencari konteks relevan dan menyusun jawaban via pgvector RAG...',
@@ -265,6 +275,24 @@ const translations: Record<Language, Record<string, string>> = {
     'rename.cancel': 'Batal',
     'rename.saving': 'Menyimpan...',
     'rename.save': 'Simpan Perubahan',
+
+    // Login Page
+    'login.welcome_title': 'Masuk ke Akun Anda',
+    'login.welcome_subtitle': 'Akses Portal Enterprise Brilian.Ai',
+    'login.tagline': 'Akses terenkripsi ke seluruh basis pengetahuan dan kapabilitas multi-agent korporat.',
+    'login.email_label': 'Email Korporat',
+    'login.email_placeholder': 'nama@perusahaan.co.id',
+    'login.password_label': 'Kata Sandi',
+    'login.password_placeholder': 'Masukkan kata sandi akun',
+    'login.remember_me': 'Ingat sesi saya di perangkat ini',
+    'login.forgot_password': 'Lupa kata sandi?',
+    'login.submit_btn': 'Masuk',
+    'login.logging_in': 'Memverifikasi kredensial...',
+    'login.error_email_required': 'Silakan masukkan alamat email',
+    'login.error_not_found': 'Pengguna dengan email ini tidak ditemukan',
+    'login.error_inactive': 'Akun ini sedang nonaktif. Hubungi IT administrator.',
+    'login.toast_success': 'Berhasil masuk sebagai',
+    'login.footer_security': 'Sistem Terotentikasi & Terenkripsi TLS 1.3',
   },
   en: {
     // Nav & Sidebar
@@ -321,6 +349,7 @@ const translations: Record<Language, Record<string, string>> = {
     'profile.vector_val': 'pgvector 1024-d Cosine',
     'profile.status': 'Account Status',
     'profile.status_val': 'Active & Verified',
+    'profile.status_pending': 'Awaiting Super Admin Approval',
 
     // Help Center Modal
     'help.title': 'Help Center & Guides',
@@ -409,6 +438,15 @@ const translations: Record<Language, Record<string, string>> = {
     'chat.reset_btn': 'Reset Chat',
     'chat.reset_confirm': 'Clear chat conversation history?',
     'chat.reset_msg': 'Conversation history has been cleared. Feel free to ask a new question.',
+    'chat.new_chat': 'New chat',
+    'chat.recents': 'Recent',
+    'chat.no_recents': 'No conversations yet',
+    'chat.rename': 'Rename',
+    'chat.pin': 'Pin chat',
+    'chat.unpin': 'Unpin chat',
+    'chat.delete': 'Delete chat',
+    'chat.options': 'Conversation options',
+    'chat.loading_history': 'Loading conversations...',
     'chat.placeholder': 'Ask anything about ingested documents... (Press Enter)',
     'chat.send': 'Send',
     'chat.thinking': 'AI is retrieving relevant context and generating response via pgvector RAG...',
@@ -520,17 +558,35 @@ const translations: Record<Language, Record<string, string>> = {
     'rename.cancel': 'Cancel',
     'rename.saving': 'Saving...',
     'rename.save': 'Save Changes',
+
+    // Login Page
+    'login.welcome_title': 'Sign in to your account',
+    'login.welcome_subtitle': 'Access Brilian.Ai Enterprise Portal',
+    'login.tagline': 'Encrypted access to your enterprise knowledge base and multi-agent capabilities.',
+    'login.email_label': 'Corporate Email',
+    'login.email_placeholder': 'name@company.com',
+    'login.password_label': 'Password',
+    'login.password_placeholder': 'Enter your account password',
+    'login.remember_me': 'Remember my session on this device',
+    'login.forgot_password': 'Forgot password?',
+    'login.submit_btn': 'Sign In',
+    'login.logging_in': 'Authenticating credentials...',
+    'login.error_email_required': 'Please enter an email address',
+    'login.error_not_found': 'User with this email was not found',
+    'login.error_inactive': 'This account is currently inactive. Contact your IT administrator.',
+    'login.toast_success': 'Successfully signed in as',
+    'login.footer_security': 'Enterprise Authenticated & TLS 1.3 Encrypted',
   },
 };
 
 const LanguageContext = createContext<LanguageContextType>({
-  language: 'id',
+  language: 'en',
   setLanguage: () => {},
   t: (key: string) => key,
 });
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguageState] = useState<Language>('id');
+  const [language, setLanguageState] = useState<Language>('en');
 
   useEffect(() => {
     try {
@@ -539,8 +595,8 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         setLanguageState(saved);
         document.documentElement.lang = saved;
       } else {
-        setLanguageState('id');
-        document.documentElement.lang = 'id';
+        setLanguageState('en');
+        document.documentElement.lang = 'en';
       }
     } catch {
       // quiet fallback
@@ -562,8 +618,8 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     if (dict && dict[key]) {
       return dict[key];
     }
-    // Fallback to Indonesian if key exists there, else return key
-    return translations.id[key] || key;
+    // Fallback to English if key exists there, else Indonesian, else return key
+    return translations.en[key] || translations.id[key] || key;
   };
 
   return (

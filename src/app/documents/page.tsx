@@ -6,14 +6,19 @@ import { UploadCloud, MessageSquare } from 'lucide-react';
 import AppShell from '@/components/layout/AppShell';
 import DocumentTable from '@/components/documents/DocumentTable';
 import DocumentStatsCards from '@/components/documents/DocumentStatsCards';
+import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import { UploadBatch } from '@/types/document';
 import { useLanguage } from '@/context/LanguageContext';
+import { useUserSession } from '@/context/UserSessionContext';
 import { toast } from 'sonner';
 
 export default function DocumentsPage() {
   const { language, t } = useLanguage();
+  const { hasPermission } = useUserSession();
   const [batches, setBatches] = useState<UploadBatch[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [deletingDoc, setDeletingDoc] = useState<{ id: string; filename: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchBatches = async () => {
     setIsLoading(true);
@@ -35,42 +40,35 @@ export default function DocumentsPage() {
   }, []);
 
   const handleDelete = async (batchId: string, filename: string) => {
-    toast.warning(
-      language === 'en' ? `Delete "${filename}"?` : `Hapus dokumen "${filename}"?`,
-      {
-        description:
-          language === 'en'
-            ? 'All chunks, curated insights, and vectors will be permanently removed.'
-            : 'Seluruh chunks, kurasi insight, dan vektor dokumen ini akan dihapus permanen.',
-        duration: 8000,
-        action: {
-          label: language === 'en' ? 'Delete' : 'Hapus',
-          onClick: () => {
-            toast.promise(
-              async () => {
-                const res = await fetch(`/api/documents/${batchId}`, {
-                  method: 'DELETE',
-                });
-                if (!res.ok) {
-                  const data = await res.json();
-                  throw new Error(data.error || (language === 'en' ? 'Failed to delete document' : 'Gagal menghapus dokumen'));
-                }
-                await fetchBatches();
-              },
-              {
-                loading: language === 'en' ? 'Deleting document...' : 'Menghapus dokumen...',
-                success: language === 'en' ? `Document "${filename}" deleted` : `Dokumen "${filename}" berhasil dihapus`,
-                error: (err) => err.message,
-              }
-            );
-          },
-        },
-        cancel: {
-          label: language === 'en' ? 'Cancel' : 'Batal',
-          onClick: () => {},
-        },
+    setDeletingDoc({ id: batchId, filename });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingDoc) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/documents/${deletingDoc.id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(
+          data.error || (language === 'en' ? 'Failed to delete document' : 'Gagal menghapus dokumen')
+        );
       }
-    );
+      const deletedName = deletingDoc.filename;
+      setDeletingDoc(null);
+      await fetchBatches();
+      toast.success(
+        language === 'en'
+          ? `Document "${deletedName}" deleted successfully.`
+          : `Dokumen "${deletedName}" berhasil dihapus.`
+      );
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal menghapus dokumen');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleRename = async (batchId: string, newFilename: string) => {
@@ -159,18 +157,23 @@ export default function DocumentsPage() {
 
   return (
     <AppShell
+      requiredPermission="documents:read"
       title={t('docs.title')}
       subtitle={t('docs.subtitle')}
       actions={
         <div style={{ display: 'flex', gap: '8px' }}>
-          <Link href="/upload" className="btn btn-primary btn-sm">
-            <UploadCloud size={15} />
-            <span>{t('dash.upload_new')}</span>
-          </Link>
-          <Link href="/chat" className="btn btn-outline btn-sm">
-            <MessageSquare size={15} />
-            <span>Tanya Dokumen</span>
-          </Link>
+          {hasPermission('documents:upload') && (
+            <Link href="/upload" className="btn btn-primary btn-sm">
+              <UploadCloud size={15} />
+              <span>{t('dash.upload_new')}</span>
+            </Link>
+          )}
+          {hasPermission('chat:query') && (
+            <Link href="/chat" className="btn btn-outline btn-sm">
+              <MessageSquare size={15} />
+              <span>Tanya Dokumen</span>
+            </Link>
+          )}
         </div>
       }
     >
@@ -193,6 +196,33 @@ export default function DocumentsPage() {
           onActivateAll={handleActivateAll}
         />
       </div>
+
+      {/* Confirmation Modal for Document Deletion */}
+      <ConfirmationModal
+        isOpen={!!deletingDoc}
+        onClose={() => {
+          if (!isDeleting) setDeletingDoc(null);
+        }}
+        onConfirm={handleConfirmDelete}
+        isLoading={isDeleting}
+        title={language === 'en' ? 'Delete Document?' : 'Hapus Dokumen?'}
+        description={
+          language === 'en' ? (
+            <>
+              Are you sure you want to delete <strong>&quot;{deletingDoc?.filename}&quot;</strong>? All raw chunks,
+              curated insights, and vector embeddings for this file will be permanently removed from the database.
+            </>
+          ) : (
+            <>
+              Apakah Anda yakin ingin menghapus <strong>&quot;{deletingDoc?.filename}&quot;</strong>? Seluruh raw
+              chunk, intisari kurasi, dan vektor dokumen ini akan dihapus permanen dari sistem.
+            </>
+          )
+        }
+        confirmLabel={language === 'en' ? 'Yes, Delete Document' : 'Ya, Hapus Dokumen'}
+        cancelLabel={language === 'en' ? 'Cancel' : 'Batal'}
+        variant="danger"
+      />
     </AppShell>
   );
 }

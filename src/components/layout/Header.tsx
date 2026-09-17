@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { UploadCloud, MessageSquare, ChevronRight, Home } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { useUserSession } from '@/context/UserSessionContext';
 
 interface HeaderProps {
   title?: string;
@@ -15,10 +16,11 @@ interface HeaderProps {
 export default function Header({ title, subtitle, actions }: HeaderProps) {
   const pathname = usePathname();
   const { t } = useLanguage();
+  const { hasPermission } = useUserSession();
 
   // Determine breadcrumb based on pathname
   const getBreadcrumb = () => {
-    if (pathname === '/') return [{ label: t('header.dashboard'), href: '/' }];
+    if (pathname === '/' || pathname === '/dashboard') return [{ label: t('header.dashboard'), href: '/' }];
     if (pathname === '/upload') {
       return [
         { label: t('header.dashboard'), href: '/' },
@@ -99,13 +101,13 @@ export default function Header({ title, subtitle, actions }: HeaderProps) {
           actions
         ) : (
           <>
-            {pathname !== '/upload' && (
+            {pathname !== '/upload' && hasPermission('documents:upload') && (
               <Link href="/upload" className="btn btn-primary btn-sm">
                 <UploadCloud size={15} />
                 <span>{t('header.upload_btn')}</span>
               </Link>
             )}
-            {pathname !== '/chat' && (
+            {pathname !== '/chat' && hasPermission('chat:query') && (
               <Link href="/chat" className="btn btn-outline btn-sm">
                 <MessageSquare size={15} />
                 <span>{t('header.chat_btn')}</span>

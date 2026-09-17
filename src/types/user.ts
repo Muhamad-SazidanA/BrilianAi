@@ -140,13 +140,15 @@ export interface Role {
   user_count?: number;
 }
 
+export type UserStatus = 'active' | 'inactive' | 'pending_approval';
+
 export interface User {
   id: string;
   name: string;
   email: string;
   role_id: string;
   role?: Role;
-  status: 'active' | 'inactive';
+  status: UserStatus;
   department?: string;
   avatar_color?: string;
   last_login_at?: string;

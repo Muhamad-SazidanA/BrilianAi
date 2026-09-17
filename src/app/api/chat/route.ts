@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { askDocumentChat } from '@lib/chat/chatService';
 import { saveAuditLog } from '@lib/db/auditLogStore';
+import { getAuthenticatedUser, hasServerPermission } from '@lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 menit batas eksekusi untuk CPU inference di VPS
 
 export async function POST(request: NextRequest) {
   try {
+    const authenticatedUser = await getAuthenticatedUser(request);
+    if (!authenticatedUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (!(await hasServerPermission(request, 'chat:query'))) {
+      return NextResponse.json({ error: 'Forbidden: AI Assistant access required.' }, { status: 403 });
+    }
     const body = await request.json();
     const { query, documentId, allowPublicKnowledge, topK, minSimilarity, bypassCache, user, sessionId } = body;
 
@@ -28,10 +36,10 @@ export async function POST(request: NextRequest) {
     // Record audit log asynchronously for enterprise monitoring & compliance
     saveAuditLog({
       sessionId: sessionId || `sess-${Date.now()}`,
-      userId: user?.id,
-      userName: user?.name || 'Muhammad Sazidan',
-      userEmail: user?.email || 'admin@brilian.ai',
-      userDepartment: user?.department || 'IT & Architecture',
+      userId: authenticatedUser.id,
+      userName: authenticatedUser.name,
+      userEmail: authenticatedUser.email,
+      userDepartment: authenticatedUser.department,
       queryText: query.trim(),
       answerText: result.answer,
       sources: result.sources,

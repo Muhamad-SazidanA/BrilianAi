@@ -5,7 +5,7 @@ import AppShell from '@/components/layout/AppShell';
 import ChatWorkspace from '@/components/chat/ChatWorkspace';
 import { useLanguage } from '@/context/LanguageContext';
 
-function ChatPageContent() {
+export default function ChatPage() {
   const { t } = useLanguage();
 
   return (
@@ -14,16 +14,12 @@ function ChatPageContent() {
       subtitle={t('chat.subtitle')}
       noPadding={true}
       hideHeader={true}
+      requiredPermission="chat:query"
     >
-      <ChatWorkspace />
+      <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center' }}>Memuat Chat Workspace...</div>}>
+        <ChatWorkspace />
+      </Suspense>
     </AppShell>
   );
 }
 
-export default function ChatPage() {
-  return (
-    <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center' }}>...</div>}>
-      <ChatPageContent />
-    </Suspense>
-  );
-}

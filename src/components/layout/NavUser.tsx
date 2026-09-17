@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   CircleUser,
   Palette,
@@ -35,14 +36,15 @@ interface NavUserProps {
 
 export default function NavUser({
   user = {
-    name: 'Admin',
-    email: 'admin@brilian.ai',
+    name: 'Super Admin',
+    email: 'superadmin@brilian.ai',
   },
   version = 'Brilian.Ai v1.0.0',
   isCollapsed = false,
 }: NavUserProps) {
+  const router = useRouter();
   const { language, setLanguage, t } = useLanguage();
-  const { currentUser, allUsers, switchUser } = useUserSession();
+  const { currentUser, allUsers, switchUser, logout } = useUserSession();
   const [isOpen, setIsOpen] = useState(false);
   const [showPreferencesSubmenu, setShowPreferencesSubmenu] = useState(false);
   const [showSwitchUserSubmenu, setShowSwitchUserSubmenu] = useState(false);
@@ -108,6 +110,7 @@ export default function NavUser({
     setShowLogoutDialog(false);
     setIsOpen(false);
     toast.success(t('user.toast_logout'));
+    logout();
   };
 
   return (

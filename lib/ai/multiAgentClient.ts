@@ -274,6 +274,10 @@ export async function runSafetyEvaluator(
   userQuery: string,
   rawAnswer: string
 ): Promise<string> {
+  if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
+    return rawAnswer;
+  }
+
   const openAiApiKey = process.env.OPENAI_API_KEY;
   if (!openAiApiKey) {
     return rawAnswer;

@@ -8,9 +8,12 @@ export const metadata: Metadata = {
   title: 'Brilian.Ai — AI Ingestion & pgvector Knowledge Base',
   description: 'Sistem Ingestion PDF dan Basis Pengetahuan Enterprise Brilian.Ai dengan pgvector.',
   icons: {
-    icon: '/images/BrilianLogo-Close-P.svg',
-    shortcut: '/images/BrilianLogo-Close-P.svg',
-    apple: '/images/BrilianLogo-Close-P.svg',
+    icon: [
+      { url: '/favicon.png', type: 'image/png' },
+      { url: '/images/BrilianLogo-Close-P.svg', type: 'image/svg+xml' },
+    ],
+    shortcut: '/favicon.png',
+    apple: '/favicon.png',
   },
 };
 
@@ -20,8 +23,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="id">
-      <body>
+    <html lang="en" suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <LanguageProvider>
           <UserSessionProvider>
             {children}

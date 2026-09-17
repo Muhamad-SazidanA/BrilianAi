@@ -235,7 +235,7 @@ describe('AI Chatbot Service (Llama 3.2 3B & pgvector RAG)', () => {
         rowCount: 1,
       });
 
-      vi.spyOn(chatClient, 'generateChatResponse').mockResolvedValueOnce('Jawaban dari Llama 3.2');
+      vi.spyOn(chatClient, 'generateChatResponse').mockResolvedValue('Jawaban dari Llama 3.2');
 
       const req = new NextRequest('http://localhost:3000/api/chat', {
         method: 'POST',

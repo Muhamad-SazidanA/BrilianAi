@@ -83,7 +83,8 @@ describe('User Management, RBAC & Chat Audit Logs', () => {
         .mockResolvedValueOnce({ rows: [] }) // create roles
         .mockResolvedValueOnce({ rows: [] }) // insert roles
         .mockResolvedValueOnce({ rows: [] }) // create users
-        .mockResolvedValueOnce({ rows: [{ count: '1' }] }) // count check
+        .mockResolvedValueOnce({ rows: [] }) // insert superadmin
+        .mockResolvedValueOnce({ rows: [] }) // delete dummy users
         .mockResolvedValueOnce({ rows: mockUserRows }); // listUsers select
 
       const users = await listUsers();
@@ -107,10 +108,11 @@ describe('User Management, RBAC & Chat Audit Logs', () => {
       };
 
       mockPool.query
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [{ count: '5' }] })
+        .mockResolvedValueOnce({ rows: [] }) // create roles
+        .mockResolvedValueOnce({ rows: [] }) // insert roles
+        .mockResolvedValueOnce({ rows: [] }) // create users
+        .mockResolvedValueOnce({ rows: [] }) // insert superadmin
+        .mockResolvedValueOnce({ rows: [] }) // delete dummy users
         .mockResolvedValueOnce({ rows: [mockCreatedRow] }) // INSERT
         .mockResolvedValueOnce({
           rows: [
@@ -135,12 +137,78 @@ describe('User Management, RBAC & Chat Audit Logs', () => {
       expect(user.role_id).toBe('editor');
     });
 
+    it('should support creating user with pending_approval status and updating upon approval', async () => {
+      const pendingId = 'u-pending-1';
+      const mockPendingRow = {
+        id: pendingId,
+        name: 'Google User',
+        email: 'user@gmail.com',
+        role_id: 'member',
+        department: 'Google Account',
+        status: 'pending_approval',
+        avatar_color: '#2563EB',
+      };
+
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [mockPendingRow] }) // INSERT
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              ...mockPendingRow,
+              role_name: 'Member / Viewer',
+              role_permissions: ['chat:query'],
+              question_count: '0',
+            },
+          ],
+        }); // getUserById
+
+      const user = await createUser({
+        name: 'Google User',
+        email: 'user@gmail.com',
+        role_id: 'member',
+        department: 'Google Account',
+        status: 'pending_approval',
+      });
+
+      expect(user.status).toBe('pending_approval');
+
+      // Now approve: update status to active and role to editor
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [{ ...mockPendingRow, status: 'active', role_id: 'editor' }] }) // UPDATE
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              ...mockPendingRow,
+              status: 'active',
+              role_id: 'editor',
+              role_name: 'Knowledge Editor',
+              role_permissions: ['documents:upload'],
+              question_count: '0',
+            },
+          ],
+        }); // getUserById
+
+      const approved = await updateUser(pendingId, {
+        status: 'active',
+        role_id: 'editor',
+      });
+
+      expect(approved?.status).toBe('active');
+      expect(approved?.role_id).toBe('editor');
+    });
+
     it('should prevent deleting the primary system Super Admin', async () => {
       mockPool.query
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [{ count: '5' }] });
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] });
 
       await expect(deleteUser('a0000000-0000-0000-0000-000000000001')).rejects.toThrow(
         'Akun Super Administrator utama sistem tidak dapat dihapus'
@@ -154,18 +222,18 @@ describe('User Management, RBAC & Chat Audit Logs', () => {
         {
           id: 'admin',
           name: 'Super Administrator',
-          description: 'Full access',
+          description: 'Akses penuh',
           is_system: true,
-          permissions: ['documents:read', 'users:manage'],
+          permissions: ['users:manage', 'documents:delete'],
           user_count: '2',
         },
         {
           id: 'member',
-          name: 'Member',
-          description: 'Read only',
+          name: 'Viewer',
+          description: 'Akses baca',
           is_system: true,
           permissions: ['documents:read'],
-          user_count: '10',
+          user_count: '3',
         },
       ];
 
@@ -173,7 +241,8 @@ describe('User Management, RBAC & Chat Audit Logs', () => {
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [{ count: '5' }] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: mockRoles });
 
       const roles = await listRoles();

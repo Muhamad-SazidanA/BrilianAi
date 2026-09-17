@@ -1,8 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
-  Bot,
   Plus,
   Download,
   Pencil,
@@ -14,12 +13,13 @@ import {
   AlertCircle,
   FileSpreadsheet,
   Sparkles,
-  RefreshCw,
 } from 'lucide-react';
 import { CuratedInsightItem } from '@/types/curation';
 import InsightEditorModal from './InsightEditorModal';
 import MarkdownContent from '@/components/ui/MarkdownContent';
+import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import { useLanguage } from '@/context/LanguageContext';
+import { useUserSession } from '@/context/UserSessionContext';
 import { toast } from 'sonner';
 
 function formatSourcePages(sourcePages?: string, pageLabel: string = 'Halaman'): string {
@@ -43,6 +43,7 @@ interface CurationProgressState {
 interface CuratedInsightsTabProps {
   batchId: string;
   insights: CuratedInsightItem[];
+  totalChunks?: number;
   isLoading: boolean;
   onRefresh: () => Promise<void>;
 }
@@ -50,15 +51,19 @@ interface CuratedInsightsTabProps {
 export default function CuratedInsightsTab({
   batchId,
   insights,
+  totalChunks = 0,
   isLoading,
   onRefresh,
 }: CuratedInsightsTabProps) {
   const { language, t } = useLanguage();
+  const { hasPermission } = useUserSession();
   const [isCurating, setIsCurating] = useState(false);
   const [editingInsight, setEditingInsight] = useState<CuratedInsightItem | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [progress, setProgress] = useState<CurationProgressState | null>(null);
+  const [deletingInsightId, setDeletingInsightId] = useState<number | string | null>(null);
+  const [isDeletingInsight, setIsDeletingInsight] = useState(false);
 
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -78,7 +83,13 @@ export default function CuratedInsightsTab({
       const data: CurationProgressState = await res.json();
       setProgress(data);
 
-      if (data.status === 'completed' || (data.totalChunks > 0 && data.curatedChunks >= data.totalChunks)) {
+      const targetTotal = totalChunks || data.totalChunks || 0;
+      const processedCount = data.processedChunks ?? data.curatedChunks ?? 0;
+      const isCompleted =
+        (data.status === 'completed' && targetTotal > 0 && processedCount >= targetTotal) ||
+        (targetTotal > 0 && processedCount >= targetTotal);
+
+      if (isCompleted) {
         stopPolling();
         setIsCurating(false);
         await onRefresh();
@@ -86,12 +97,24 @@ export default function CuratedInsightsTab({
           type: 'success',
           text:
             language === 'en'
-              ? `AI Curation 100% completed! ${data.curatedChunks} chunks successfully processed.`
-              : `Kurasi AI 100% selesai! ${data.curatedChunks} chunk berhasil diproses menjadi insight.`,
+              ? `AI Curation 100% completed! ${processedCount} chunks successfully processed.`
+              : `Kurasi AI 100% selesai! ${processedCount} chunk berhasil diproses menjadi insight.`,
         });
         toast.success(
           language === 'en' ? 'AI curation completed 100%!' : 'Kurasi AI selesai 100%!'
         );
+      } else if (data.status === 'idle') {
+        stopPolling();
+        setIsCurating(false);
+        await onRefresh();
+        const donePct = targetTotal > 0 ? Math.round((processedCount / targetTotal) * 100) : (data.currentPercent ?? 0);
+        setFeedbackMsg({
+          type: 'success',
+          text:
+            language === 'en'
+              ? `Curation batch completed (${donePct}%). ${processedCount} of ${targetTotal} chunks processed.`
+              : `Kurasi batch selesai (${donePct}%). ${processedCount} dari ${targetTotal} chunk berhasil diproses.`,
+        });
       } else if (data.status === 'error') {
         stopPolling();
         setIsCurating(false);
@@ -103,7 +126,7 @@ export default function CuratedInsightsTab({
     } catch {
       // ignore network errors during poll
     }
-  }, [batchId, language, onRefresh, stopPolling]);
+  }, [batchId, totalChunks, language, onRefresh, stopPolling]);
 
   // Check initial progress status on mount
   useEffect(() => {
@@ -220,41 +243,34 @@ export default function CuratedInsightsTab({
     );
   };
 
-  // Delete
+  // Delete modal triggers
   const handleDeleteInsight = (insightId: number | string) => {
-    toast.warning(language === 'en' ? 'Delete this curated insight?' : 'Hapus insight kurasi ini?', {
-      description:
-        language === 'en'
-          ? 'This insight will be permanently removed from curated knowledge.'
-          : 'Insight ini akan dihapus permanen dari ringkasan kurasi.',
-      duration: 8000,
-      action: {
-        label: language === 'en' ? 'Delete' : 'Hapus',
-        onClick: () => {
-          toast.promise(
-            async () => {
-              const res = await fetch(`/api/documents/${batchId}/curate/${insightId}`, {
-                method: 'DELETE',
-              });
-              if (!res.ok) {
-                const errData = await res.json().catch(() => ({}));
-                throw new Error(errData.error || (language === 'en' ? 'Failed to delete insight' : 'Gagal menghapus insight'));
-              }
-              await onRefresh();
-            },
-            {
-              loading: language === 'en' ? 'Deleting insight...' : 'Menghapus insight...',
-              success: language === 'en' ? 'Curated insight deleted' : 'Insight kurasi berhasil dihapus',
-              error: (err) => err.message,
-            }
-          );
-        },
-      },
-      cancel: {
-        label: language === 'en' ? 'Cancel' : 'Batal',
-        onClick: () => {},
-      },
-    });
+    setDeletingInsightId(insightId);
+  };
+
+  const handleConfirmDeleteInsight = async () => {
+    if (!deletingInsightId) return;
+    setIsDeletingInsight(true);
+    try {
+      const res = await fetch(`/api/documents/${batchId}/curate/${deletingInsightId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(
+          errData.error || (language === 'en' ? 'Failed to delete insight' : 'Gagal menghapus insight')
+        );
+      }
+      setDeletingInsightId(null);
+      await onRefresh();
+      toast.success(
+        language === 'en' ? 'Curated insight deleted successfully' : 'Insight kurasi berhasil dihapus'
+      );
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal menghapus insight');
+    } finally {
+      setIsDeletingInsight(false);
+    }
   };
 
   // Export
@@ -263,8 +279,20 @@ export default function CuratedInsightsTab({
     window.open(`/api/documents/${batchId}/export?format=${format}`, '_blank');
   };
 
-  const isUncurated = insights.length === 0;
-  const currentPercent = progress?.currentPercent ?? (isUncurated ? 0 : 100);
+  // Unique processed raw chunks derived from active curated insights
+  const processedChunkIds = useMemo(() => {
+    return new Set(
+      insights.map((i) => (i.source_chunk_id ? String(i.source_chunk_id) : null)).filter(Boolean)
+    );
+  }, [insights]);
+
+  const targetTotal = totalChunks || progress?.totalChunks || 0;
+  const processedCount = isCurating && progress?.processedChunks
+    ? Math.max(progress.processedChunks, processedChunkIds.size)
+    : processedChunkIds.size;
+  const isCompleted = targetTotal > 0 && processedCount >= targetTotal;
+  const pct = targetTotal > 0 ? Math.min(100, Math.round((processedCount / targetTotal) * 100)) : (insights.length > 0 ? 100 : 0);
+  const currentPercent = isCurating ? (progress?.currentPercent ?? pct) : pct;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -277,11 +305,7 @@ export default function CuratedInsightsTab({
                 Curated Insights ({insights.length})
               </h3>
               {(() => {
-                const total = progress?.totalChunks || 0;
-                const processed = progress?.processedChunks || 0;
-                const isCompleted = total > 0 && processed >= total;
-
-                if (isCompleted || (!isUncurated && insights.length > 0 && isCompleted)) {
+                if (isCompleted) {
                   return (
                     <span className="badge badge-success" style={{ fontSize: '11px', fontWeight: 600 }}>
                       100% Terkurasi ({insights.length} Insight)
@@ -289,8 +313,7 @@ export default function CuratedInsightsTab({
                   );
                 }
 
-                if (processed > 0 && total > 0) {
-                  const pct = Math.round((processed / total) * 100);
+                if (processedCount > 0 && targetTotal > 0) {
                   return (
                     <span className="badge badge-warning" style={{ fontSize: '11px', fontWeight: 600 }}>
                       {pct}% ({insights.length} Insight)
@@ -298,7 +321,7 @@ export default function CuratedInsightsTab({
                   );
                 }
 
-                if (!isUncurated) {
+                if (insights.length > 0) {
                   return (
                     <span className="badge badge-success" style={{ fontSize: '11px', fontWeight: 600 }}>
                       Terkurasi ({insights.length} Insight)
@@ -344,34 +367,44 @@ export default function CuratedInsightsTab({
               <FileSpreadsheet size={14} />
               <span>{t('curate.export_csv')}</span>
             </button>
-            <button
-              onClick={() => {
-                setEditingInsight(null);
-                setIsModalOpen(true);
-              }}
-              className="btn btn-outline btn-sm"
-            >
-              <Plus size={14} />
-              <span>{t('curate.add_manual')}</span>
-            </button>
-            <button
-              onClick={handleStartCuration}
-              disabled={isCurating}
-              className="btn btn-primary btn-sm"
-              style={{ fontWeight: 600 }}
-            >
-              {isCurating ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  <span>Memproses ({currentPercent}%)...</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles size={14} />
-                  <span>{insights.length === 0 ? 'Mulai Kurasi AI' : 'Kurasi Ulang AI'}</span>
-                </>
-              )}
-            </button>
+            {hasPermission('curation:edit') && (
+              <button
+                onClick={() => {
+                  setEditingInsight(null);
+                  setIsModalOpen(true);
+                }}
+                className="btn btn-outline btn-sm"
+              >
+                <Plus size={14} />
+                <span>{t('curate.add_manual')}</span>
+              </button>
+            )}
+            {hasPermission('curation:trigger') && (
+              <button
+                onClick={handleStartCuration}
+                disabled={isCurating}
+                className="btn btn-primary btn-sm"
+                style={{ fontWeight: 600 }}
+              >
+                {isCurating ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Memproses ({currentPercent}%)...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={14} />
+                    <span>
+                      {insights.length === 0
+                        ? (language === 'en' ? 'Start AI Curation' : 'Mulai Kurasi AI')
+                        : isCompleted
+                        ? (language === 'en' ? 'Re-curate AI' : 'Kurasi Ulang AI')
+                        : (language === 'en' ? `Continue AI Curation (${pct}%)` : `Lanjutkan Kurasi AI (${pct}%)`)}
+                    </span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
 
@@ -490,7 +523,7 @@ export default function CuratedInsightsTab({
       )}
 
       {/* Uncurated Callout Banner (jika belum dikurasi dan tidak sedang loading) */}
-      {!isCurating && isUncurated && !isLoading && (
+      {!isCurating && insights.length === 0 && !isLoading && (
         <div
           className="ui-card"
           style={{
@@ -530,14 +563,16 @@ export default function CuratedInsightsTab({
             </p>
           </div>
 
-          <button
-            onClick={handleStartCuration}
-            className="btn btn-primary"
-            style={{ marginTop: '6px', padding: '10px 22px', fontSize: '14px', fontWeight: 700 }}
-          >
-            <Sparkles size={16} />
-            <span>{language === 'en' ? 'Start AI Curation (1-100%)' : 'Mulai Kurasi AI Sekarang'}</span>
-          </button>
+          {hasPermission('curation:trigger') && (
+            <button
+              onClick={handleStartCuration}
+              className="btn btn-primary"
+              style={{ marginTop: '6px', padding: '10px 22px', fontSize: '14px', fontWeight: 700 }}
+            >
+              <Sparkles size={16} />
+              <span>{language === 'en' ? 'Start AI Curation (1-100%)' : 'Mulai Kurasi AI Sekarang'}</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -588,25 +623,29 @@ export default function CuratedInsightsTab({
                     </h4>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                    <button
-                      onClick={() => {
-                        setEditingInsight(item);
-                        setIsModalOpen(true);
-                      }}
-                      className="btn btn-ghost btn-sm"
-                      style={{ padding: '6px' }}
-                      title="Edit insight"
-                    >
-                      <Pencil size={14} />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteInsight(item.id)}
-                      className="btn btn-ghost-danger btn-sm"
-                      style={{ padding: '6px' }}
-                      title="Hapus insight"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    {hasPermission('curation:edit') && (
+                      <button
+                        onClick={() => {
+                          setEditingInsight(item);
+                          setIsModalOpen(true);
+                        }}
+                        className="btn btn-ghost btn-sm"
+                        style={{ padding: '6px' }}
+                        title="Edit insight"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                    )}
+                    {hasPermission('curation:delete') && (
+                      <button
+                        onClick={() => handleDeleteInsight(item.id)}
+                        className="btn btn-ghost-danger btn-sm"
+                        style={{ padding: '6px' }}
+                        title="Hapus insight"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -657,6 +696,25 @@ export default function CuratedInsightsTab({
           setEditingInsight(null);
         }}
         onSave={handleSaveInsight}
+      />
+
+      {/* Confirmation Modal for Insight Deletion */}
+      <ConfirmationModal
+        isOpen={deletingInsightId !== null}
+        onClose={() => {
+          if (!isDeletingInsight) setDeletingInsightId(null);
+        }}
+        onConfirm={handleConfirmDeleteInsight}
+        isLoading={isDeletingInsight}
+        title={language === 'en' ? 'Delete Curated Insight?' : 'Hapus Insight Kurasi?'}
+        description={
+          language === 'en'
+            ? 'Are you sure you want to delete this curated insight? It will be permanently removed from the curated knowledge repository.'
+            : 'Apakah Anda yakin ingin menghapus insight kurasi ini? Catatan intisari ini akan dihapus permanen dari basis pengetahuan terverifikasi.'
+        }
+        confirmLabel={language === 'en' ? 'Yes, Delete Insight' : 'Ya, Hapus Insight'}
+        cancelLabel={language === 'en' ? 'Cancel' : 'Batal'}
+        variant="danger"
       />
     </div>
   );

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import {
   FileText,
   BookOpen,
@@ -12,7 +12,6 @@ import {
   ArrowLeft,
   CheckCircle2,
   XCircle,
-  Download,
 } from 'lucide-react';
 import AppShell from '@/components/layout/AppShell';
 import CuratedInsightsTab from '@/components/studio/CuratedInsightsTab';
@@ -21,12 +20,13 @@ import MetadataTab from '@/components/studio/MetadataTab';
 import { UploadBatch, DocumentChunk } from '@/types/document';
 import { CuratedInsightItem } from '@/types/curation';
 import { useLanguage } from '@/context/LanguageContext';
+import { useUserSession } from '@/context/UserSessionContext';
 import { toast } from 'sonner';
 
 export default function DocumentStudioPage() {
   const { language, t } = useLanguage();
+  const { hasPermission } = useUserSession();
   const params = useParams();
-  const router = useRouter();
   const batchId = params.id as string;
 
   const [activeTab, setActiveTab] = useState<'insights' | 'chunks' | 'metadata'>('insights');
@@ -115,18 +115,32 @@ export default function DocumentStudioPage() {
 
   return (
     <AppShell
+      requiredPermission="documents:read"
       title={batch ? `Studio: ${batch.original_filename}` : t('studio.title')}
       subtitle={t('studio.subtitle')}
       actions={
         <div style={{ display: 'flex', gap: '8px' }}>
-          <Link href="/documents" className="btn btn-outline btn-sm">
-            <ArrowLeft size={14} />
-            <span>{t('studio.back_to_docs')}</span>
-          </Link>
-          <Link href="/chat" className="btn btn-primary btn-sm">
-            <MessageSquare size={14} />
-            <span>{t('studio.ask_doc')}</span>
-          </Link>
+          {hasPermission('documents:read') && (
+            <Link href="/documents" className="btn btn-outline btn-sm">
+              <ArrowLeft size={14} />
+              <span>{t('studio.back_to_docs')}</span>
+            </Link>
+          )}
+          {hasPermission('chat:query') && (
+            <Link
+              href={
+                batch
+                  ? `/chat?q=${encodeURIComponent(
+                      `Tolong jelaskan ringkasan dan intisari penting dari dokumen "${batch.original_filename}"`
+                    )}`
+                  : '/chat'
+              }
+              className="btn btn-primary btn-sm"
+            >
+              <MessageSquare size={14} />
+              <span>{t('studio.ask_doc')}</span>
+            </Link>
+          )}
         </div>
       }
     >
@@ -278,29 +292,31 @@ export default function DocumentStudioPage() {
                     )}
                   </div>
 
-                  <button
-                    onClick={handleToggleActive}
-                    className={`btn btn-xs ${batch.is_active_knowledge ? 'btn-ghost-danger' : 'btn-outline'}`}
-                    style={{
-                      padding: '3px 10px',
-                      fontSize: '11.5px',
-                      borderRadius: 'var(--radius-xs)',
-                      fontWeight: 600,
-                    }}
-                    title="Klik untuk mengubah status dokumen dalam basis pencarian RAG Chat"
-                  >
-                    {batch.is_active_knowledge ? (
-                      <>
-                        <XCircle size={12} />
-                        <span>Nonaktifkan dari Chat</span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 size={12} />
-                        <span>Aktifkan untuk Chat</span>
-                      </>
-                    )}
-                  </button>
+                  {hasPermission('documents:toggle_active') && (
+                    <button
+                      onClick={handleToggleActive}
+                      className={`btn btn-xs ${batch.is_active_knowledge ? 'btn-ghost-danger' : 'btn-outline'}`}
+                      style={{
+                        padding: '3px 10px',
+                        fontSize: '11.5px',
+                        borderRadius: 'var(--radius-xs)',
+                        fontWeight: 600,
+                      }}
+                      title="Klik untuk mengubah status dokumen dalam basis pencarian RAG Chat"
+                    >
+                      {batch.is_active_knowledge ? (
+                        <>
+                          <XCircle size={12} />
+                          <span>Nonaktifkan dari Chat</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 size={12} />
+                          <span>Aktifkan untuk Chat</span>
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -350,6 +366,7 @@ export default function DocumentStudioPage() {
           <CuratedInsightsTab
             batchId={batchId}
             insights={insights}
+            totalChunks={chunks.length || batch?.chunk_count || 0}
             isLoading={isLoading}
             onRefresh={loadDocumentData}
           />

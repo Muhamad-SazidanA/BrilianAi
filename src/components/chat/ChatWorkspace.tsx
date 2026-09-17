@@ -1,14 +1,17 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Plus,
   ArrowUp,
   Mic,
   Loader2,
   RefreshCw,
+  Share2,
+  LogIn,
 } from 'lucide-react';
+
 import {
   ChatMessage,
   ChatSource,
@@ -21,11 +24,28 @@ import CitationDrawer from './CitationDrawer';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserSession } from '@/context/UserSessionContext';
 import { toast } from 'sonner';
+import { generateSessionTitle } from '@lib/chat/sessionTitleHelper';
 
-export default function ChatWorkspace() {
+interface ChatWorkspaceProps {
+  /** UUID sesi dari URL /chat/w/[uuid]. Jika undefined, workspace dalam mode idle. */
+  sessionId?: string;
+  /** NanoID sesi publik dari /share/w/[shareId] */
+  shareId?: string;
+  /** Mode read-only (tamu / belum login) */
+  isPublicShare?: boolean;
+}
+
+export default function ChatWorkspace({
+  sessionId,
+  shareId,
+  isPublicShare = false,
+}: ChatWorkspaceProps) {
+
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { language, t } = useLanguage();
-  const { currentUser } = useUserSession();
+  const { currentUser, hasPermission, isLoading: isUserLoading } = useUserSession();
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputQuery, setInputQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -33,15 +53,224 @@ export default function ChatWorkspace() {
   const [allowPublicKnowledge, setAllowPublicKnowledge] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isRestored, setIsRestored] = useState(false);
+  const [sessionTitle, setSessionTitle] = useState('Chat Baru');
+  const [loadedSessionId, setLoadedSessionId] = useState<string | null>(
+    sessionId ? null : 'idle'
+  );
+  const [sessionLoadError, setSessionLoadError] = useState<string | null>(null);
+  const [lastSharedMessageId, setLastSharedMessageId] = useState<string | null>(null);
+  const [sharedMeta, setSharedMeta] = useState<{
+    userId?: string | null;
+    sessionId?: string | null;
+    title?: string;
+  } | null>(null);
+
+  const isGuestOnShare = Boolean(isPublicShare && !currentUser);
+
+  const handleLoginRedirect = useCallback(() => {
+    const currentPath =
+      typeof window !== 'undefined'
+        ? `${window.location.pathname}${window.location.search}`
+        : `/share/w/${shareId || ''}`;
+    router.push(`/login?redirect=${encodeURIComponent(currentPath)}`);
+  }, [router, shareId]);
+
+  const initialQueryHandledRef = useRef(false);
+
+  // Preload query from URL parameter ?q=... (e.g. from Dashboard starter cards)
+  useEffect(() => {
+    if (!initialQueryHandledRef.current && !sessionId) {
+      const q = searchParams?.get('q');
+      if (q && q.trim()) {
+        initialQueryHandledRef.current = true;
+        setInputQuery(q.trim());
+        setTimeout(() => {
+          inputRef.current?.focus();
+        }, 150);
+      }
+    }
+  }, [searchParams, sessionId]);
 
   // Citation inspection
   const [inspectingSource, setInspectingSource] = useState<ChatSource | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const sessionIdRef = useRef<string>(`sess-${Date.now()}`);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFirstMessageRef = useRef<boolean>(true);
+  const sessionIdRef = useRef<string | undefined>(sessionId);
+  const isCreatingSessionRef = useRef(false);
 
-  // Execute AI chat query and append response or create new variant on retry
+  // ── Load sesi dari DB saat sessionId atau shareId berubah ─────────
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+
+    if (!sessionId && !shareId) {
+      setMessages([]);
+      setIsRestored(true);
+      setLoadedSessionId('idle');
+      setSessionLoadError(null);
+      setSessionTitle('Chat Baru');
+      setLastSharedMessageId(null);
+      isFirstMessageRef.current = true;
+      return;
+    }
+
+    let cancelled = false;
+    setIsRestored(false);
+    setLoadedSessionId(null);
+    setSessionLoadError(null);
+    setMessages([]);
+    setSessionTitle('Chat Baru');
+    isFirstMessageRef.current = true;
+
+    async function loadData() {
+      try {
+        if (shareId) {
+          // Muat snapshot percakapan publik (tanpa autentikasi)
+          const res = await fetch(`/api/public/share/${shareId}`);
+          if (!res.ok) {
+            if (res.status === 404) {
+              toast.error('Percakapan yang dibagikan tidak ditemukan.');
+              router.push('/chat');
+              return;
+            }
+            throw new Error('Gagal memuat percakapan publik');
+          }
+          const shared = await res.json();
+          if (!cancelled) {
+            const loadedMessages: ChatMessage[] = Array.isArray(shared.messages)
+              ? shared.messages
+              : [];
+            setMessages(loadedMessages);
+            setSessionTitle(shared.title || 'Percakapan AI');
+            setLoadedSessionId(shareId);
+            setSharedMeta({
+              userId: shared.userId || null,
+              sessionId: shared.sessionId || null,
+              title: shared.title || 'Percakapan AI',
+            });
+
+            // Jika yang membuka adalah pemilik asli link share dan sudah login,
+            // langsung arahkan ke room chat aslinya (/chat/w/[sessionId])
+            if (currentUser && shared.userId && currentUser.id === shared.userId && shared.sessionId) {
+              toast.info(
+                language === 'en'
+                  ? 'Opening your original chat room...'
+                  : 'Membuka room chat asli Anda...'
+              );
+              router.replace(`/chat/w/${shared.sessionId}`);
+              return;
+            }
+          }
+        } else if (sessionId) {
+          // Muat sesi percakapan private
+          const res = await fetch(`/api/chat-sessions/${sessionId}`);
+          if (!res.ok) {
+            if (res.status === 404 || res.status === 403) {
+              toast.error('Sesi chat tidak ditemukan atau akses ditolak.');
+              router.push('/chat');
+              return;
+            }
+            throw new Error('Gagal memuat sesi');
+          }
+          const session = await res.json();
+          if (!cancelled) {
+            const loadedMessages: ChatMessage[] = Array.isArray(session.messages)
+              ? session.messages
+              : [];
+            setMessages(loadedMessages);
+            setSessionTitle(session.title || 'Chat Baru');
+            setLastSharedMessageId(session.last_shared_message_id || null);
+            // If session has messages, first message already set title
+            if (loadedMessages.length > 0) {
+              isFirstMessageRef.current = false;
+            }
+
+            // Auto-resume unanswered question
+            const lastMsg = loadedMessages[loadedMessages.length - 1];
+            if (lastMsg && lastMsg.sender === 'user') {
+              setTimeout(() => {
+                if (!cancelled) executeAiResponse(lastMsg.text);
+              }, 120);
+            }
+            setLoadedSessionId(sessionId);
+          }
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setSessionLoadError(
+            err instanceof Error ? err.message : 'Gagal memuat sesi chat.'
+          );
+          console.warn('[ChatWorkspace] loadData error:', err);
+        }
+      } finally {
+        if (!cancelled) setIsRestored(true);
+      }
+    }
+
+    loadData();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, shareId, router, currentUser, language]);
+
+  // Otomatis arahkan pemilik asli ke room chat pribadinya jika sesi baru selesai dimuat
+  useEffect(() => {
+    if (shareId && sharedMeta && currentUser && !isUserLoading) {
+      if (sharedMeta.userId && currentUser.id === sharedMeta.userId && sharedMeta.sessionId) {
+        toast.info(
+          language === 'en'
+            ? 'Opening your original chat room...'
+            : 'Membuka room chat asli Anda...'
+        );
+        router.replace(`/chat/w/${sharedMeta.sessionId}`);
+      }
+    }
+  }, [shareId, sharedMeta, currentUser, isUserLoading, router, language]);
+
+  // ── Debounced DB save ─────────────────────────────────────────────
+  const scheduleSave = useCallback(
+    (updatedMessages: ChatMessage[]) => {
+      const activeSessionId = sessionIdRef.current;
+      if (!activeSessionId) return;
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(async () => {
+        try {
+          await fetch(`/api/chat-sessions/${activeSessionId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messages: updatedMessages }),
+          });
+        } catch {
+          // silent fallback
+        }
+      }, 1500);
+    },
+    []
+  );
+
+  // ── Auto-update title from first user message ─────────────────────
+  const updateSessionTitle = useCallback(
+    async (firstQuery: string) => {
+      const activeSessionId = sessionIdRef.current;
+      if (!activeSessionId) return;
+      const newTitle = generateSessionTitle(firstQuery);
+      setSessionTitle(newTitle);
+      try {
+        await fetch(`/api/chat-sessions/${activeSessionId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: newTitle }),
+        });
+      } catch {
+        // silent
+      }
+    },
+    []
+  );
+
+  // ── Execute AI query ──────────────────────────────────────────────
   const executeAiResponse = async (
     queryText: string,
     targetMessageId?: string,
@@ -49,6 +278,7 @@ export default function ChatWorkspace() {
   ) => {
     const trimmed = queryText.trim();
     if (!trimmed || isLoading) return;
+    const activeSessionId = sessionIdRef.current;
 
     setActiveQueryText(trimmed);
     setIsLoading(true);
@@ -66,7 +296,7 @@ export default function ChatWorkspace() {
               department: currentUser.department,
             }
           : undefined,
-        sessionId: sessionIdRef.current,
+        sessionId: activeSessionId || `sess-${Date.now()}`,
       };
 
       const res = await fetch('/api/chat', {
@@ -85,26 +315,20 @@ export default function ChatWorkspace() {
       const sources = data.sources || [];
       const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+      let updatedMessages: ChatMessage[] = [];
+
       if (targetMessageId) {
         // Regenerate/retry: append new variant to target message
-        setMessages((prev) =>
-          prev.map((msg) => {
+        setMessages((prev) => {
+          const next = prev.map((msg) => {
             if (msg.id !== targetMessageId) return msg;
-
             const existingVariants: ChatMessageVariant[] =
               msg.variants && msg.variants.length > 0
                 ? [...msg.variants]
                 : [{ text: msg.text, sources: msg.sources, timestamp: msg.timestamp }];
-
-            const newVariant: ChatMessageVariant = {
-              text: answerText,
-              sources,
-              timestamp,
-            };
-
+            const newVariant: ChatMessageVariant = { text: answerText, sources, timestamp };
             const updatedVariants = [...existingVariants, newVariant];
             const newIndex = updatedVariants.length - 1;
-
             return {
               ...msg,
               text: answerText,
@@ -114,20 +338,16 @@ export default function ChatWorkspace() {
               variants: updatedVariants,
               currentVariantIndex: newIndex,
             };
-          })
-        );
+          });
+          updatedMessages = next;
+          scheduleSave(next);
+          return next;
+        });
         toast.success(
-          language === 'en'
-            ? 'Regenerated new response'
-            : 'Jawaban baru berhasil dibuat'
+          language === 'en' ? 'Regenerated new response' : 'Jawaban baru berhasil dibuat'
         );
       } else {
-        const initialVariant: ChatMessageVariant = {
-          text: answerText,
-          sources,
-          timestamp,
-        };
-
+        const initialVariant: ChatMessageVariant = { text: answerText, sources, timestamp };
         const aiMessage: ChatMessage = {
           id: `ai-${Date.now()}`,
           sender: 'ai',
@@ -138,7 +358,12 @@ export default function ChatWorkspace() {
           currentVariantIndex: 0,
         };
 
-        setMessages((prev) => [...prev, aiMessage]);
+        setMessages((prev) => {
+          const next = [...prev, aiMessage];
+          updatedMessages = next;
+          scheduleSave(next);
+          return next;
+        });
       }
     } catch (err: any) {
       if (targetMessageId) {
@@ -151,7 +376,11 @@ export default function ChatWorkspace() {
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           isError: true,
         };
-        setMessages((prev) => [...prev, errorMessage]);
+        setMessages((prev) => {
+          const next = [...prev, errorMessage];
+          scheduleSave(next);
+          return next;
+        });
       }
     } finally {
       setIsLoading(false);
@@ -174,60 +403,7 @@ export default function ChatWorkspace() {
     );
   };
 
-  // Restore messages and options from sessionStorage on mount (persists across page navigation)
-  useEffect(() => {
-    try {
-      const savedMessages = sessionStorage.getItem('brilian_chat_messages');
-      if (savedMessages) {
-        const parsed = JSON.parse(savedMessages);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setMessages(parsed);
-
-          // Auto-resume: If the user navigated away while waiting for an answer,
-          // the last message will be from the user without an AI answer.
-          const lastMsg = parsed[parsed.length - 1];
-          if (lastMsg && lastMsg.sender === 'user') {
-            setTimeout(() => {
-              executeAiResponse(lastMsg.text);
-            }, 120);
-          }
-        }
-      }
-      const savedPublic = sessionStorage.getItem('brilian_chat_allow_public');
-      if (savedPublic !== null) {
-        setAllowPublicKnowledge(savedPublic === 'true');
-      }
-    } catch (err) {
-      console.warn('Failed to restore chat session:', err);
-    } finally {
-      setIsRestored(true);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Save messages to sessionStorage whenever it changes (cleared only when browser/tab is closed)
-  useEffect(() => {
-    if (!isRestored) return;
-    try {
-      if (messages.length > 0) {
-        sessionStorage.setItem('brilian_chat_messages', JSON.stringify(messages));
-      } else {
-        sessionStorage.removeItem('brilian_chat_messages');
-      }
-    } catch (err) {
-      console.warn('Failed to persist chat session:', err);
-    }
-  }, [messages, isRestored]);
-
-  // Save allowPublicKnowledge to sessionStorage
-  useEffect(() => {
-    if (!isRestored) return;
-    try {
-      sessionStorage.setItem('brilian_chat_allow_public', String(allowPublicKnowledge));
-    } catch {}
-  }, [allowPublicKnowledge, isRestored]);
-
-  // Auto scroll in conversation mode
+  // ── Auto scroll ───────────────────────────────────────────────────
   useEffect(() => {
     if (messages.length > 0) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -237,18 +413,25 @@ export default function ChatWorkspace() {
   // Focus input on load
   useEffect(() => {
     inputRef.current?.focus();
+  }, [sessionId, shareId]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
   }, []);
 
-  const promptChips = [
-    'Q4 Financial Audit',
-    'Compliance & SOC2',
-    'Curated Policies',
-  ];
+  const promptChips = ['Q4 Financial Audit', 'Compliance & SOC2', 'Curated Policies'];
 
   const handleSend = async (queryText?: string) => {
+    if (isGuestOnShare) {
+      handleLoginRedirect();
+      return;
+    }
+
     const textToSend = (queryText || inputQuery).trim();
 
-    // If input is empty, check if there is an unanswered question at the end of messages
     if (!textToSend) {
       if (messages.length > 0 && !isLoading) {
         const lastMsg = messages[messages.length - 1];
@@ -259,7 +442,7 @@ export default function ChatWorkspace() {
       return;
     }
 
-    if (isLoading) return;
+    if (isLoading || isCreatingSessionRef.current) return;
 
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
@@ -268,44 +451,161 @@ export default function ChatWorkspace() {
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    // ── Kasus 1: Memulai chat dari link share milik orang lain ──
+    // "ketika memulai chat di bawah link share maka akan membuat percakapan baru"
+    if (shareId && currentUser) {
+      isCreatingSessionRef.current = true;
+      try {
+        const forkedMessages = [...messages, userMessage];
+        const newTitle = sessionTitle || generateSessionTitle(textToSend);
+
+        const res = await fetch('/api/chat-sessions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: newTitle,
+            messages: forkedMessages,
+          }),
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.id) {
+          throw new Error(data.error || 'Gagal membuat percakapan baru');
+        }
+
+        setInputQuery('');
+        toast.success(
+          language === 'en'
+            ? 'Starting new conversation from shared chat...'
+            : 'Membuat percakapan baru dari riwayat yang dibagikan...'
+        );
+        router.replace(`/chat/w/${data.id}`);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Gagal membuat sesi chat');
+      } finally {
+        isCreatingSessionRef.current = false;
+      }
+      return;
+    }
+
+    // Lazy creation: an empty /chat route never creates a database row.
+    // The first user message is persisted atomically with its generated title.
+    if (!sessionIdRef.current) {
+      isCreatingSessionRef.current = true;
+      try {
+        const res = await fetch('/api/chat-sessions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: [userMessage] }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.id) {
+          throw new Error(data.error || 'Gagal menyimpan sesi chat');
+        }
+
+        sessionIdRef.current = data.id;
+        isFirstMessageRef.current = false;
+        setInputQuery('');
+        router.replace(`/chat/w/${data.id}`);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Gagal menyimpan sesi chat');
+      } finally {
+        isCreatingSessionRef.current = false;
+      }
+      return;
+    }
+
+    // Existing sessions only update their title when the first message is sent.
+    if (isFirstMessageRef.current) {
+      isFirstMessageRef.current = false;
+      void updateSessionTitle(textToSend);
+    }
+
+    setMessages((prev) => {
+      const next = [...prev, userMessage];
+      scheduleSave(next);
+      return next;
+    });
     setInputQuery('');
 
     await executeAiResponse(textToSend);
   };
 
-  const handleClearHistory = () => {
-    if (messages.length === 0) return;
-    toast.warning(t('chat.reset_confirm') || 'Reset sesi percakapan?', {
-      description:
+  const [isSharing, setIsSharing] = useState(false);
+
+  const handleShareConversation = async () => {
+    if (messages.length === 0 || isSharing) return;
+
+    setIsSharing(true);
+    try {
+      // Panggil backend API nyata untuk menyimpan snapshot percakapan ke shared_chats di DB
+      const res = await fetch('/api/chat/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: sessionIdRef.current,
+          title: sessionTitle,
+          messages,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.shareUrl) {
+        throw new Error(data.error || 'Gagal membuat tautan berbagi');
+      }
+
+      if (data.lastSharedMessageId) {
+        setLastSharedMessageId(data.lastSharedMessageId);
+      }
+
+      const publicShareUrl = data.shareUrl as string;
+      const previewUrl = (data.directUrl as string) || publicShareUrl;
+
+      // Salin tautan ke clipboard
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(publicShareUrl);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = publicShareUrl;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+
+      toast.success(
         language === 'en'
-          ? 'Clear chat session and return to fresh prompt stage.'
-          : 'Riwayat percakapan akan dibersihkan kembali ke tampilan awal.',
-      duration: 6000,
-      action: {
-        label: 'Reset',
-        onClick: () => {
-          setMessages([]);
-          setInputQuery('');
-          setActiveQueryText('');
-          try {
-            sessionStorage.removeItem('brilian_chat_messages');
-          } catch {}
-          toast.success(
-            language === 'en'
-              ? 'Chat session has been reset'
-              : 'Sesi percakapan telah di-reset'
-          );
-        },
-      },
-      cancel: {
-        label: language === 'en' ? 'Cancel' : 'Batal',
-        onClick: () => {},
-      },
-    });
+          ? 'Public share link copied to clipboard!'
+          : 'Tautan percakapan publik berhasil disalin!',
+        {
+          description: publicShareUrl,
+          action: {
+            label: language === 'en' ? 'Preview' : 'Lihat Hasil',
+            onClick: () => window.open(previewUrl, '_blank'),
+          },
+        }
+      );
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Gagal menyalin tautan berbagi'
+      );
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
+  const handleNewChat = async () => {
+    router.push('/chat');
   };
 
   const handleVoiceInput = () => {
+    if (isPublicShare) {
+      router.push('/login');
+      return;
+    }
+
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -333,14 +633,8 @@ export default function ChatWorkspace() {
         setIsListening(false);
       };
 
-      recognition.onerror = () => {
-        setIsListening(false);
-      };
-
-      recognition.onend = () => {
-        setIsListening(false);
-      };
-
+      recognition.onerror = () => setIsListening(false);
+      recognition.onend = () => setIsListening(false);
       recognition.start();
     } catch {
       setIsListening(false);
@@ -352,14 +646,63 @@ export default function ChatWorkspace() {
       const next = !prev;
       toast.info(
         next
-          ? (language === 'en' ? 'Model: Pro (Internal Documents + Public Knowledge)' : 'Model: Pro (Dokumen Internal + Pengetahuan Umum)')
-          : (language === 'en' ? 'Model: Pro (Strict Isolated Internal Documents)' : 'Model: Pro (Terisolasi Dokumen Internal)')
+          ? language === 'en'
+            ? 'Model: Pro (Internal Documents + Public Knowledge)'
+            : 'Model: Pro (Dokumen Internal + Pengetahuan Umum)'
+          : language === 'en'
+          ? 'Model: Pro (Strict Isolated Internal Documents)'
+          : 'Model: Pro (Terisolasi Dokumen Internal)'
       );
       return next;
     });
   };
 
   const hasMessages = messages.length > 0;
+
+  // Keep the initial assistant screen hidden until the requested session has
+  // been loaded successfully. This prevents a blank-chat flash during route
+  // transitions from the Recent list.
+  const isWorkspaceReady = (sessionId || shareId)
+    ? loadedSessionId === (sessionId || shareId)
+    : loadedSessionId === 'idle';
+
+  if (!isWorkspaceReady) {
+    return (
+      <div
+        className="chat-container-bg"
+        style={{
+          position: 'relative',
+          width: '100%',
+          height: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+        }}
+        role={sessionLoadError ? 'alert' : 'status'}
+        aria-live="polite"
+      >
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '0.75rem',
+            color: 'var(--text-secondary)',
+          }}
+        >
+          <Loader2
+            size={24}
+            strokeWidth={2}
+            style={{ animation: 'spin 1s linear infinite' }}
+          />
+          <span>
+            {sessionLoadError || 'Memuat sesi chat...'}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -373,32 +716,80 @@ export default function ChatWorkspace() {
         overflow: 'hidden',
       }}
     >
-      {/* ── 1. FLOATING TOP HEADER BAR (Mengambang tanpa Background) ─────── */}
-      <header
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          padding: '1rem 1.75rem',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          backgroundColor: 'transparent',
-          borderBottom: 'none',
-          zIndex: 30,
-          pointerEvents: 'none',
-        }}
-      >
-        {/* Left: Active Knowledge Indicator */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', pointerEvents: 'auto' }}>
-        </div>
+      {/* ── 1. FLOATING TOP HEADER BAR ──────────────────────────────── */}
+      {!isPublicShare && (
+        <header
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            padding: '1rem 1.75rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: 'transparent',
+            borderBottom: 'none',
+            zIndex: 30,
+            pointerEvents: 'none',
+          }}
+        >
+          {/* Left: Session title indicator */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', pointerEvents: 'auto' }}>
+            {hasMessages && (
+              <span
+                style={{
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  color: 'var(--text-muted)',
+                  maxWidth: '240px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+                title={sessionTitle}
+              >
+                {sessionTitle}
+              </span>
+            )}
+          </div>
 
-        {/* Right: Actions Floating Pills */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', pointerEvents: 'auto' }}>
-          {hasMessages && (
+          {/* Right: Actions */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', pointerEvents: 'auto' }}>
+            {hasMessages && (
+              <button
+                onClick={handleShareConversation}
+                disabled={isSharing}
+                className="btn btn-outline btn-sm"
+                style={{
+                  borderRadius: '9999px',
+                  padding: '6px 14px',
+                  fontSize: '12.5px',
+                  backgroundColor: 'var(--bg-card)',
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
+                  borderColor: 'var(--border-default)',
+                  color: 'var(--text-primary)',
+                  boxShadow: '0 2px 10px rgba(15, 23, 42, 0.06)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  opacity: isSharing ? 0.7 : 1,
+                  cursor: isSharing ? 'not-allowed' : 'pointer',
+                }}
+                title="Salin tautan publik percakapan ini"
+              >
+                {isSharing ? (
+                  <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+                ) : (
+                  <Share2 size={13} />
+                )}
+                <span>{isSharing ? 'Menyimpan...' : language === 'en' ? 'Share' : 'Share Conversation'}</span>
+              </button>
+            )}
+
             <button
-              onClick={handleClearHistory}
+              onClick={handleNewChat}
               className="btn btn-outline btn-sm"
               style={{
                 borderRadius: '9999px',
@@ -411,35 +802,36 @@ export default function ChatWorkspace() {
                 color: 'var(--text-primary)',
                 boxShadow: '0 2px 10px rgba(15, 23, 42, 0.06)',
               }}
-              title={t('chat.reset_btn')}
             >
-              <RefreshCw size={13} />
-              <span>{language === 'en' ? 'New Chat' : 'Percakapan Baru'}</span>
+              <Plus size={13} />
+              <span>{language === 'en' ? 'New Chat' : 'Chat Baru'}</span>
             </button>
-          )}
 
-          <button
-            onClick={() => router.push('/upload')}
-            className="btn btn-outline btn-sm"
-            style={{
-              borderRadius: '9999px',
-              padding: '6px 14px',
-              fontSize: '12.5px',
-              backgroundColor: 'var(--bg-card)',
-              backdropFilter: 'blur(12px)',
-              WebkitBackdropFilter: 'blur(12px)',
-              borderColor: 'var(--border-default)',
-              color: 'var(--text-primary)',
-              boxShadow: '0 2px 10px rgba(15, 23, 42, 0.06)',
-            }}
-          >
-            <Plus size={13} />
-            <span>{language === 'en' ? 'Upload PDF' : 'Unggah PDF'}</span>
-          </button>
-        </div>
-      </header>
+            {hasPermission('documents:upload') && (
+              <button
+                onClick={() => router.push('/upload')}
+                className="btn btn-outline btn-sm"
+                style={{
+                  borderRadius: '9999px',
+                  padding: '6px 14px',
+                  fontSize: '12.5px',
+                  backgroundColor: 'var(--bg-card)',
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
+                  borderColor: 'var(--border-default)',
+                  color: 'var(--text-primary)',
+                  boxShadow: '0 2px 10px rgba(15, 23, 42, 0.06)',
+                }}
+              >
+                <Plus size={13} />
+                <span>{language === 'en' ? 'Upload PDF' : 'Unggah PDF'}</span>
+              </button>
+            )}
+          </div>
+        </header>
+      )}
 
-      {/* ── 2. SCROLLABLE MIDDLE CONTAINER (Full Height behind Floating Header & Dock) ───── */}
+      {/* ── 2. SCROLLABLE MIDDLE CONTAINER ───────────────────────────── */}
       <div
         style={{
           width: '100%',
@@ -455,14 +847,19 @@ export default function ChatWorkspace() {
             width: '100%',
             maxWidth: '52rem',
             margin: '0 auto',
-            padding: hasMessages ? '4.75rem 1.5rem 8.5rem' : '4.5rem 1.5rem 7.5rem',
+            padding: isPublicShare
+              ? '2.25rem 1.5rem 8.5rem'
+              : hasMessages
+              ? '4.75rem 1.5rem 8.5rem'
+              : '4.5rem 1.5rem 7.5rem',
             flex: 1,
             display: 'flex',
             flexDirection: 'column',
           }}
         >
+
           {!hasMessages ? (
-            /* Center Stage Gemini Hero */
+            /* Center Stage Hero */
             <div
               style={{
                 flex: 1,
@@ -484,11 +881,13 @@ export default function ChatWorkspace() {
                     lineHeight: 1.25,
                   }}
                 >
-                  Hi Muhamad Sazidan, what&apos;s on your mind?
+                  {currentUser
+                    ? `Hi ${currentUser.name.split(' ')[0]}, what's on your mind?`
+                    : "Hi, what's on your mind?"}
                 </h1>
               </div>
 
-              {/* Minimal Suggested Query Chips */}
+              {/* Suggested Query Chips */}
               <div
                 style={{
                   display: 'flex',
@@ -514,7 +913,7 @@ export default function ChatWorkspace() {
                 ))}
               </div>
 
-              {/* Query Status Indicator Toast */}
+              {/* Loading indicator */}
               {isLoading && (
                 <div id="statusToast" style={{ marginTop: '1.5rem', textAlign: 'center' }}>
                   <div
@@ -553,26 +952,80 @@ export default function ChatWorkspace() {
             /* Active Message Stream */
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
               {messages.map((msg, idx) => (
-                <ChatMessageItem
-                  key={msg.id}
-                  message={msg}
-                  onSelectCitation={(source) => setInspectingSource(source)}
-                  onSwitchVariant={(newIndex) => handleSwitchVariant(msg.id, newIndex)}
-                  onRetry={() => {
-                    if (msg.sender === 'user') {
-                      executeAiResponse(msg.text);
-                    } else {
-                      const prevUser = [...messages.slice(0, idx)].reverse().find((m) => m.sender === 'user');
-                      if (prevUser) {
-                        executeAiResponse(prevUser.text, msg.id, true);
+                <React.Fragment key={msg.id}>
+                  <ChatMessageItem
+                    message={msg}
+                    onSelectCitation={(source) => setInspectingSource(source)}
+                    onSwitchVariant={(newIndex) => handleSwitchVariant(msg.id, newIndex)}
+                    onRetry={() => {
+                      if (isPublicShare) return;
+                      if (msg.sender === 'user') {
+                        executeAiResponse(msg.text);
+                      } else {
+                        const prevUser = [...messages.slice(0, idx)]
+                          .reverse()
+                          .find((m) => m.sender === 'user');
+                        if (prevUser) {
+                          executeAiResponse(prevUser.text, msg.id, true);
+                        }
                       }
-                    }
-                  }}
-                />
+                    }}
+                  />
+
+                  {/* Privacy Divider: Titik pemisah pesan yang telah dibagikan ke publik */}
+                  {msg.id === lastSharedMessageId && (
+                    <div
+                      key={`divider-${msg.id}`}
+                      style={{
+                        position: 'relative',
+                        margin: '1.75rem 0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        userSelect: 'none',
+                      }}
+                    >
+                      <div
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: '100%',
+                            borderTop: '1px dashed var(--border-default, rgba(148, 163, 184, 0.4))',
+                          }}
+                        />
+                      </div>
+                      <div
+                        style={{
+                          position: 'relative',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '5px 16px',
+                          borderRadius: '9999px',
+                          backgroundColor: 'var(--bg-card, #ffffff)',
+                          border: '1px solid var(--border-default, rgba(148, 163, 184, 0.3))',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          color: 'var(--text-secondary, #64748b)',
+                          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+                        }}
+                      >
+                        <Share2 style={{ width: '13px', height: '13px', opacity: 0.8 }} />
+                        <span>Messages beyond this point are only visible to you</span>
+                      </div>
+                    </div>
+                  )}
+                </React.Fragment>
               ))}
 
-              {/* Banner jika pertanyaan terakhir belum dijawab (misal akibat pindah page) */}
-              {hasMessages && messages[messages.length - 1].sender === 'user' && !isLoading && (
+              {/* Unanswered question banner */}
+              {hasMessages && messages[messages.length - 1].sender === 'user' && !isLoading && !isPublicShare && (
                 <div
                   style={{
                     display: 'inline-flex',
@@ -644,7 +1097,7 @@ export default function ChatWorkspace() {
         </div>
       </div>
 
-      {/* ── 3. FLOATING BOTTOM DOCK (Mengambang tanpa Background Container) ─────── */}
+      {/* ── 3. FLOATING BOTTOM DOCK ───────────────────────────────────── */}
       <div
         style={{
           position: 'absolute',
@@ -670,23 +1123,56 @@ export default function ChatWorkspace() {
             pointerEvents: 'auto',
           }}
         >
-          {/* Centered Pill Capsule Search Prompt Bar */}
-          <div className="chat-pill-bar">
-            {/* Input Query Field */}
+          {/* Pill Capsule Input Bar */}
+          <div
+            className="chat-pill-bar"
+            onClick={() => {
+              if (isGuestOnShare) {
+                handleLoginRedirect();
+              }
+            }}
+            style={isGuestOnShare ? { cursor: 'pointer' } : undefined}
+          >
             <input
               ref={inputRef}
               autoComplete="off"
               id="promptInput"
               type="text"
+              readOnly={isGuestOnShare}
               value={inputQuery}
-              onChange={(e) => setInputQuery(e.target.value)}
+              onChange={(e) => {
+                if (isGuestOnShare) {
+                  handleLoginRedirect();
+                  return;
+                }
+                setInputQuery(e.target.value);
+              }}
+              onFocus={() => {
+                if (isGuestOnShare) {
+                  handleLoginRedirect();
+                }
+              }}
               onKeyDown={(e) => {
+                if (isGuestOnShare) {
+                  handleLoginRedirect();
+                  return;
+                }
                 if (e.key === 'Enter') {
                   e.preventDefault();
                   handleSend();
                 }
               }}
-              placeholder="Ask Apps Brilian RAG..."
+              placeholder={
+                isGuestOnShare
+                  ? (language === 'en'
+                      ? 'This shared conversation is read-only. Log in to chat...'
+                      : 'Percakapan ini dibagikan (Read-only). Masuk untuk mulai chat...')
+                  : isPublicShare
+                  ? (language === 'en'
+                      ? 'Continue this conversation with Apps Brilian...'
+                      : 'Lanjutkan percakapan ini dengan Apps Brilian...')
+                  : 'Ask Apps Brilian RAG...'
+              }
               style={{
                 width: '100%',
                 backgroundColor: 'transparent',
@@ -696,42 +1182,52 @@ export default function ChatWorkspace() {
                 fontSize: '15.5px',
                 padding: '0 14px',
                 fontWeight: 400,
+                cursor: isGuestOnShare ? 'pointer' : 'text',
               }}
             />
 
-            {/* Right Trailing Controls */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-              {/* Voice Input Icon */}
-              <button
-                type="button"
-                onClick={handleVoiceInput}
-                aria-label="Use microphone"
-                title={isListening ? 'Mendengarkan...' : 'Gunakan Mikrofon'}
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderRadius: '50%',
-                  color: isListening ? 'var(--color-primary)' : 'var(--text-muted)',
-                  border: 'none',
-                  backgroundColor: isListening ? 'var(--color-primary-subtle)' : 'transparent',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
-                className="hover:bg-slate-100 dark:hover:bg-slate-800"
-              >
-                <Mic size={19} />
-              </button>
+              {/* Voice Input Icon (only in active workspace) */}
+              {!isPublicShare && (
+                <button
+                  type="button"
+                  onClick={handleVoiceInput}
+                  aria-label="Use microphone"
+                  title={isListening ? 'Mendengarkan...' : 'Gunakan Mikrofon'}
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '50%',
+                    color: isListening ? 'var(--color-primary)' : 'var(--text-muted)',
+                    border: 'none',
+                    backgroundColor: isListening ? 'var(--color-primary-subtle)' : 'transparent',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                  className="hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  <Mic size={19} />
+                </button>
+              )}
 
-              {/* Submit Button */}
+              {/* Circular Action Button: LogIn icon in guest mode, ArrowUp send icon in active chat */}
               <button
                 type="button"
                 id="sendBtn"
-                onClick={() => handleSend()}
-                disabled={isLoading || !inputQuery.trim()}
-                aria-label="Submit query"
+                onClick={(e) => {
+                  if (isGuestOnShare) {
+                    e.stopPropagation();
+                    handleLoginRedirect();
+                    return;
+                  }
+                  handleSend();
+                }}
+                disabled={!isGuestOnShare && (isLoading || !inputQuery.trim())}
+                aria-label={isGuestOnShare ? 'Log in to chat' : 'Submit query'}
+                title={isGuestOnShare ? (language === 'en' ? 'Log in to chat' : 'Masuk untuk mulai chat') : undefined}
                 style={{
                   width: '36px',
                   height: '36px',
@@ -742,13 +1238,15 @@ export default function ChatWorkspace() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   border: 'none',
-                  cursor: isLoading || !inputQuery.trim() ? 'not-allowed' : 'pointer',
-                  opacity: isLoading || !inputQuery.trim() ? 0.6 : 1,
+                  cursor: 'pointer',
+                  opacity: !isGuestOnShare && (isLoading || !inputQuery.trim()) ? 0.6 : 1,
                   boxShadow: '0 2px 8px rgba(37, 99, 235, 0.3)',
                   transition: 'all 0.15s ease',
                 }}
               >
-                {isLoading ? (
+                {isGuestOnShare ? (
+                  <LogIn size={17} strokeWidth={2.2} />
+                ) : isLoading ? (
                   <Loader2 size={17} className="animate-spin" />
                 ) : (
                   <ArrowUp size={18} strokeWidth={2.5} />
@@ -757,7 +1255,9 @@ export default function ChatWorkspace() {
             </div>
           </div>
 
-          {/* Ultra-Minimal Single Line Disclaimer Footer */}
+
+
+          {/* Disclaimer */}
           <p
             style={{
               fontSize: '12px',
@@ -772,7 +1272,7 @@ export default function ChatWorkspace() {
         </div>
       </div>
 
-      {/* ── Citation Inspector Drawer ──────────────────────────────── */}
+      {/* ── Citation Inspector Drawer ────────────────────────────────── */}
       <CitationDrawer
         source={inspectingSource}
         isOpen={!!inspectingSource}

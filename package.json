@@ -9,6 +9,7 @@
     "lint": "next lint",
     "test": "vitest",
     "db:migrate": "node scripts/migrate.js",
+    "db:seed-demo-users": "node scripts/seed-demo-users.js",
     "verify:vision": "node scripts/verify-vision.mjs",
     "verify:db": "node scripts/verify-db-vector.mjs"
   },

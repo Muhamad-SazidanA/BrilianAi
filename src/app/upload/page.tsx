@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { CheckCircle2, ArrowRight, FileText, Layers, ExternalLink } from 'lucide-react';
+import { CheckCircle2, ArrowRight } from 'lucide-react';
 import AppShell from '@/components/layout/AppShell';
 import Dropzone from '@/components/upload/Dropzone';
 import PipelineStepper from '@/components/upload/PipelineStepper';
@@ -39,7 +38,6 @@ const INITIAL_STEPS: PipelineStep[] = [
 ];
 
 export default function UploadPage() {
-  const router = useRouter();
   const { language, t } = useLanguage();
   const [steps, setSteps] = useState<PipelineStep[]>(INITIAL_STEPS);
   const [isUploading, setIsUploading] = useState(false);
@@ -190,6 +188,7 @@ export default function UploadPage() {
 
   return (
     <AppShell
+      requiredPermission="documents:upload"
       title={t('upload.title')}
       subtitle={t('upload.subtitle')}
     >

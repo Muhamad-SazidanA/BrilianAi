@@ -46,3 +46,15 @@ export interface ChatResponsePayload {
   retrievedCount: number;
   error?: string;
 }
+
+export interface ChatSession {
+  id: string;
+  user_id: string;
+  title: string;
+  is_pinned: boolean;
+  last_shared_message_id?: string | null;
+  messages: ChatMessage[];
+  created_at: string;
+  updated_at: string;
+}
+

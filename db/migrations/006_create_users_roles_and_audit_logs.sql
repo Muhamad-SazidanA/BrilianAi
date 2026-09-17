@@ -60,58 +60,18 @@ CREATE INDEX IF NOT EXISTS idx_users_role_id ON users (role_id);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
 CREATE INDEX IF NOT EXISTS idx_users_status ON users (status);
 
--- Seed Initial Enterprise Users
+-- Seed Initial Super Admin User
 INSERT INTO users (id, name, email, role_id, status, department, avatar_color, last_login_at)
 VALUES
     (
         'a0000000-0000-0000-0000-000000000001',
-        'Muhammad Sazidan',
-        'admin@brilian.ai',
+        'Super Admin',
+        'superadmin@brilian.ai',
         'admin',
         'active',
-        'IT & Architecture',
+        'System Administration',
         '#2563EB',
         now()
-    ),
-    (
-        'a0000000-0000-0000-0000-000000000002',
-        'Budi Pratama',
-        'budi.editor@brilian.ai',
-        'editor',
-        'active',
-        'Clinical & Research',
-        '#10B981',
-        now() - INTERVAL '2 hours'
-    ),
-    (
-        'a0000000-0000-0000-0000-000000000003',
-        'Siti Rahmawati',
-        'siti.member@brilian.ai',
-        'member',
-        'active',
-        'Medical Staff',
-        '#8B5CF6',
-        now() - INTERVAL '5 hours'
-    ),
-    (
-        'a0000000-0000-0000-0000-000000000004',
-        'Ahmad Fauzi',
-        'ahmad.fauzi@brilian.ai',
-        'member',
-        'active',
-        'Compliance & Audit',
-        '#F59E0B',
-        now() - INTERVAL '1 day'
-    ),
-    (
-        'a0000000-0000-0000-0000-000000000005',
-        'Rian Hidayat',
-        'rian.inactive@brilian.ai',
-        'member',
-        'inactive',
-        'Internship',
-        '#6B7280',
-        now() - INTERVAL '7 days'
     )
 ON CONFLICT (email) DO NOTHING;
 

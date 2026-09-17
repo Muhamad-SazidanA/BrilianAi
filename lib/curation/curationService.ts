@@ -392,7 +392,20 @@ export async function curateAllChunks(
 
   activeCurationBatches.add(batchId);
 
-  // Inisialisasi status progres
+  // Segera set state running agar caller/polling tidak membaca cache stale status 'completed'
+  progressMap.set(batchId, {
+    batchId,
+    totalChunks: 0,
+    processedChunks: 0,
+    curatedChunks: 0,
+    curatedInsightsCount: 0,
+    currentPercent: 0,
+    status: 'running',
+    currentChunkTitle: 'Menyiapkan proses kurasi...',
+    updatedAt: Date.now(),
+  });
+
+  // Inisialisasi status progres aktual dari database
   const rawChunks = await listChunks(batchId);
   const initialInsights = await listCuratedInsights(batchId);
   const totalChunks = rawChunks.length;
@@ -472,16 +485,24 @@ export async function curateAllChunks(
     await deduplicateCuratedInsights(batchId);
     const finalInsights = await listCuratedInsights(batchId);
 
-    // Selesai 100%
+    const finalProcessedChunkIds = new Set(
+      finalInsights
+        .map((i) => (i.source_chunk_id ? String(i.source_chunk_id) : null))
+        .filter(Boolean)
+    );
+    const finalProcessedChunks = finalProcessedChunkIds.size;
+    const isCompleted = totalChunks > 0 && finalProcessedChunks >= totalChunks;
+    const finalPercent = totalChunks > 0 ? Math.min(100, Math.round((finalProcessedChunks / totalChunks) * 100)) : 100;
+
     progressMap.set(batchId, {
       batchId,
       totalChunks,
-      processedChunks: totalChunks,
-      curatedChunks: totalChunks,
+      processedChunks: finalProcessedChunks,
+      curatedChunks: finalProcessedChunks,
       curatedInsightsCount: finalInsights.length,
-      currentPercent: 100,
-      status: 'completed',
-      currentChunkTitle: 'Kurasi AI selesai 100%',
+      currentPercent: isCompleted ? 100 : finalPercent,
+      status: isCompleted ? 'completed' : 'idle',
+      currentChunkTitle: isCompleted ? 'Kurasi AI selesai 100%' : `Kurasi selesai (${finalPercent}%)`,
       updatedAt: Date.now(),
     });
   } catch (err: any) {

@@ -11,11 +11,12 @@ import {
   Trash2,
   ExternalLink,
   RefreshCw,
-  Layers,
+  MessageSquare,
 } from 'lucide-react';
 import { UploadBatch } from '@/types/document';
 import RenameModal from './RenameModal';
 import { useLanguage } from '@/context/LanguageContext';
+import { useUserSession } from '@/context/UserSessionContext';
 
 interface DocumentTableProps {
   batches: UploadBatch[];
@@ -37,6 +38,7 @@ export default function DocumentTable({
   onActivateAll,
 }: DocumentTableProps) {
   const { language, t } = useLanguage();
+  const { hasPermission } = useUserSession();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterActive, setFilterActive] = useState<'all' | 'active' | 'inactive'>('all');
   const [selectedForRename, setSelectedForRename] = useState<UploadBatch | null>(null);
@@ -127,7 +129,7 @@ export default function DocumentTable({
 
           {/* Action Group: Activate All & Refresh */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {onActivateAll && inactiveCount > 0 && (
+            {onActivateAll && inactiveCount > 0 && hasPermission('documents:toggle_active') && (
               <button
                 onClick={async () => {
                   setIsActivatingAll(true);
@@ -406,35 +408,47 @@ export default function DocumentTable({
                           )}
 
                           {/* Explicit Action Button */}
-                          <button
-                            onClick={() => onToggleActive(batch.id, !batch.is_active_knowledge)}
-                            className={`btn btn-xs ${batch.is_active_knowledge ? 'btn-ghost-danger' : 'btn-outline'}`}
-                            style={{
-                              padding: '2px 8px',
-                              fontSize: '11px',
-                              borderRadius: 'var(--radius-xs)',
-                              fontWeight: 600,
-                            }}
-                            title={t('table.toggle_tooltip')}
-                          >
-                            {batch.is_active_knowledge ? (
-                              <>
-                                <XCircle size={11} />
-                                <span>{t('table.action_deactivate')}</span>
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle2 size={11} />
-                                <span>{t('table.action_activate')}</span>
-                              </>
-                            )}
-                          </button>
+                          {hasPermission('documents:toggle_active') && (
+                            <button
+                              onClick={() => onToggleActive(batch.id, !batch.is_active_knowledge)}
+                              className={`btn btn-xs ${batch.is_active_knowledge ? 'btn-ghost-danger' : 'btn-outline'}`}
+                              style={{
+                                padding: '2px 8px',
+                                fontSize: '11px',
+                                borderRadius: 'var(--radius-xs)',
+                                fontWeight: 600,
+                              }}
+                              title={t('table.toggle_tooltip')}
+                            >
+                              {batch.is_active_knowledge ? (
+                                <>
+                                  <XCircle size={11} />
+                                  <span>{t('table.action_deactivate')}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle2 size={11} />
+                                  <span>{t('table.action_activate')}</span>
+                                </>
+                              )}
+                            </button>
+                          )}
                         </div>
                       </td>
 
                       {/* Actions */}
                       <td style={{ padding: '14px 1.5rem', textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          {hasPermission('chat:query') && (
+                            <Link
+                              href={`/chat?q=${encodeURIComponent(`Tolong jelaskan intisari dan ringkasan dari dokumen "${batch.original_filename}"`)}`}
+                              className="btn btn-ghost btn-sm"
+                              title="Tanya AI seputar dokumen ini"
+                              style={{ color: 'var(--color-primary)' }}
+                            >
+                              <MessageSquare size={15} />
+                            </Link>
+                          )}
                           <Link
                             href={`/documents/${batch.id}`}
                             className="btn btn-ghost btn-sm"
@@ -442,20 +456,24 @@ export default function DocumentTable({
                           >
                             <ExternalLink size={15} />
                           </Link>
-                          <button
-                            onClick={() => setSelectedForRename(batch)}
-                            className="btn btn-ghost btn-sm"
-                            title={t('table.rename_tooltip')}
-                          >
-                            <Pencil size={14} />
-                          </button>
-                          <button
-                            onClick={() => onDelete(batch.id, batch.original_filename)}
-                            className="btn btn-ghost-danger btn-sm"
-                            title={t('table.delete_tooltip')}
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          {hasPermission('documents:upload') && (
+                            <button
+                              onClick={() => setSelectedForRename(batch)}
+                              className="btn btn-ghost btn-sm"
+                              title={t('table.rename_tooltip')}
+                            >
+                              <Pencil size={14} />
+                            </button>
+                          )}
+                          {hasPermission('documents:delete') && (
+                            <button
+                              onClick={() => onDelete(batch.id, batch.original_filename)}
+                              className="btn btn-ghost-danger btn-sm"
+                              title={t('table.delete_tooltip')}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
