@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
   authUrl.searchParams.set('response_type', 'code');
   authUrl.searchParams.set('scope', 'openid email profile');
   authUrl.searchParams.set('access_type', 'offline');
-  authUrl.searchParams.set('prompt', 'select_account');
+  authUrl.searchParams.set('prompt', 'select_account consent');
   authUrl.searchParams.set('state', state);
 
   return NextResponse.redirect(authUrl.toString());

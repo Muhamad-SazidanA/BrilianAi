@@ -101,39 +101,11 @@ function LoginForm() {
     }
   }, [searchParams]);
 
-  // Social Sign In: Google (Auto detects OAuth config or runs SSO demo)
-  const handleGoogleSignIn = async () => {
+  // Social Sign In: Google (Redirects to real Google OAuth 2.0 flow)
+  const handleGoogleSignIn = () => {
     setIsSubmitting(true);
-    toast.info('Connecting to Google Workspace SSO...');
-    try {
-      // 1. Check if Google OAuth 2.0 is configured in .env
-      const checkRes = await fetch('/api/auth/google?check=1');
-      if (checkRes.ok) {
-        const checkData = await checkRes.json();
-        if (checkData.configured) {
-          // Direct user to real Google OAuth screen
-          window.location.href = `/api/auth/google?redirect=${encodeURIComponent(redirectUrl)}`;
-          return;
-        }
-      }
-
-      // 2. Fallback if credentials not yet configured in .env: sign in as Super Admin
-      toast.info('Google OAuth belum disetup di .env. Menggunakan mode Super Admin SSO...');
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'superadmin@brilian.ai', isSso: true }),
-      });
-      const data = await res.json();
-      if (data.user) {
-        loginUser(data.user);
-        toast.success(`Signed in with Google as ${data.user.name}`);
-        window.location.href = redirectUrl;
-      }
-    } catch {
-      toast.error('Failed to sign in with Google SSO');
-      setIsSubmitting(false);
-    }
+    toast.info('Menghubungkan ke Google OAuth...');
+    window.location.href = `/api/auth/google?redirect=${encodeURIComponent(redirectUrl)}`;
   };
 
   // Passkey Sign In
