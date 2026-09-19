@@ -38,7 +38,24 @@ export async function POST(request: NextRequest) {
       maxRetries: 5,
     });
 
-    const origin = request.nextUrl.origin || process.env.NEXT_PUBLIC_APP_URL || '';
+    const host =
+      request.headers.get('x-forwarded-host') ||
+      request.headers.get('host') ||
+      '';
+    const proto =
+      request.headers.get('x-forwarded-proto') ||
+      (host.includes('localhost') ? 'http' : 'https');
+
+    let origin = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || '').trim().replace(/\/+$/, '');
+    if (!origin || origin.includes('0.0.0.0')) {
+      if (host && !host.includes('0.0.0.0')) {
+        origin = `${proto}://${host}`;
+      } else {
+        origin = request.nextUrl.origin.replace('0.0.0.0', 'localhost');
+      }
+    }
+    origin = origin.replace(/\/+$/, '');
+
     const publicShareUrl = `${origin}/share/w/${record.share_id}`;
     const directUrl = `/share/w/${record.share_id}`;
 

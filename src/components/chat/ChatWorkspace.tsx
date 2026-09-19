@@ -10,6 +10,10 @@ import {
   RefreshCw,
   Share2,
   LogIn,
+  Copy,
+  Check,
+  ExternalLink,
+  X,
 } from 'lucide-react';
 
 import {
@@ -58,6 +62,8 @@ export default function ChatWorkspace({
   );
   const [sessionLoadError, setSessionLoadError] = useState<string | null>(null);
   const [lastSharedMessageId, setLastSharedMessageId] = useState<string | null>(null);
+  const [shareModalUrl, setShareModalUrl] = useState<string | null>(null);
+  const [hasCopiedShareUrl, setHasCopiedShareUrl] = useState(false);
   const [sharedMeta, setSharedMeta] = useState<{
     userId?: string | null;
     sessionId?: string | null;
@@ -529,32 +535,45 @@ export default function ChatWorkspace({
         setLastSharedMessageId(data.lastSharedMessageId);
       }
 
-      const publicShareUrl = data.shareUrl as string;
-      const previewUrl = (data.directUrl as string) || publicShareUrl;
+      // Pastikan URL selalu menggunakan domain browser (contoh: https://brilian.uti.co.id)
+      const currentOrigin =
+        typeof window !== 'undefined' && window.location.origin && !window.location.origin.includes('0.0.0.0')
+          ? window.location.origin
+          : (data.shareUrl ? data.shareUrl.replace(/\/share\/w\/.*$/, '') : '');
+      const publicShareUrl = `${currentOrigin}/share/w/${data.shareId}`;
 
       // Salin tautan ke clipboard
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(publicShareUrl);
-      } else {
-        const textarea = document.createElement('textarea');
-        textarea.value = publicShareUrl;
-        textarea.style.position = 'fixed';
-        textarea.style.opacity = '0';
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(publicShareUrl);
+        } else {
+          const textarea = document.createElement('textarea');
+          textarea.value = publicShareUrl;
+          textarea.style.position = 'fixed';
+          textarea.style.opacity = '0';
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textarea);
+        }
+      } catch {
+        // silent fallback
       }
+
+      // Buka modal dialog share berisi link & tombol copy
+      setShareModalUrl(publicShareUrl);
+      setHasCopiedShareUrl(true);
+      setTimeout(() => setHasCopiedShareUrl(false), 2500);
 
       toast.success(
         language === 'en'
-          ? 'Public share link copied to clipboard!'
+          ? 'Public share link created and copied!'
           : 'Tautan percakapan publik berhasil disalin!',
         {
           description: publicShareUrl,
           action: {
-            label: language === 'en' ? 'Preview' : 'Lihat Hasil',
-            onClick: () => window.open(previewUrl, '_blank'),
+            label: language === 'en' ? 'Open Link' : 'Buka Link',
+            onClick: () => window.open(publicShareUrl, '_blank'),
           },
         }
       );
@@ -1192,6 +1211,162 @@ export default function ChatWorkspace({
         isOpen={!!inspectingSource}
         onClose={() => setInspectingSource(null)}
       />
+
+      {/* ── Share Link Modal Dialog ──────────────────────────────────── */}
+      {shareModalUrl && (
+        <div
+          onClick={() => setShareModalUrl(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.45)',
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: 'var(--bg-card, #ffffff)',
+              borderRadius: '16px',
+              maxWidth: '520px',
+              width: '100%',
+              padding: '24px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+              border: '1px solid var(--border-default, #e2e8f0)',
+              position: 'relative',
+            }}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '10px',
+                    backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                    color: '#2563EB',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Share2 size={18} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary, #0f172a)', margin: 0 }}>
+                    {language === 'en' ? 'Share link to Chat' : 'Bagikan Tautan Percakapan'}
+                  </h3>
+                  <p style={{ fontSize: '13px', color: 'var(--text-secondary, #64748b)', margin: '2px 0 0' }}>
+                    {language === 'en'
+                      ? 'Anyone with this link will be able to view this conversation.'
+                      : 'Siapa saja yang memiliki link ini dapat melihat percakapan ini.'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShareModalUrl(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-muted, #94a3b8)',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Link Input & Actions */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginTop: '18px',
+                backgroundColor: 'var(--bg-app, #f8fafc)',
+                border: '1px solid var(--border-default, #cbd5e1)',
+                borderRadius: '10px',
+                padding: '6px 8px 6px 12px',
+              }}
+            >
+              <input
+                type="text"
+                readOnly
+                value={shareModalUrl}
+                onClick={(e) => (e.target as HTMLInputElement).select()}
+                style={{
+                  flex: 1,
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  fontSize: '13px',
+                  color: 'var(--text-primary, #0f172a)',
+                  fontFamily: 'monospace',
+                }}
+              />
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(shareModalUrl);
+                    setHasCopiedShareUrl(true);
+                    setTimeout(() => setHasCopiedShareUrl(false), 2000);
+                    toast.success(language === 'en' ? 'Link copied!' : 'Tautan berhasil disalin!');
+                  } catch {
+                    toast.error('Gagal menyalin tautan');
+                  }
+                }}
+                className="btn btn-primary btn-sm"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  borderRadius: '8px',
+                  padding: '6px 14px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {hasCopiedShareUrl ? <Check size={14} /> : <Copy size={14} />}
+                <span>{hasCopiedShareUrl ? (language === 'en' ? 'Copied!' : 'Tersalin!') : (language === 'en' ? 'Copy Link' : 'Salin Link')}</span>
+              </button>
+              <a
+                href={shareModalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-outline btn-sm"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  borderRadius: '8px',
+                  padding: '6px 10px',
+                  fontSize: '13px',
+                  color: 'var(--text-secondary, #64748b)',
+                  textDecoration: 'none',
+                }}
+                title={language === 'en' ? 'Open link in new tab' : 'Buka link di tab baru'}
+              >
+                <ExternalLink size={14} />
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
