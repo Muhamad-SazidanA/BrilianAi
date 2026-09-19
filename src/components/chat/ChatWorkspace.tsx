@@ -356,6 +356,8 @@ export default function ChatWorkspace({
     }
   };
 
+  executeAiResponseRef.current = executeAiResponse;
+
   const handleSwitchVariant = (messageId: string, newIndex: number) => {
     setMessages((prev) =>
       prev.map((msg) => {
@@ -424,8 +426,10 @@ export default function ChatWorkspace({
     // "ketika memulai chat di bawah link share maka akan membuat percakapan baru"
     if (shareId && currentUser) {
       isCreatingSessionRef.current = true;
+      const forkedMessages = [...messages, userMessage];
+      setMessages(forkedMessages);
+      setInputQuery('');
       try {
-        const forkedMessages = [...messages, userMessage];
         const newTitle = sessionTitle || generateSessionTitle(textToSend);
 
         const res = await fetch('/api/chat-sessions', {
@@ -442,13 +446,9 @@ export default function ChatWorkspace({
           throw new Error(data.error || 'Gagal membuat percakapan baru');
         }
 
-        setInputQuery('');
-        toast.success(
-          language === 'en'
-            ? 'Starting new conversation from shared chat...'
-            : 'Membuat percakapan baru dari riwayat yang dibagikan...'
-        );
-        router.replace(`/chat/w/${data.id}`);
+        sessionIdRef.current = data.id;
+        window.history.replaceState(null, '', `/chat/w/${data.id}`);
+        await executeAiResponse(textToSend);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Gagal membuat sesi chat');
       } finally {
@@ -461,6 +461,8 @@ export default function ChatWorkspace({
     // The first user message is persisted atomically with its generated title.
     if (!sessionIdRef.current) {
       isCreatingSessionRef.current = true;
+      setMessages([userMessage]);
+      setInputQuery('');
       try {
         const res = await fetch('/api/chat-sessions', {
           method: 'POST',
@@ -474,8 +476,8 @@ export default function ChatWorkspace({
 
         sessionIdRef.current = data.id;
         isFirstMessageRef.current = false;
-        setInputQuery('');
-        router.replace(`/chat/w/${data.id}`);
+        window.history.replaceState(null, '', `/chat/w/${data.id}`);
+        await executeAiResponse(textToSend);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Gagal menyimpan sesi chat');
       } finally {
@@ -976,47 +978,6 @@ export default function ChatWorkspace({
                   )}
                 </React.Fragment>
               ))}
-
-              {/* Unanswered question banner */}
-              {hasMessages && messages[messages.length - 1].sender === 'user' && !isLoading && !isPublicShare && (
-                <div
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    margin: '0.25rem 0 1.25rem',
-                    padding: '8px 14px',
-                    borderRadius: 'var(--radius-sm)',
-                    backgroundColor: 'var(--bg-subtle)',
-                    border: '1px dashed var(--border-default)',
-                    fontSize: '13px',
-                    color: 'var(--text-secondary)',
-                    width: 'fit-content',
-                  }}
-                >
-                  <span>
-                    {language === 'en'
-                      ? 'Question waiting for answer:'
-                      : 'Pertanyaan ini belum terjawab:'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => executeAiResponse(messages[messages.length - 1].text)}
-                    className="btn btn-primary btn-sm"
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      padding: '4px 12px',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                    }}
-                  >
-                    <RefreshCw size={13} />
-                    <span>{language === 'en' ? 'Get Answer' : 'Jawab Sekarang'}</span>
-                  </button>
-                </div>
-              )}
 
               {isLoading && (
                 <div

@@ -1,5 +1,5 @@
 const { Client } = require('pg');
-try { require('dotenv').config(); } catch {}
+try { require('dotenv').config(); } catch { }
 const { getConnectionString } = require('./get-db-url');
 
 async function init() {
