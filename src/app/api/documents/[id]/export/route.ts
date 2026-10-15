@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listChunks, listCuratedInsights, listBatches } from '@lib/db/vectorStore';
+import { getAuthenticatedUser, canUserAccessDocument } from '@lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,8 +10,16 @@ export async function GET(
 ) {
   try {
     const { id } = params;
+    const user = await getAuthenticatedUser(request);
     const batches = await listBatches();
     const batch = batches.find((b) => b.id === id);
+
+    if (batch && batch.classification && !canUserAccessDocument(user, batch)) {
+      return NextResponse.json(
+        { error: 'Dokumen tidak ditemukan atau akses ditolak.' },
+        { status: 404 }
+      );
+    }
 
     const rawChunks = await listChunks(id);
     const curatedInsights = await listCuratedInsights(id);

@@ -12,11 +12,14 @@ import {
   ArrowLeft,
   CheckCircle2,
   XCircle,
+  Lock,
+  Users,
 } from 'lucide-react';
 import AppShell from '@/components/layout/AppShell';
 import CuratedInsightsTab from '@/components/studio/CuratedInsightsTab';
 import RawChunksTab from '@/components/studio/RawChunksTab';
 import MetadataTab from '@/components/studio/MetadataTab';
+import DocumentGrantsTab from '@/components/studio/DocumentGrantsTab';
 import { UploadBatch, DocumentChunk } from '@/types/document';
 import { CuratedInsightItem } from '@/types/curation';
 import { useLanguage } from '@/context/LanguageContext';
@@ -29,7 +32,7 @@ export default function DocumentStudioPage() {
   const params = useParams();
   const batchId = params.id as string;
 
-  const [activeTab, setActiveTab] = useState<'insights' | 'chunks' | 'metadata'>('insights');
+  const [activeTab, setActiveTab] = useState<'insights' | 'chunks' | 'metadata' | 'grants'>('insights');
   const [batch, setBatch] = useState<UploadBatch | null>(null);
   const [chunks, setChunks] = useState<DocumentChunk[]>([]);
   const [insights, setInsights] = useState<CuratedInsightItem[]>([]);
@@ -39,13 +42,18 @@ export default function DocumentStudioPage() {
   const loadDocumentData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // 1. Fetch batches to find current batch
-      const batchesRes = await fetch('/api/documents');
-      if (batchesRes.ok) {
-        const allBatches: UploadBatch[] = await batchesRes.json();
-        const current = allBatches.find((b) => b.id === batchId) || null;
-        setBatch(current);
+      // 1. Fetch current batch directly via /api/documents/${batchId} (ABAC validated)
+      const batchRes = await fetch(`/api/documents/${batchId}`);
+      if (!batchRes.ok) {
+        setBatch(null);
+        setChunks([]);
+        setInsights([]);
+        setIsLoading(false);
+        return;
       }
+
+      const current: UploadBatch = await batchRes.json();
+      setBatch(current);
 
       // 2. Fetch Chunks and Curated Insights in parallel
       const [chunksRes, insightsRes] = await Promise.all([
@@ -55,12 +63,12 @@ export default function DocumentStudioPage() {
 
       if (chunksRes.ok) {
         const chunksData = await chunksRes.json();
-        setChunks(chunksData);
+        setChunks(Array.isArray(chunksData) ? chunksData : []);
       }
 
       if (insightsRes.ok) {
         const insightsData = await insightsRes.json();
-        setInsights(insightsData);
+        setInsights(Array.isArray(insightsData) ? insightsData : []);
       }
     } catch (err) {
       console.error('Error loading document studio data:', err);
@@ -112,6 +120,48 @@ export default function DocumentStudioPage() {
       }
     );
   };
+
+  if (!isLoading && !batch) {
+    return (
+      <AppShell requiredPermission="documents:read">
+        <div
+          className="ui-card"
+          style={{
+            maxWidth: '520px',
+            margin: '5rem auto',
+            padding: '2.5rem 2rem',
+            textAlign: 'center',
+            borderRadius: 'var(--radius-xl)',
+          }}
+        >
+          <div
+            style={{
+              width: '50px',
+              height: '50px',
+              borderRadius: '50%',
+              backgroundColor: 'var(--bg-subtle)',
+              color: 'var(--text-secondary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1.25rem',
+            }}
+          >
+            <Lock size={24} />
+          </div>
+          <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
+            Dokumen Tidak Ditemukan atau Akses Dibatasi
+          </h2>
+          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '20px', marginBottom: '1.75rem' }}>
+            Dokumen ini tidak tersedia atau memiliki klasifikasi kerahasiaan / divisi di luar izin akun Anda.
+          </p>
+          <Link href="/documents" className="btn btn-primary btn-md">
+            Kembali ke Knowledge Base
+          </Link>
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell
@@ -169,12 +219,41 @@ export default function DocumentStudioPage() {
                   <h2 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
                     {batch.original_filename}
                   </h2>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                    <span className="font-mono" style={{ color: 'var(--text-muted)' }}>ID: {batch.id}</span>
-                    <span>·</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '5px', flexWrap: 'wrap' }}>
                     <span className="badge badge-neutral font-mono">{batch.page_count} {t('studio.pages')}</span>
-                    <span>·</span>
                     <span className="badge badge-accent font-mono">{batch.chunk_count} {t('studio.chunks')}</span>
+                    <span
+                      className={`badge ${
+                        batch.classification === 'Publik'
+                          ? 'badge-success'
+                          : batch.classification === 'Rahasia'
+                          ? 'badge-warning'
+                          : batch.classification === 'Sangat Rahasia'
+                          ? 'badge-danger'
+                          : 'badge-neutral'
+                      }`}
+                      style={{ fontSize: '11px', fontWeight: 600 }}
+                    >
+                      {batch.classification || 'Internal'}
+                    </span>
+                    <span className="badge badge-neutral" style={{ fontSize: '11px' }}>
+                      {batch.division_id || 'General'}
+                    </span>
+                    <span className="badge badge-neutral font-mono" style={{ fontSize: '11px' }}>
+                      v{batch.version || '1.0'}
+                    </span>
+                    <span
+                      className={`badge ${
+                        batch.status === 'Aktif'
+                          ? 'badge-success'
+                          : batch.status === 'Review'
+                          ? 'badge-warning'
+                          : 'badge-neutral'
+                      }`}
+                      style={{ fontSize: '11px', fontWeight: 600 }}
+                    >
+                      {batch.status || (batch.is_active_knowledge ? 'Aktif' : 'Draft')}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -359,6 +438,15 @@ export default function DocumentStudioPage() {
             <Info size={15} />
             <span>{t('studio.tab_metadata')}</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('grants')}
+            className={`btn btn-sm ${activeTab === 'grants' ? 'btn-primary' : 'btn-ghost'}`}
+            style={{ borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0', padding: '8px 16px' }}
+          >
+            <Users size={15} />
+            <span>Akses Pengguna</span>
+          </button>
         </div>
 
         {/* Tab Content Panes */}
@@ -382,7 +470,18 @@ export default function DocumentStudioPage() {
         )}
 
         {activeTab === 'metadata' && (
-          <MetadataTab batch={batch} chunks={chunks} />
+          <MetadataTab
+            batch={batch}
+            chunks={chunks}
+            onBatchUpdated={(updated) => setBatch(updated)}
+          />
+        )}
+
+        {activeTab === 'grants' && (
+          <DocumentGrantsTab
+            batchId={batchId}
+            batchTitle={batch?.original_filename}
+          />
         )}
       </div>
     </AppShell>

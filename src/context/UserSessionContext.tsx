@@ -71,6 +71,15 @@ export function UserSessionProvider({ children }: { children: React.ReactNode })
             localStorage.setItem('brilian_active_user_id', userRecord.id);
             localStorage.setItem('brilian_user_status', userRecord.status || 'active');
           } catch {}
+        } else {
+          setCurrentUser(null);
+          try {
+            localStorage.removeItem('brilian_active_user_id');
+            localStorage.removeItem('brilian_user_status');
+            document.cookie = 'brilian_active_user_id=; path=/; max-age=0; SameSite=Lax';
+            document.cookie = 'brilian_user_status=; path=/; max-age=0; SameSite=Lax';
+            document.cookie = 'brilian_chat_access=; path=/; max-age=0; SameSite=Lax';
+          } catch {}
         }
       } else {
         // Not authenticated or session invalid: clean stale cookies & storage

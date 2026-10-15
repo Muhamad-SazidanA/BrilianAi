@@ -56,7 +56,7 @@ function PendingApprovalContent() {
           document.cookie = 'brilian_user_status=active; path=/; max-age=2592000; SameSite=Lax';
         } catch {}
         setTimeout(() => {
-          router.replace('/');
+          router.replace('/chat');
         }, 800);
       } else if (!isSilent) {
         toast.info('Akun Anda masih dalam antrean persetujuan Super Administrator.');
@@ -205,7 +205,7 @@ function PendingApprovalContent() {
           }}
         >
           {isApproved
-            ? 'Persetujuan selesai! Menyiapkan dashboard untuk Anda...'
+            ? 'Persetujuan selesai! Menyiapkan ruang chat untuk Anda...'
             : 'Akun Google Anda berhasil terdaftar dan sedang dalam antrean verifikasi Super Administrator.'}
         </p>
 

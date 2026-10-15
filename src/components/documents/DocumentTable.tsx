@@ -12,8 +12,13 @@ import {
   ExternalLink,
   RefreshCw,
   MessageSquare,
+  Shield,
+  Lock,
+  Building2,
+  Calendar,
+  Users,
 } from 'lucide-react';
-import { UploadBatch } from '@/types/document';
+import { UploadBatch, DocumentClassification, DocumentStatus } from '@/types/document';
 import RenameModal from './RenameModal';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserSession } from '@/context/UserSessionContext';
@@ -267,8 +272,52 @@ export default function DocumentTable({
                             >
                               {batch.original_filename}
                             </Link>
-                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>
-                              ID: {batch.id.substring(0, 14)}...
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap', marginTop: '4px' }}>
+                              {/* Classification Badge (ABAC) */}
+                              <span
+                                className={`badge ${
+                                  batch.classification === 'Publik'
+                                    ? 'badge-success'
+                                    : batch.classification === 'Rahasia'
+                                    ? 'badge-warning'
+                                    : batch.classification === 'Sangat Rahasia'
+                                    ? 'badge-danger'
+                                    : 'badge-neutral'
+                                }`}
+                                style={{ fontSize: '10.5px', padding: '1px 6px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                              >
+                                {batch.classification === 'Sangat Rahasia' ? <Lock size={10} /> : <Shield size={10} />}
+                                <span>{batch.classification || 'Internal'}</span>
+                              </span>
+
+                              {/* Division Tag */}
+                              <span
+                                className="badge badge-neutral"
+                                style={{ fontSize: '10.5px', padding: '1px 6px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                              >
+                                <Building2 size={10} />
+                                <span>{batch.division_id || 'General'}</span>
+                              </span>
+
+                              {/* Version Tag */}
+                              <span
+                                className="badge badge-neutral font-mono"
+                                style={{ fontSize: '10.5px', padding: '1px 6px' }}
+                              >
+                                v{batch.version || '1.0'}
+                              </span>
+
+                              {/* Explicit User Grant Badge */}
+                              {batch.has_user_grant && (
+                                <span
+                                  className="badge badge-accent"
+                                  style={{ fontSize: '10px', padding: '1px 6px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                                  title="Anda memiliki hak akses khusus ke dokumen ini"
+                                >
+                                  <Users size={10} />
+                                  <span>Akses Khusus</span>
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -364,36 +413,59 @@ export default function DocumentTable({
 
                       {/* AI Knowledge Base Toggle (Separated Status and Clear Action Button) */}
                       <td style={{ padding: '14px 1rem' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start' }}>
-                          {/* Visual Status Indicator */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', alignItems: 'flex-start' }}>
+                          {/* Lifecycle Badge */}
+                          <span
+                            className={`badge ${
+                              batch.status === 'Aktif'
+                                ? 'badge-success'
+                                : batch.status === 'Review'
+                                ? 'badge-warning'
+                                : batch.status === 'Draft'
+                                ? 'badge-neutral'
+                                : 'badge-neutral'
+                            }`}
+                            style={{ fontSize: '11px', padding: '2px 7px', fontWeight: 600 }}
+                          >
+                            {batch.status || (batch.is_active_knowledge ? 'Aktif' : 'Draft')}
+                          </span>
+
+                          {/* AI RAG Indicator */}
                           {batch.is_active_knowledge ? (
                             <span
                               style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '5px',
-                                fontSize: '11px',
-                                fontWeight: 700,
+                                gap: '4px',
+                                fontSize: '10.5px',
+                                fontWeight: 600,
                                 color: 'var(--color-success)',
-                                letterSpacing: '0.02em',
                               }}
                             >
-                              <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: 'var(--color-success)', boxShadow: '0 0 6px var(--color-success)' }} />
-                              {t('table.status_active_rag')}
+                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--color-success)' }} />
+                              RAG Aktif
                             </span>
                           ) : (
                             <span
                               style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '5px',
-                                fontSize: '11px',
-                                fontWeight: 600,
+                                gap: '4px',
+                                fontSize: '10.5px',
+                                fontWeight: 500,
                                 color: 'var(--text-muted)',
                               }}
                             >
-                              <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: 'var(--border-default)' }} />
-                              {t('table.status_standby')}
+                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--border-default)' }} />
+                              Standby
+                            </span>
+                          )}
+
+                          {/* Review due date if set */}
+                          {batch.review_due_date && (
+                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                              <Calendar size={10} />
+                              {new Date(batch.review_due_date).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' })}
                             </span>
                           )}
 
@@ -403,21 +475,22 @@ export default function DocumentTable({
                               onClick={() => onToggleActive(batch.id, !batch.is_active_knowledge)}
                               className={`btn btn-xs ${batch.is_active_knowledge ? 'btn-ghost-danger' : 'btn-outline'}`}
                               style={{
-                                padding: '2px 8px',
-                                fontSize: '11px',
+                                padding: '2px 7px',
+                                fontSize: '10.5px',
                                 borderRadius: 'var(--radius-xs)',
                                 fontWeight: 600,
+                                marginTop: '2px',
                               }}
                               title={t('table.toggle_tooltip')}
                             >
                               {batch.is_active_knowledge ? (
                                 <>
-                                  <XCircle size={11} />
+                                  <XCircle size={10} />
                                   <span>{t('table.action_deactivate')}</span>
                                 </>
                               ) : (
                                 <>
-                                  <CheckCircle2 size={11} />
+                                  <CheckCircle2 size={10} />
                                   <span>{t('table.action_activate')}</span>
                                 </>
                               )}

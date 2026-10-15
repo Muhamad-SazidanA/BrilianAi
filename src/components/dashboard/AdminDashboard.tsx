@@ -35,42 +35,41 @@ export default function AdminDashboard({
   const { hasPermission } = useUserSession();
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-      {/* ── 1. Hero Admin Overview Banner ── */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      {/* ── 1. Hero Admin Overview Banner (Clean & Slim) ── */}
       <div
         className="ui-card hero-gradient"
         style={{
-          padding: '1.75rem 2rem',
+          padding: '1.25rem 1.5rem',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: '1.5rem',
+          gap: '1.25rem',
           flexWrap: 'wrap',
-          borderRadius: 'var(--radius-xl)',
-          boxShadow: 'var(--shadow-sm)',
+          borderRadius: 'var(--radius-sm)',
           position: 'relative',
         }}
       >
         <div style={{ maxWidth: '640px', position: 'relative', zIndex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
             <span
-              className="badge badge-accent"
-              style={{ padding: '3px 10px', fontSize: '11px', fontWeight: 700 }}
+              className="badge badge-neutral"
+              style={{ padding: '2px 8px', fontSize: '11px', fontWeight: 600 }}
             >
               Konsol Operasional Sistem
             </span>
-            <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>
+            <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', fontWeight: 500 }}>
               pgvector RAG · Vision OCR · In-Memory Buffer
             </span>
           </div>
 
           <h1
             style={{
-              fontSize: '22px',
-              fontWeight: 800,
+              fontSize: '20px',
+              fontWeight: 700,
               color: 'var(--text-primary)',
-              lineHeight: '28px',
-              letterSpacing: '-0.025em',
+              lineHeight: '26px',
+              letterSpacing: '-0.02em',
             }}
           >
             Pusat Kendali & Operasional AI
@@ -109,14 +108,14 @@ export default function AdminDashboard({
           )}
 
           {hasPermission('documents:upload') && (
-            <Link href="/upload" className="btn btn-primary btn-md" style={{ padding: '10px 18px' }}>
-              <UploadCloud size={16} />
+            <Link href="/upload" className="btn btn-primary btn-sm">
+              <UploadCloud size={15} />
               <span>{t('dash.upload_new')}</span>
             </Link>
           )}
           {hasPermission('documents:read') && (
-            <Link href="/documents" className="btn btn-outline btn-md" style={{ padding: '10px 16px' }}>
-              <FolderTree size={16} />
+            <Link href="/documents" className="btn btn-outline btn-sm">
+              <FolderTree size={15} />
               <span>{t('dash.manage_docs')}</span>
             </Link>
           )}
@@ -136,7 +135,7 @@ export default function AdminDashboard({
             href="/users"
             className="ui-card ui-card-interactive"
             style={{
-              padding: '12px 16px',
+              padding: '10px 14px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -146,28 +145,29 @@ export default function AdminDashboard({
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div
                 style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: 'var(--radius-sm)',
-                  backgroundColor: 'var(--color-primary-subtle)',
-                  color: 'var(--color-primary)',
+                  width: '30px',
+                  height: '30px',
+                  borderRadius: 'var(--radius-xs)',
+                  backgroundColor: 'var(--bg-subtle)',
+                  color: 'var(--text-secondary)',
+                  border: '1px solid var(--border-subtle)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <Users size={16} />
+                <Users size={15} />
               </div>
               <div>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
                   Kelola Pengguna
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                   Akun & Persetujuan
                 </div>
               </div>
             </div>
-            <ArrowRight size={14} color="var(--text-muted)" />
+            <ArrowRight size={13} color="var(--text-muted)" />
           </Link>
         )}
 
@@ -176,7 +176,7 @@ export default function AdminDashboard({
             href="/roles"
             className="ui-card ui-card-interactive"
             style={{
-              padding: '12px 16px',
+              padding: '10px 14px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -186,28 +186,29 @@ export default function AdminDashboard({
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div
                 style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: 'var(--radius-sm)',
-                  backgroundColor: 'var(--color-success-subtle)',
-                  color: 'var(--color-success)',
+                  width: '30px',
+                  height: '30px',
+                  borderRadius: 'var(--radius-xs)',
+                  backgroundColor: 'var(--bg-subtle)',
+                  color: 'var(--text-secondary)',
+                  border: '1px solid var(--border-subtle)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <ShieldCheck size={16} />
+                <ShieldCheck size={15} />
               </div>
               <div>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
                   Role & Hak Akses
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                   Matriks Perizinan
                 </div>
               </div>
             </div>
-            <ArrowRight size={14} color="var(--text-muted)" />
+            <ArrowRight size={13} color="var(--text-muted)" />
           </Link>
         )}
 
@@ -216,7 +217,7 @@ export default function AdminDashboard({
             href="/logs"
             className="ui-card ui-card-interactive"
             style={{
-              padding: '12px 16px',
+              padding: '10px 14px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -226,28 +227,29 @@ export default function AdminDashboard({
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div
                 style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: 'var(--radius-sm)',
-                  backgroundColor: 'var(--color-warning-subtle)',
-                  color: 'var(--color-warning)',
+                  width: '30px',
+                  height: '30px',
+                  borderRadius: 'var(--radius-xs)',
+                  backgroundColor: 'var(--bg-subtle)',
+                  color: 'var(--text-secondary)',
+                  border: '1px solid var(--border-subtle)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <ScrollText size={16} />
+                <ScrollText size={15} />
               </div>
               <div>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
                   Audit Log
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                   Riwayat Pertanyaan
                 </div>
               </div>
             </div>
-            <ArrowRight size={14} color="var(--text-muted)" />
+            <ArrowRight size={13} color="var(--text-muted)" />
           </Link>
         )}
 
@@ -256,7 +258,7 @@ export default function AdminDashboard({
             href="/chat"
             className="ui-card ui-card-interactive"
             style={{
-              padding: '12px 16px',
+              padding: '10px 14px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -266,28 +268,29 @@ export default function AdminDashboard({
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div
                 style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: 'var(--radius-sm)',
+                  width: '30px',
+                  height: '30px',
+                  borderRadius: 'var(--radius-xs)',
                   backgroundColor: 'var(--bg-subtle)',
-                  color: 'var(--text-primary)',
+                  color: 'var(--text-secondary)',
+                  border: '1px solid var(--border-subtle)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <MessageSquare size={16} />
+                <MessageSquare size={15} />
               </div>
               <div>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
                   Asisten AI
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                   Workspace Chat RAG
                 </div>
               </div>
             </div>
-            <ArrowRight size={14} color="var(--text-muted)" />
+            <ArrowRight size={13} color="var(--text-muted)" />
           </Link>
         )}
       </div>

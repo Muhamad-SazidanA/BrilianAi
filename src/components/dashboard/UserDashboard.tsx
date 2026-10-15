@@ -35,8 +35,6 @@ const STARTER_PROMPTS = [
     prompt: 'Tolong ringkaskan poin-poin utama dari SOP dan panduan kerja yang terdaftar di sistem.',
     category: 'Prosedur',
     icon: FileText,
-    color: '#2563EB',
-    bgColor: '#EFF6FF',
   },
   {
     id: 'claims',
@@ -45,8 +43,6 @@ const STARTER_PROMPTS = [
     prompt: 'Bagaimana prosedur dan syarat pengajuan klaim operasional atau reimbursement yang berlaku?',
     category: 'Operasional',
     icon: Sparkles,
-    color: '#10B981',
-    bgColor: '#ECFDF5',
   },
   {
     id: 'compliance',
@@ -55,8 +51,6 @@ const STARTER_PROMPTS = [
     prompt: 'Jelaskan poin-poin regulasi dan kepatuhan yang harus dipatuhi seluruh anggota tim.',
     category: 'Kepatuhan',
     icon: CheckCircle2,
-    color: '#8B5CF6',
-    bgColor: '#F5F3FF',
   },
   {
     id: 'tech',
@@ -65,8 +59,6 @@ const STARTER_PROMPTS = [
     prompt: 'Tolong cari informasi spesifikasi teknis dan rangkuman laporan yang ada dalam arsip.',
     category: 'Teknis',
     icon: BookOpen,
-    color: '#F59E0B',
-    bgColor: '#FFFBEB',
   },
 ];
 
@@ -130,83 +122,80 @@ export default function UserDashboard({
   const roleName = currentUser?.role?.name || 'Member';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-      {/* ── 1. Personalized User Welcome Hero ── */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      {/* ── 1. Personalized User Welcome Hero (Clean & Slim) ── */}
       <div
         className="ui-card hero-gradient"
         style={{
-          padding: '2rem 2.25rem',
-          borderRadius: 'var(--radius-xl)',
+          padding: '1.25rem 1.5rem',
+          borderRadius: 'var(--radius-sm)',
           position: 'relative',
-          overflow: 'hidden',
-          boxShadow: 'var(--shadow-sm)',
         }}
       >
-        <div style={{ maxWidth: '680px', position: 'relative', zIndex: 1 }}>
+        <div style={{ maxWidth: '640px', position: 'relative', zIndex: 1 }}>
           {/* Badge line */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
             <span
-              className="badge badge-accent"
-              style={{ padding: '3px 12px', fontSize: '11px', fontWeight: 700 }}
+              className="badge badge-neutral"
+              style={{ padding: '2px 8px', fontSize: '11px', fontWeight: 600 }}
             >
               Knowledge Assistant Hub
             </span>
             <span
               className="badge badge-neutral"
-              style={{ padding: '3px 10px', fontSize: '11px', fontWeight: 600 }}
+              style={{ padding: '2px 8px', fontSize: '11px', fontWeight: 600 }}
             >
               {department}
             </span>
             <span
               style={{
                 fontSize: '11.5px',
-                color: 'var(--text-secondary)',
+                color: 'var(--text-muted)',
                 fontWeight: 500,
               }}
             >
-              Peran: {roleName}
+              · Peran: {roleName}
             </span>
           </div>
 
           <h1
             style={{
-              fontSize: 'clamp(22px, 3vw, 28px)',
-              fontWeight: 800,
+              fontSize: '20px',
+              fontWeight: 700,
               color: 'var(--text-primary)',
-              lineHeight: 1.25,
-              letterSpacing: '-0.025em',
+              lineHeight: 1.3,
+              letterSpacing: '-0.02em',
             }}
           >
-            Halo, {firstName}! 👋
+            Halo, {firstName}!
           </h1>
           <p
             style={{
-              fontSize: '14px',
+              fontSize: '13px',
               color: 'var(--text-secondary)',
-              marginTop: '8px',
-              lineHeight: '24px',
-              fontWeight: 500,
+              marginTop: '4px',
+              lineHeight: '20px',
+              fontWeight: 400,
             }}
           >
             Akses seluruh dokumen pengetahuan perusahaan yang telah terverifikasi. Tanyakan apa saja mengenai SOP, kebijakan, kontrak, dan operasional dengan presisi tinggi.
           </p>
 
-          {/* Quick Input Bar directly in Hero */}
+          {/* Quick Input Bar directly in Hero (Slim) */}
           <form
             onSubmit={handleQuickSubmit}
             style={{
-              marginTop: '1.25rem',
+              marginTop: '1rem',
               display: 'flex',
               alignItems: 'center',
-              backgroundColor: 'var(--bg-card)',
+              backgroundColor: 'var(--bg-app)',
               border: '1px solid var(--border-default)',
-              borderRadius: '9999px',
-              padding: '6px 8px 6px 18px',
-              boxShadow: 'var(--shadow-sm)',
-              maxWidth: '560px',
+              borderRadius: 'var(--radius-full)',
+              padding: '4px 6px 4px 14px',
+              maxWidth: '520px',
             }}
           >
-            <Search size={17} color="var(--text-muted)" style={{ flexShrink: 0, marginRight: '10px' }} />
+            <Search size={15} color="var(--text-muted)" style={{ flexShrink: 0, marginRight: '8px' }} />
             <input
               type="text"
               placeholder="Tanya dokumen apa saja... (contoh: Bagaimana SOP pengajuan cuti?)"
@@ -217,16 +206,16 @@ export default function UserDashboard({
                 border: 'none',
                 background: 'transparent',
                 outline: 'none',
-                fontSize: '13.5px',
+                fontSize: '13px',
                 color: 'var(--text-primary)',
               }}
             />
             <button
               type="submit"
               className="btn btn-primary btn-sm"
-              style={{ borderRadius: '9999px', padding: '7px 16px', fontSize: '13px' }}
+              style={{ borderRadius: 'var(--radius-full)', padding: '5px 14px', fontSize: '12px' }}
             >
-              <Sparkles size={14} />
+              <Sparkles size={13} />
               <span>Tanya AI</span>
             </button>
           </form>
@@ -262,173 +251,175 @@ export default function UserDashboard({
         )}
       </div>
 
-      {/* ── 2. User-Centric Stat Cards (4 Cards) ── */}
+      {/* ── 2. User-Centric Stat Cards (4 Cards - Slim & Monochromatic) ── */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: '1.25rem',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '1rem',
         }}
       >
         {/* Card 1: Dokumen Siap Diakses */}
-        <div className="ui-card ui-card-interactive" style={{ padding: '1.25rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+        <div className="ui-card ui-card-interactive" style={{ padding: '0.85rem 1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-secondary)' }}>
               Dokumen Terverifikasi
             </span>
             <div
               style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: 'var(--radius-sm)',
-                backgroundColor: 'var(--color-primary-subtle)',
-                color: 'var(--color-primary)',
+                width: '30px',
+                height: '30px',
+                borderRadius: 'var(--radius-xs)',
+                backgroundColor: 'var(--bg-subtle)',
+                color: 'var(--text-secondary)',
+                border: '1px solid var(--border-subtle)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <BookOpen size={18} />
+              <BookOpen size={15} />
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-            <span style={{ fontSize: '28px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+            <span style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
               {isLoading ? '...' : activeBatches.length}
             </span>
-            <span className="badge badge-accent" style={{ fontSize: '11px' }}>
+            <span className="badge badge-neutral" style={{ fontSize: '10.5px' }}>
               Aktif RAG
             </span>
           </div>
-          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px' }}>
+          <p style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
             {totalPages} halaman dokumen siap dianalisis
           </p>
         </div>
 
         {/* Card 2: Percakapan Saya */}
-        <div className="ui-card ui-card-interactive" style={{ padding: '1.25rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+        <div className="ui-card ui-card-interactive" style={{ padding: '0.85rem 1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-secondary)' }}>
               Sesi Percakapan Saya
             </span>
             <div
               style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: 'var(--radius-sm)',
-                backgroundColor: 'var(--color-success-subtle)',
-                color: 'var(--color-success)',
+                width: '30px',
+                height: '30px',
+                borderRadius: 'var(--radius-xs)',
+                backgroundColor: 'var(--bg-subtle)',
+                color: 'var(--text-secondary)',
+                border: '1px solid var(--border-subtle)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <MessageSquare size={18} />
+              <MessageSquare size={15} />
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-            <span style={{ fontSize: '28px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+            <span style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
               {isLoading ? '...' : sessions.length}
             </span>
-            <span className="badge badge-success" style={{ fontSize: '11px' }}>
+            <span className="badge badge-neutral" style={{ fontSize: '10.5px' }}>
               Tersimpan
             </span>
           </div>
-          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px' }}>
+          <p style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
             Riwayat sesi tanya jawab tersimpan aman
           </p>
         </div>
 
         {/* Card 3: Topik Pengetahuan */}
-        <div className="ui-card ui-card-interactive" style={{ padding: '1.25rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+        <div className="ui-card ui-card-interactive" style={{ padding: '0.85rem 1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-secondary)' }}>
               Topik & Kategori
             </span>
             <div
               style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: 'var(--radius-sm)',
-                backgroundColor: 'var(--color-warning-subtle)',
-                color: 'var(--color-warning)',
+                width: '30px',
+                height: '30px',
+                borderRadius: 'var(--radius-xs)',
+                backgroundColor: 'var(--bg-subtle)',
+                color: 'var(--text-secondary)',
+                border: '1px solid var(--border-subtle)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <Layers size={18} />
+              <Layers size={15} />
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-            <span style={{ fontSize: '28px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+            <span style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
               4+
             </span>
-            <span className="badge badge-warning" style={{ fontSize: '11px' }}>
+            <span className="badge badge-neutral" style={{ fontSize: '10.5px' }}>
               Kategori
             </span>
           </div>
-          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px' }}>
+          <p style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
             SOP, Regulasi, Kebijakan & Laporan
           </p>
         </div>
 
         {/* Card 4: Status AI Knowledge Assistant */}
-        <div className="ui-card ui-card-interactive" style={{ padding: '1.25rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+        <div className="ui-card ui-card-interactive" style={{ padding: '0.85rem 1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-secondary)' }}>
               Status AI Assistant
             </span>
             <div
               style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: 'var(--radius-sm)',
-                backgroundColor: 'var(--color-success-subtle)',
-                color: 'var(--color-success)',
+                width: '30px',
+                height: '30px',
+                borderRadius: 'var(--radius-xs)',
+                backgroundColor: 'var(--bg-subtle)',
+                color: 'var(--text-secondary)',
+                border: '1px solid var(--border-subtle)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <Sparkles size={18} />
+              <Sparkles size={15} />
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-            <span style={{ fontSize: '20px', fontWeight: 800, color: 'var(--color-success)', letterSpacing: '-0.02em' }}>
-              Online & Siap
+            <span style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+              Online
             </span>
-            <span className="badge badge-success" style={{ fontSize: '10.5px' }}>
+            <span className="badge badge-neutral" style={{ fontSize: '10.5px' }}>
               Llama-3 RAG
             </span>
           </div>
-          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px' }}>
+          <p style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
             Vision OCR & Vektor Dense 1024-dim
           </p>
         </div>
       </div>
 
-      {/* ── 3. Interactive Starter Prompts ("Inspirasi Pertanyaan") ── */}
+      {/* ── 3. Interactive Starter Prompts (Slim & Clean) ── */}
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-          <div>
-            <h2 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
-              💡 Inspirasi Pertanyaan Cepat
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Sparkles size={16} color="var(--text-secondary)" />
+            <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+              Inspirasi Pertanyaan Cepat
             </h2>
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-              Pilih topik di bawah untuk langsung menanyakan intisari dokumen ke AI Assistant:
-            </p>
           </div>
-          <Link href="/chat" className="btn btn-ghost btn-sm" style={{ gap: '4px', fontSize: '13px' }}>
+          <Link href="/chat" className="btn btn-ghost btn-sm" style={{ gap: '4px', fontSize: '12.5px' }}>
             <span>Buka Chat Workspace</span>
-            <ArrowRight size={14} />
+            <ArrowRight size={13} />
           </Link>
         </div>
 
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-            gap: '1rem',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
+            gap: '0.85rem',
           }}
         >
           {STARTER_PROMPTS.map((p) => {
@@ -440,21 +431,18 @@ export default function UserDashboard({
                 className="prompt-starter-card"
               >
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                    <div
-                      className="prompt-icon"
-                      style={{ backgroundColor: p.bgColor, color: p.color }}
-                    >
-                      <Icon size={17} />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <div className="prompt-icon">
+                      <Icon size={15} />
                     </div>
-                    <span className="badge badge-neutral" style={{ fontSize: '10.5px' }}>
+                    <span className="badge badge-neutral" style={{ fontSize: '10px' }}>
                       {p.category}
                     </span>
                   </div>
-                  <h3 style={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  <h3 style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
                     {p.title}
                   </h3>
-                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: '18px' }}>
+                  <p style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: '17px' }}>
                     {p.desc}
                   </p>
                 </div>
@@ -464,14 +452,14 @@ export default function UserDashboard({
                     display: 'flex',
                     alignItems: 'center',
                     gap: '4px',
-                    fontSize: '12px',
+                    fontSize: '11.5px',
                     fontWeight: 600,
-                    color: 'var(--color-primary)',
+                    color: 'var(--text-secondary)',
                     marginTop: '4px',
                   }}
                 >
                   <span>Tanyakan ini</span>
-                  <ArrowUpRight size={14} />
+                  <ArrowUpRight size={13} />
                 </div>
               </div>
             );
@@ -483,34 +471,34 @@ export default function UserDashboard({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 340px',
-          gap: '1.5rem',
+          gridTemplateColumns: '1fr 320px',
+          gap: '1.25rem',
           alignItems: 'start',
         }}
       >
         {/* Left Column: Active Knowledge Hub */}
-        <div className="ui-card" style={{ padding: '1.5rem' }}>
+        <div className="ui-card" style={{ padding: '1.15rem 1.25rem' }}>
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               borderBottom: '1px solid var(--border-default)',
-              paddingBottom: '1rem',
-              marginBottom: '1rem',
+              paddingBottom: '0.75rem',
+              marginBottom: '0.85rem',
             }}
           >
-            <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                📚 Dokumen Pengetahuan Terverifikasi
-              </h3>
-              <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                Arsip resmi perusahaan yang aktif menjadi basis jawaban AI Chatbot
-              </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <BookOpen size={16} color="var(--text-secondary)" />
+              <div>
+                <h3 style={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  Dokumen Pengetahuan Terverifikasi
+                </h3>
+              </div>
             </div>
-            <Link href="/documents" className="btn btn-ghost btn-sm" style={{ gap: '4px', fontSize: '13px' }}>
+            <Link href="/documents" className="btn btn-ghost btn-sm" style={{ gap: '4px', fontSize: '12px' }}>
               <span>Lihat Semua ({batches.length})</span>
-              <ArrowRight size={14} />
+              <ArrowRight size={13} />
             </Link>
           </div>
 
@@ -549,27 +537,28 @@ export default function UserDashboard({
                     key={batch.id}
                     className="knowledge-list-item"
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                       <div
                         style={{
-                          width: '36px',
-                          height: '36px',
-                          borderRadius: 'var(--radius-sm)',
-                          backgroundColor: 'var(--color-primary-subtle)',
-                          color: 'var(--color-primary)',
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: 'var(--radius-xs)',
+                          backgroundColor: 'var(--bg-subtle)',
+                          color: 'var(--text-secondary)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           flexShrink: 0,
+                          border: '1px solid var(--border-subtle)',
                         }}
                       >
-                        <FileText size={18} />
+                        <FileText size={16} />
                       </div>
                       <div style={{ minWidth: 0 }}>
                         <div
                           style={{
-                            fontSize: '13.5px',
-                            fontWeight: 700,
+                            fontSize: '13px',
+                            fontWeight: 600,
                             color: 'var(--text-primary)',
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
@@ -583,17 +572,17 @@ export default function UserDashboard({
                           style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '8px',
-                            fontSize: '11.5px',
-                            color: 'var(--text-secondary)',
+                            gap: '6px',
+                            fontSize: '11px',
+                            color: 'var(--text-muted)',
                             marginTop: '2px',
                           }}
                         >
-                          <span className="badge badge-neutral font-mono" style={{ fontSize: '10px' }}>
+                          <span className="badge badge-neutral font-mono" style={{ fontSize: '9.5px', padding: '1px 6px' }}>
                             {batch.page_count} Hal
                           </span>
                           <span>·</span>
-                          <span className="badge badge-accent font-mono" style={{ fontSize: '10px' }}>
+                          <span className="badge badge-neutral font-mono" style={{ fontSize: '9.5px', padding: '1px 6px' }}>
                             {batch.chunk_count} Chunks
                           </span>
                           <span>·</span>
@@ -715,31 +704,31 @@ export default function UserDashboard({
             )}
           </div>
 
-          {/* Smart Tips Card */}
+          {/* Smart Tips Card (Clean & Subtle) */}
           <div
             className="ui-card"
             style={{
-              padding: '1.25rem',
-              backgroundColor: 'var(--color-primary-subtle)',
-              borderColor: 'var(--color-primary-border)',
+              padding: '1rem 1.15rem',
+              backgroundColor: 'var(--bg-card)',
+              borderColor: 'var(--border-default)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-              <Lightbulb size={17} color="var(--color-primary)" />
-              <h4 style={{ fontSize: '13.5px', fontWeight: 700, color: 'var(--color-primary)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+              <Lightbulb size={15} color="var(--text-secondary)" />
+              <h4 style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
                 Tips Memaksimalkan Jawaban AI
               </h4>
             </div>
             <ul
               style={{
-                fontSize: '12px',
+                fontSize: '11.5px',
                 color: 'var(--text-secondary)',
-                lineHeight: '18px',
-                paddingLeft: '1.2rem',
+                lineHeight: '17px',
+                paddingLeft: '1.1rem',
                 margin: 0,
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '6px',
+                gap: '5px',
               }}
             >
               <li>Sebutkan nama dokumen spesifik jika ingin fokus pada berkas tertentu.</li>

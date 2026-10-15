@@ -13,24 +13,99 @@ export interface IngestJobData {
   clientId?: string;
 }
 
+import net from 'net';
+
 export function getRedisConnectionOptions() {
+  let host = 'localhost';
+  let port = 6379;
+  let username: string | undefined;
+  let password: string | undefined;
+
   if (process.env.REDIS_URL) {
-    const url = new URL(process.env.REDIS_URL);
-    return {
-      host: url.hostname || 'localhost',
-      port: parseInt(url.port || '6379', 10),
-      username: url.username || undefined,
-      password: url.password || undefined,
-      maxRetriesPerRequest: null,
-    };
+    try {
+      const url = new URL(process.env.REDIS_URL);
+      host = url.hostname || 'localhost';
+      port = parseInt(url.port || '6379', 10);
+      username = url.username || undefined;
+      password = url.password || undefined;
+    } catch {
+      // quiet fallback
+    }
+  } else {
+    host = process.env.REDIS_HOST || 'localhost';
+    port = parseInt(process.env.REDIS_PORT || '6379', 10);
+  }
+
+  // Seamlessly adapt Docker service hostname 'redis' to localhost when running on host machine
+  if (host === 'redis' && !process.env.DOCKER_CONTAINER) {
+    host = 'localhost';
   }
 
   return {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6379', 10),
+    host,
+    port,
+    username,
+    password,
     maxRetriesPerRequest: null,
   };
 }
+
+let lastRedisCheckTime = 0;
+let lastRedisCheckResult = false;
+const REDIS_CHECK_CACHE_MS = 10000; // 10 detik
+
+/**
+ * Checks if Redis server is reachable within timeoutMs to avoid blocking in-memory pipelines.
+ * Menggunakan cache 10 detik untuk menghindari TCP socket handshake berulang pada request cepat.
+ */
+export async function isRedisReachable(host: string, port: number, timeoutMs = 300): Promise<boolean> {
+  const now = Date.now();
+  if (now - lastRedisCheckTime < REDIS_CHECK_CACHE_MS) {
+    return lastRedisCheckResult;
+  }
+
+  const result = await new Promise<boolean>((resolve) => {
+    const socket = new net.Socket();
+    let isResolved = false;
+
+    socket.setTimeout(timeoutMs);
+
+    socket.on('connect', () => {
+      if (!isResolved) {
+        isResolved = true;
+        socket.destroy();
+        resolve(true);
+      }
+    });
+
+    socket.on('error', () => {
+      if (!isResolved) {
+        isResolved = true;
+        socket.destroy();
+        resolve(false);
+      }
+    });
+
+    socket.on('timeout', () => {
+      if (!isResolved) {
+        isResolved = true;
+        socket.destroy();
+        resolve(false);
+      }
+    });
+
+    try {
+      socket.connect(port, host);
+    } catch {
+      resolve(false);
+    }
+  });
+
+  lastRedisCheckTime = Date.now();
+  lastRedisCheckResult = result;
+  return result;
+}
+
 
 let queueInstance: Queue<IngestJobData, UploadResult> | null = null;
 let workerInstance: Worker<IngestJobData, UploadResult> | null = null;
@@ -107,6 +182,16 @@ export async function queuePdfIngestion(
   options?: IngestOptions,
   clientId?: string
 ): Promise<UploadResult> {
+  const connection = getRedisConnectionOptions();
+  const redisUp = await isRedisReachable(connection.host, connection.port, 600);
+
+  if (!redisUp) {
+    console.log(
+      `[IngestQueue] Redis tidak terhubung pada ${connection.host}:${connection.port}. Menjalankan ingestion langsung secara in-memory (Direct Local Mode)...`
+    );
+    return await ingestPdf(fileBuffer, filename, options, clientId);
+  }
+
   try {
     const queue = getIngestQueue();
     // Ensure worker is running to process jobs in local server lifecycle
@@ -131,3 +216,4 @@ export async function queuePdfIngestion(
     return await ingestPdf(fileBuffer, filename, options, clientId);
   }
 }
+

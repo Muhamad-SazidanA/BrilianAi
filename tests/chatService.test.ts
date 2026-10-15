@@ -30,10 +30,16 @@ vi.mock('../lib/auth/serverAuth', () => ({
     status: 'active',
   }),
   hasServerPermission: vi.fn().mockResolvedValue(true),
+  getAllowedClassificationsForRole: vi.fn().mockReturnValue(['Publik', 'Internal', 'Rahasia', 'Sangat Rahasia']),
+  canUserAccessDocument: vi.fn().mockReturnValue(true),
 }));
 
 vi.mock('../lib/db/auditLogStore', () => ({
   saveAuditLog: vi.fn().mockResolvedValue(true),
+}));
+
+vi.mock('../lib/db/documentGrantStore', () => ({
+  listUserGrantedBatchIds: vi.fn().mockResolvedValue([]),
 }));
 
 describe('AI Chatbot Service (Llama 3.2 3B & pgvector RAG)', () => {

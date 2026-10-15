@@ -3,11 +3,46 @@ import {
   deleteUploadBatch,
   updateUploadBatchFilename,
   toggleBatchKnowledgeBase,
+  updateBatchMetadata,
   listChunks,
+  getBatchById,
 } from '@lib/db/vectorStore';
 import { abortCuration } from '@lib/curation/curationService';
+import { getAuthenticatedUser, canUserAccessDocumentAsync } from '@lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = params;
+    const user = await getAuthenticatedUser(request);
+    const batch = await getBatchById(id);
+
+    if (!batch) {
+      return NextResponse.json(
+        { error: 'Dokumen tidak ditemukan atau akses ditolak.' },
+        { status: 404 }
+      );
+    }
+
+    const { canAccess, canEdit, accessLevel } = await canUserAccessDocumentAsync(user, batch);
+    if (!canAccess) {
+      return NextResponse.json(
+        { error: 'Dokumen tidak ditemukan atau akses ditolak.' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ ...batch, can_edit: canEdit, user_access_level: accessLevel }, { status: 200 });
+  } catch (error) {
+    console.error('[API /api/documents/[id] GET] Error:', error);
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
 
 export async function DELETE(
   request: NextRequest,
@@ -15,6 +50,25 @@ export async function DELETE(
 ) {
   try {
     const { id } = params;
+    const user = await getAuthenticatedUser(request);
+    const batch = await getBatchById(id);
+
+    if (!batch) {
+      return NextResponse.json(
+        { error: 'Dokumen tidak ditemukan atau sudah dihapus.' },
+        { status: 404 }
+      );
+    }
+
+    const isOwner = batch.owner_id && user?.id && batch.owner_id === user.id;
+    const isAdmin = user?.role_id === 'superadmin' || user?.role_id === 'admin';
+    if (!isOwner && !isAdmin) {
+      return NextResponse.json(
+        { error: 'Forbidden: Hanya pemilik dokumen atau administrator yang dapat menghapus dokumen.' },
+        { status: 403 }
+      );
+    }
+
     // Hentikan kurasi jika dokumen sedang diproses AI di background
     abortCuration(id);
     const success = await deleteUploadBatch(id);
@@ -46,8 +100,43 @@ export async function PATCH(
 ) {
   try {
     const { id } = params;
+    const user = await getAuthenticatedUser(request);
+    const batch = await getBatchById(id);
+
+    if (!batch) {
+      return NextResponse.json(
+        { error: 'Dokumen tidak ditemukan atau akses ditolak.' },
+        { status: 404 }
+      );
+    }
+
+    const { canEdit } = await canUserAccessDocumentAsync(user, batch);
+    if (!canEdit) {
+      return NextResponse.json(
+        { error: 'Forbidden: Anda hanya memiliki izin melihat (Viewer) untuk dokumen ini.' },
+        { status: 403 }
+      );
+    }
     const body = await request.json();
-    const { filename, isActiveKnowledge } = body;
+    const { filename, isActiveKnowledge, status, classification, divisionId, version, reviewDueDate } = body;
+
+    // 1. Update lifecycle status atau metadata ABAC jika ada
+    if (status || classification || divisionId || version || reviewDueDate !== undefined) {
+      const updated = await updateBatchMetadata(id, {
+        status,
+        classification,
+        divisionId,
+        version,
+        reviewDueDate,
+      });
+      return NextResponse.json(
+        {
+          message: 'Metadata dokumen berhasil diperbarui.',
+          data: updated,
+        },
+        { status: 200 }
+      );
+    }
 
     // 1. Aktivasi / Nonaktifkan dokumen sebagai Basis Pengetahuan AI Chatbot
     if (typeof isActiveKnowledge === 'boolean') {

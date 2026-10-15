@@ -113,11 +113,15 @@ export async function generateChatResponse(
     process.env.CHAT_MODEL ||
     'llama3.2:3b';
 
-  const baseUrl =
+  let baseUrl =
     options?.baseUrl ||
     process.env.OLLAMA_ENDPOINT ||
     process.env.OLLAMA_BASE_URL ||
     'http://localhost:11434';
+
+  if (baseUrl.includes('//ollama:') && !process.env.DOCKER_CONTAINER) {
+    baseUrl = baseUrl.replace('//ollama:', '//localhost:');
+  }
 
   const temperature = options?.temperature ?? (allowPublicKnowledge ? 0.3 : 0.0);
 

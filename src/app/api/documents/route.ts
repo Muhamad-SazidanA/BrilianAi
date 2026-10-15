@@ -1,12 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listBatches, activateAllBatches } from '@lib/db/vectorStore';
+import { getAuthenticatedUser, canUserAccessDocument } from '@lib/auth/serverAuth';
+import { listUserGrantedBatchIds } from '@lib/db/documentGrantStore';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request?: NextRequest) {
   try {
-    const batches = await listBatches();
-    return NextResponse.json(batches, { status: 200 });
+    const allBatches = await listBatches();
+    if (!request) {
+      return NextResponse.json(allBatches, { status: 200 });
+    }
+
+    const user = await getAuthenticatedUser(request);
+    const grantedBatchList = user?.id ? await listUserGrantedBatchIds(user.id) : [];
+    const grantedBatchSet = new Set(grantedBatchList);
+
+    // Enterprise ABAC + User Grant filter
+    const visibleBatches = allBatches
+      .filter((batch) => canUserAccessDocument(user, batch, grantedBatchSet))
+      .map((batch) => ({
+        ...batch,
+        has_user_grant: grantedBatchSet.has(batch.id),
+      }));
+
+    return NextResponse.json(visibleBatches, { status: 200 });
   } catch (error) {
     console.error('[API /api/documents] Error fetching batches:', error);
     const message = error instanceof Error ? error.message : 'Internal server error';

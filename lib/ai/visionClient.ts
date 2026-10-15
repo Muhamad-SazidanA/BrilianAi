@@ -33,7 +33,10 @@ export async function extractPageText(
   const geminiApiKey = process.env.GEMINI_API_KEY;
   if (!geminiApiKey) {
     const model = options?.model || process.env.VISION_MODEL_NAME || 'qwen2.5vl:3b';
-    const baseUrl = process.env.OLLAMA_ENDPOINT || process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+    let baseUrl = process.env.OLLAMA_ENDPOINT || process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+    if (baseUrl.includes('//ollama:') && !process.env.DOCKER_CONTAINER) {
+      baseUrl = baseUrl.replace('//ollama:', '//localhost:');
+    }
     const maxRetries = options?.maxRetries ?? 3;
     let attempt = 0;
     let delay = options?.initialBackoffMs ?? 1000;

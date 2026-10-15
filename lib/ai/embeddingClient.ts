@@ -5,6 +5,14 @@ export interface EmbeddingClientOptions {
   dimensions?: number;
 }
 
+// In-memory cache for query embeddings to avoid repeat embedding API round-trips
+const queryEmbeddingCache = new Map<string, number[]>();
+const MAX_QUERY_EMBED_CACHE = 1000;
+
+export function clearQueryEmbeddingCache(): void {
+  queryEmbeddingCache.clear();
+}
+
 /**
  * Agent 2: Embedding & Indexing Agent (serta Vektor Search)
  * Menghasilkan representasi vektor semantik berdimensi 1024 menggunakan
@@ -22,22 +30,37 @@ export async function embedTexts(
     return [];
   }
 
+  const model = options?.model || process.env.EMBEDDING_MODEL || 'text-embedding-3-small';
+  const dimensions = options?.dimensions || Number(process.env.EMBEDDING_DIM) || 1024;
+
+  const isSingleQuery = texts.length === 1;
+  const singleQueryText = isSingleQuery ? (texts[0] || '').trim() : '';
+  const cacheKey = `${model}:${dimensions}:${singleQueryText}`;
+
+  if (isSingleQuery && singleQueryText && queryEmbeddingCache.has(cacheKey)) {
+    return [queryEmbeddingCache.get(cacheKey)!];
+  }
+
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     try {
-      const baseUrl = process.env.OLLAMA_ENDPOINT || process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+      let baseUrl = process.env.OLLAMA_ENDPOINT || process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+      if (baseUrl.includes('//ollama:') && !process.env.DOCKER_CONTAINER) {
+        baseUrl = baseUrl.replace('//ollama:', '//localhost:');
+      }
       const client = new OllamaEmbeddings({
         model: process.env.EMBEDDING_MODEL_NAME || 'bge-m3',
         baseUrl,
       });
-      return await client.embedDocuments(texts);
+      const vectors = await client.embedDocuments(texts);
+      if (isSingleQuery && vectors[0]) {
+        queryEmbeddingCache.set(cacheKey, vectors[0]);
+      }
+      return vectors;
     } catch {
       return texts.map(() => new Array(1024).fill(0.01));
     }
   }
-
-  const model = options?.model || process.env.EMBEDDING_MODEL || 'text-embedding-3-small';
-  const dimensions = options?.dimensions || Number(process.env.EMBEDDING_DIM) || 1024;
 
   // OpenAI supports max 2048 inputs per batch
   const BATCH_SIZE = 100;
@@ -104,6 +127,14 @@ export async function embedTexts(
         }
       }
     }
+  }
+
+  if (isSingleQuery && allEmbeddings[0]) {
+    if (queryEmbeddingCache.size >= MAX_QUERY_EMBED_CACHE) {
+      const oldestKey = queryEmbeddingCache.keys().next().value;
+      if (oldestKey) queryEmbeddingCache.delete(oldestKey);
+    }
+    queryEmbeddingCache.set(cacheKey, allEmbeddings[0]);
   }
 
   return allEmbeddings;

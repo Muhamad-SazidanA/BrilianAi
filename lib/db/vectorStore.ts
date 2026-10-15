@@ -1,4 +1,7 @@
 import { getPool } from './dbClient';
+import type { DocumentClassification, DocumentStatus } from '@/types/document';
+
+export type { DocumentClassification, DocumentStatus };
 
 export interface UploadBatch {
   id: string;
@@ -9,6 +12,14 @@ export interface UploadBatch {
   is_active_knowledge?: boolean;
   curated_count?: number;
   processed_chunks?: number;
+  owner_id?: string | null;
+  division_id?: string;
+  classification?: DocumentClassification;
+  status?: DocumentStatus;
+  version?: string;
+  supersedes_id?: string | null;
+  effective_date?: Date | string;
+  review_due_date?: Date | string | null;
 }
 
 export interface ChunkInput {
@@ -32,34 +43,86 @@ export interface DocumentChunk {
 // Alias Chunk for flexibility
 export type Chunk = DocumentChunk;
 
+export interface CreateBatchOptions {
+  ownerId?: string | null;
+  divisionId?: string;
+  classification?: DocumentClassification;
+  status?: DocumentStatus;
+  version?: string;
+  supersedesId?: string | null;
+  reviewDueDate?: Date | string | null;
+}
+
 /**
  * Creates a new upload batch record in PostgreSQL and returns its UUID.
+ * Mendukung metadata siklus hidup & ABAC sesuai PRD v2.0.
  *
  * @param filename - Original filename of the uploaded PDF
  * @param pageCount - Total number of pages in the PDF
+ * @param options - Optional metadata (owner, division, classification, status, version, reviewDueDate)
  * @returns Promise<string> - The generated batch UUID
  */
 export async function createUploadBatch(
   filename: string,
-  pageCount: number
+  pageCount: number,
+  options?: CreateBatchOptions
 ): Promise<string> {
   const pool = getPool();
+  const divisionId = options?.divisionId || 'General';
+  const classification = options?.classification || 'Internal';
+  const status = options?.status || 'Aktif';
+  const version = options?.version || '1.0';
+  const ownerId = options?.ownerId || null;
+  const supersedesId = options?.supersedesId || null;
+  const reviewDueDate = options?.reviewDueDate || null;
+
   try {
     const sql = `
+      INSERT INTO upload_batches (
+        original_filename, 
+        page_count, 
+        is_active_knowledge,
+        owner_id,
+        division_id,
+        classification,
+        status,
+        version,
+        supersedes_id,
+        review_due_date
+      )
+      VALUES ($1, $2, true, $3, $4, $5, $6, $7, $8, $9)
+      RETURNING id;
+    `;
+    const result = await pool.query<{ id: string }>(sql, [
+      filename,
+      pageCount,
+      ownerId,
+      divisionId,
+      classification,
+      status,
+      version,
+      supersedesId,
+      reviewDueDate,
+    ]);
+    return result.rows[0].id;
+  } catch {
+    const fallbackSql = `
       INSERT INTO upload_batches (original_filename, page_count, is_active_knowledge)
       VALUES ($1, $2, true)
       RETURNING id;
     `;
-    const result = await pool.query<{ id: string }>(sql, [filename, pageCount]);
-    return result.rows[0].id;
-  } catch {
-    const fallbackSql = `
-      INSERT INTO upload_batches (original_filename, page_count)
-      VALUES ($1, $2)
-      RETURNING id;
-    `;
-    const result = await pool.query<{ id: string }>(fallbackSql, [filename, pageCount]);
-    return result.rows[0].id;
+    try {
+      const result = await pool.query<{ id: string }>(fallbackSql, [filename, pageCount]);
+      return result.rows[0].id;
+    } catch {
+      const basicSql = `
+        INSERT INTO upload_batches (original_filename, page_count)
+        VALUES ($1, $2)
+        RETURNING id;
+      `;
+      const result = await pool.query<{ id: string }>(basicSql, [filename, pageCount]);
+      return result.rows[0].id;
+    }
   }
 }
 
@@ -156,6 +219,13 @@ export async function listBatches(): Promise<UploadBatch[]> {
         b.page_count, 
         b.uploaded_at, 
         COALESCE(b.is_active_knowledge, false) AS is_active_knowledge,
+        b.owner_id,
+        COALESCE(b.division_id, 'General') AS division_id,
+        COALESCE(b.classification, 'Internal') AS classification,
+        COALESCE(b.status, 'Aktif') AS status,
+        COALESCE(b.version, '1.0') AS version,
+        b.effective_date,
+        b.review_due_date,
         COALESCE(ci.curated_count, 0)::int AS curated_count,
         COALESCE(ci.processed_chunks, 0)::int AS processed_chunks
       FROM upload_batches b
@@ -206,6 +276,13 @@ export async function getBatchById(batchId: string): Promise<UploadBatch | null>
         b.page_count, 
         b.uploaded_at, 
         COALESCE(b.is_active_knowledge, false) AS is_active_knowledge,
+        b.owner_id,
+        COALESCE(b.division_id, 'General') AS division_id,
+        COALESCE(b.classification, 'Internal') AS classification,
+        COALESCE(b.status, 'Aktif') AS status,
+        COALESCE(b.version, '1.0') AS version,
+        b.effective_date,
+        b.review_due_date,
         COALESCE(ci.curated_count, 0)::int AS curated_count,
         COALESCE(ci.processed_chunks, 0)::int AS processed_chunks
       FROM upload_batches b
@@ -266,6 +343,72 @@ export async function toggleBatchKnowledgeBase(
     RETURNING id, original_filename, chunk_count, page_count, uploaded_at, is_active_knowledge;
   `;
   const result = await pool.query<UploadBatch>(sql, [isActive, batchId]);
+  if (result.rowCount === 0) {
+    throw new Error(`Upload batch with ID ${batchId} not found.`);
+  }
+  return result.rows[0];
+}
+
+/**
+ * Updates batch metadata (status, classification, division_id, version, review_due_date).
+ */
+export async function updateBatchMetadata(
+  batchId: string,
+  metadata: {
+    status?: DocumentStatus;
+    classification?: DocumentClassification;
+    divisionId?: string;
+    version?: string;
+    reviewDueDate?: Date | string | null;
+  }
+): Promise<UploadBatch> {
+  const pool = getPool();
+  const fields: string[] = [];
+  const values: any[] = [];
+  let idx = 1;
+
+  if (metadata.status) {
+    fields.push(`status = $${idx++}`);
+    values.push(metadata.status);
+    // Jika status diset bukan 'Aktif', otomatis is_active_knowledge = false
+    if (metadata.status !== 'Aktif') {
+      fields.push(`is_active_knowledge = false`);
+    } else {
+      fields.push(`is_active_knowledge = true`);
+    }
+  }
+  if (metadata.classification) {
+    fields.push(`classification = $${idx++}`);
+    values.push(metadata.classification);
+  }
+  if (metadata.divisionId) {
+    fields.push(`division_id = $${idx++}`);
+    values.push(metadata.divisionId);
+  }
+  if (metadata.version) {
+    fields.push(`version = $${idx++}`);
+    values.push(metadata.version);
+  }
+  if (metadata.reviewDueDate !== undefined) {
+    fields.push(`review_due_date = $${idx++}`);
+    values.push(metadata.reviewDueDate);
+  }
+
+  if (fields.length === 0) {
+    const existing = await getBatchById(batchId);
+    if (!existing) throw new Error(`Batch with ID ${batchId} not found.`);
+    return existing;
+  }
+
+  values.push(batchId);
+  const sql = `
+    UPDATE upload_batches
+    SET ${fields.join(', ')}
+    WHERE id = $${idx}
+    RETURNING id, original_filename, chunk_count, page_count, uploaded_at, is_active_knowledge,
+              owner_id, division_id, classification, status, version, effective_date, review_due_date;
+  `;
+  const result = await pool.query<UploadBatch>(sql, values);
   if (result.rowCount === 0) {
     throw new Error(`Upload batch with ID ${batchId} not found.`);
   }
@@ -357,6 +500,8 @@ export interface SimilarChunkResult {
   sourcePageStart: number;
   sourcePageEnd: number;
   similarity: number;
+  classification?: string;
+  version?: string;
 }
 
 export interface SearchOptions {
@@ -365,6 +510,11 @@ export interface SearchOptions {
   minSimilarity?: number;
   onlyActiveKnowledge?: boolean;
   textQuery?: string;
+  // PRD v2.0 ABAC & Lifecycle
+  divisionId?: string;
+  allowedClassifications?: DocumentClassification[];
+  onlyActiveStatus?: boolean;
+  grantedBatchIds?: string[];
 }
 
 /**
@@ -410,6 +560,30 @@ export async function searchSimilarChunks(
     ? 'AND (COALESCE(b.is_active_knowledge, false) = true OR NOT EXISTS (SELECT 1 FROM upload_batches ub WHERE COALESCE(ub.is_active_knowledge, false) = true))'
     : '';
 
+  // PRD v2.0: ABAC & Lifecycle Filters
+  const statusCondition = options?.onlyActiveStatus !== false
+    ? "AND (b.status IS NULL OR b.status = 'Aktif')"
+    : '';
+
+  let divisionCondition = '';
+  if (options?.divisionId && options.divisionId !== 'all') {
+    divisionCondition = `AND (b.division_id IS NULL OR b.division_id = 'General' OR b.division_id = '${options.divisionId.replace(/'/g, "''")}')`;
+  }
+
+  let classificationCondition = '';
+  if (options?.allowedClassifications && options.allowedClassifications.length > 0) {
+    const classList = options.allowedClassifications.map(c => `'${c.replace(/'/g, "''")}'`).join(', ');
+    classificationCondition = `AND (b.classification IS NULL OR b.classification IN (${classList}))`;
+  }
+
+  let explicitGrantCondition = '';
+  if (options?.grantedBatchIds && options.grantedBatchIds.length > 0) {
+    const grantList = options.grantedBatchIds.map((id) => `'${id.replace(/'/g, "''")}'`).join(', ');
+    explicitGrantCondition = `OR b.id IN (${grantList})`;
+  }
+
+  const abacFilter = `AND ((1=1 ${statusCondition} ${divisionCondition} ${classificationCondition}) ${explicitGrantCondition})`;
+
   const results: SimilarChunkResult[] = [];
   const seenIds = new Set<string | number>();
 
@@ -426,11 +600,14 @@ export async function searchSimilarChunks(
           c.content,
           c.source_page_start AS "sourcePageStart",
           c.source_page_end AS "sourcePageEnd",
+          COALESCE(b.classification, 'Internal') AS classification,
+          COALESCE(b.version, '1.0') AS version,
           (1 - (c.embedding <=> $1::vector)) AS similarity
         FROM document_chunks c
         JOIN upload_batches b ON b.id = c.upload_batch_id
         WHERE ($2::uuid IS NULL OR c.upload_batch_id = $2)
           ${activeCondition}
+          ${abacFilter}
         ORDER BY c.embedding <=> $1::vector ASC
         LIMIT $3;
       `;
@@ -507,11 +684,14 @@ export async function searchSimilarChunks(
             c.content,
             c.source_page_start AS "sourcePageStart",
             c.source_page_end AS "sourcePageEnd",
+            COALESCE(b.classification, 'Internal') AS classification,
+            COALESCE(b.version, '1.0') AS version,
             0.88 AS similarity
           FROM document_chunks c
           JOIN upload_batches b ON b.id = c.upload_batch_id
           WHERE ($1::uuid IS NULL OR c.upload_batch_id = $1)
             ${activeCondition}
+            ${abacFilter}
             AND (${orClauses})
           ORDER BY c.chunk_index ASC
           LIMIT $2;
@@ -545,11 +725,14 @@ export async function searchSimilarChunks(
             c.content,
             c.source_page_start AS "sourcePageStart",
             c.source_page_end AS "sourcePageEnd",
+            COALESCE(b.classification, 'Internal') AS classification,
+            COALESCE(b.version, '1.0') AS version,
             0.80 AS similarity
           FROM document_chunks c
           JOIN upload_batches b ON b.id = c.upload_batch_id
           WHERE ($1::uuid IS NULL OR c.upload_batch_id = $1)
             ${activeCondition}
+            ${abacFilter}
             AND c.content ILIKE $3
           ORDER BY c.chunk_index ASC
           LIMIT $2;
@@ -602,6 +785,24 @@ export async function searchSimilarCuratedInsights(
     ? 'AND (COALESCE(b.is_active_knowledge, false) = true OR NOT EXISTS (SELECT 1 FROM upload_batches ub WHERE COALESCE(ub.is_active_knowledge, false) = true))'
     : '';
 
+  // PRD v2.0: ABAC & Lifecycle Filters
+  const statusCondition = options?.onlyActiveStatus !== false
+    ? "AND (b.status IS NULL OR b.status = 'Aktif')"
+    : '';
+
+  let divisionCondition = '';
+  if (options?.divisionId && options.divisionId !== 'all') {
+    divisionCondition = `AND (b.division_id IS NULL OR b.division_id = 'General' OR b.division_id = '${options.divisionId.replace(/'/g, "''")}')`;
+  }
+
+  let explicitGrantCondition = '';
+  if (options?.grantedBatchIds && options.grantedBatchIds.length > 0) {
+    const grantList = options.grantedBatchIds.map((id) => `'${id.replace(/'/g, "''")}'`).join(', ');
+    explicitGrantCondition = `OR b.id IN (${grantList})`;
+  }
+
+  const abacFilter = `AND ((1=1 ${statusCondition} ${divisionCondition} ${classificationCondition}) ${explicitGrantCondition})`;
+
   const results: SimilarCuratedResult[] = [];
   const seenIds = new Set<string | number>();
 
@@ -625,6 +826,7 @@ export async function searchSimilarCuratedInsights(
         JOIN upload_batches b ON b.id = ci.upload_batch_id
         WHERE ($2::uuid IS NULL OR ci.upload_batch_id = $2)
           ${activeCondition}
+          ${abacFilter}
           AND ci.embedding IS NOT NULL
         ORDER BY ci.embedding <=> $1::vector ASC
         LIMIT $3;
@@ -710,6 +912,7 @@ export async function searchSimilarCuratedInsights(
           JOIN upload_batches b ON b.id = ci.upload_batch_id
           WHERE ($1::uuid IS NULL OR ci.upload_batch_id = $1)
             ${activeCondition}
+            ${abacFilter}
             AND (${orClauses})
           ORDER BY
             CASE ci.importance

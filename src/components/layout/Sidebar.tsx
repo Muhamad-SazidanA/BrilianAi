@@ -16,6 +16,7 @@ import {
   ScrollText,
   Plus,
   LogIn,
+  FileQuestion,
 } from 'lucide-react';
 
 import NavUser from './NavUser';
@@ -249,10 +250,10 @@ export default function Sidebar({
       items: [
         {
           label: t('nav.dashboard'),
-          href: '/',
+          href: '/dashboard',
           icon: LayoutDashboard,
           badge: null,
-          isActive: pathname === '/' || pathname === '/dashboard',
+          isActive: pathname === '/dashboard',
           permission: null,
         },
 
@@ -271,6 +272,14 @@ export default function Sidebar({
           badge: docCount > 0 ? `${docCount}` : null,
           badgeVariant: 'badge-neutral',
           isActive: pathname.startsWith('/documents'),
+          permission: 'documents:read' as PermissionKey,
+        },
+        {
+          label: language === 'en' ? 'Knowledge Gaps' : 'Kesenjangan Dokumen',
+          href: '/knowledge-gaps',
+          icon: FileQuestion,
+          badge: null,
+          isActive: pathname.startsWith('/knowledge-gaps'),
           permission: 'documents:read' as PermissionKey,
         },
       ].filter((item) => !item.permission || hasPermission(item.permission)),
@@ -346,7 +355,7 @@ export default function Sidebar({
         </button>
       )}
 
-      {/* ── Brand Header (Brilian.Ai Logo) ── */}
+      {/* ── Brand Header (Brilian.Ai Logo - Slim) ── */}
       <div
         style={{
           padding: '0 0.5rem',
@@ -354,19 +363,19 @@ export default function Sidebar({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          height: '70px',
+          height: 'var(--header-height)',
           boxSizing: 'border-box',
         }}
       >
         <Link
-          href="/"
-          aria-label="Brilian.Ai Dashboard"
+          href="/chat"
+          aria-label="Brilian.Ai"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
             textDecoration: 'none',
-            borderRadius: 'var(--radius-md)',
+            borderRadius: 'var(--radius-sm)',
             padding: '2px 4px',
             transition: 'background-color 0.15s ease',
           }}
@@ -378,8 +387,8 @@ export default function Sidebar({
               key={`collapsed-${theme}`}
               src={logoSrc}
               alt="Brilian.Ai"
-              width={38}
-              height={38}
+              width={32}
+              height={32}
               priority
               style={{ objectFit: 'contain', display: 'block' }}
             />
@@ -388,10 +397,10 @@ export default function Sidebar({
               key={`open-${theme}`}
               src={logoSrc}
               alt="Brilian.Ai"
-              width={140}
-              height={52}
+              width={120}
+              height={36}
               priority
-              style={{ objectFit: 'contain', display: 'block', maxHeight: '52px', width: 'auto' }}
+              style={{ objectFit: 'contain', display: 'block', maxHeight: '34px', width: 'auto' }}
             />
           )}
         </Link>
@@ -500,12 +509,12 @@ export default function Sidebar({
             <button
               type="button"
               onClick={handleNewChat}
-              className={`nav-link assistant-nav-link ${pathname.startsWith('/chat') ? 'active' : ''}`}
+              className={`nav-link assistant-nav-link ${pathname.startsWith('/chat') || pathname.startsWith('/share') ? 'active' : ''}`}
               style={{
                 width: '100%',
                 justifyContent: isCollapsed ? 'center' : 'flex-start',
                 padding: isCollapsed ? '10px 0' : '9px 12px',
-                backgroundColor: pathname.startsWith('/chat') ? undefined : 'transparent',
+                backgroundColor: pathname.startsWith('/chat') || pathname.startsWith('/share') ? undefined : 'transparent',
                 border: 'none',
                 cursor: 'pointer',
                 textAlign: 'left',
@@ -515,7 +524,7 @@ export default function Sidebar({
             >
               <MessageSquare
                 size={18}
-                strokeWidth={pathname.startsWith('/chat') ? 2.2 : 1.75}
+                strokeWidth={pathname.startsWith('/chat') || pathname.startsWith('/share') ? 2.2 : 1.75}
               />
               {!isCollapsed && (
                 <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>

@@ -20,65 +20,65 @@ export default function Header({ title, subtitle, actions }: HeaderProps) {
 
   // Determine breadcrumb based on pathname
   const getBreadcrumb = () => {
-    if (pathname === '/' || pathname === '/dashboard') return [{ label: t('header.dashboard'), href: '/' }];
+    if (pathname === '/' || pathname === '/dashboard') return [{ label: t('header.dashboard'), href: '/dashboard' }];
     if (pathname === '/upload') {
       return [
-        { label: t('header.dashboard'), href: '/' },
+        { label: t('header.dashboard'), href: '/dashboard' },
         { label: t('header.upload'), href: '/upload' },
       ];
     }
     if (pathname === '/documents') {
       return [
-        { label: t('header.dashboard'), href: '/' },
+        { label: t('header.dashboard'), href: '/dashboard' },
         { label: t('header.documents'), href: '/documents' },
       ];
     }
     if (pathname.startsWith('/documents/')) {
       return [
-        { label: t('header.dashboard'), href: '/' },
+        { label: t('header.dashboard'), href: '/dashboard' },
         { label: t('header.documents'), href: '/documents' },
         { label: 'Document Studio', href: pathname },
       ];
     }
     if (pathname === '/chat') {
       return [
-        { label: t('header.dashboard'), href: '/' },
+        { label: t('header.dashboard'), href: '/dashboard' },
         { label: t('header.chat'), href: '/chat' },
       ];
     }
     if (pathname === '/users') {
       return [
-        { label: t('header.dashboard'), href: '/' },
+        { label: t('header.dashboard'), href: '/dashboard' },
         { label: t('header.users'), href: '/users' },
       ];
     }
     if (pathname === '/roles') {
       return [
-        { label: t('header.dashboard'), href: '/' },
+        { label: t('header.dashboard'), href: '/dashboard' },
         { label: t('header.roles'), href: '/roles' },
       ];
     }
     if (pathname === '/logs') {
       return [
-        { label: t('header.dashboard'), href: '/' },
+        { label: t('header.dashboard'), href: '/dashboard' },
         { label: t('header.logs'), href: '/logs' },
       ];
     }
-    return [{ label: t('header.dashboard'), href: '/' }];
+    return [{ label: t('header.dashboard'), href: '/dashboard' }];
   };
 
   const breadcrumbs = getBreadcrumb();
 
   return (
     <header className="app-header">
-      {/* Left: Breadcrumbs & Dynamic Title */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
-          <Home size={13} />
+      {/* Left: Breadcrumbs & Dynamic Title (Slim Inline) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+          <Home size={13} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />
           {breadcrumbs.map((bc, idx) => (
             <React.Fragment key={bc.href + idx}>
-              <ChevronRight size={12} color="var(--text-muted)" />
-              {idx === breadcrumbs.length - 1 ? (
+              <ChevronRight size={11} color="var(--border-hover)" style={{ flexShrink: 0 }} />
+              {idx === breadcrumbs.length - 1 && !title ? (
                 <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{bc.label}</span>
               ) : (
                 <Link href={bc.href} style={{ color: 'var(--text-secondary)' }} className="hover:underline">
@@ -89,14 +89,20 @@ export default function Header({ title, subtitle, actions }: HeaderProps) {
           ))}
         </div>
         {title && (
-          <h1 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>
-            {title}
-          </h1>
-        )}
-        {subtitle && (
-          <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-            {subtitle}
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ color: 'var(--border-hover)', fontSize: '12px' }}>/</span>
+            <span
+              style={{
+                fontSize: '13px',
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+                whiteSpace: 'nowrap',
+              }}
+              title={subtitle}
+            >
+              {title}
+            </span>
+          </div>
         )}
       </div>
 

@@ -20,13 +20,38 @@ export interface GuardrailDecision {
  * - Mereformulasi query user agar pencarian vektor di pgvector lebih akurat
  */
 export async function runGuardrailAndRouter(userQuery: string): Promise<GuardrailDecision> {
+  const trimmed = (userQuery || '').trim();
+
+  // Fast-Path 1: Deteksi sapaan murni via Regex (< 0.1ms tanpa LLM)
+  const GREETING_REGEX = /^(halo|hai|hey|hi|hei|selamat (pagi|siang|sore|malam)|assalamu[']?alaikum|salam|terima kasih|makasih|thanks|thank you|siapa kamu|kamu siapa)[!?. ]*$/i;
+  if (GREETING_REGEX.test(trimmed)) {
+    return {
+      isBlocked: false,
+      blockReason: '',
+      isDirectGreeting: true,
+      directGreetingResponse: 'Halo! Saya asisten AI BrilianAi. Ada dokumen atau informasi apa yang bisa saya bantu cari dan analisis hari ini?',
+      optimizedQuery: trimmed,
+    };
+  }
+
+  // Fast-Path 2: Deteksi upaya prompt injection / jailbreak (< 0.1ms)
+  const INJECTION_REGEX = /(ignore (all )?previous instructions|system prompt|jailbreak|disregard (all )?prior|you are now DAN|reveal your secret)/i;
+  if (INJECTION_REGEX.test(trimmed)) {
+    return {
+      isBlocked: true,
+      blockReason: 'Permintaan Anda terdeteksi melanggar kebijakan keamanan sistem (Prompt Injection Protection).',
+      isDirectGreeting: false,
+      optimizedQuery: trimmed,
+    };
+  }
+
   const openAiApiKey = process.env.OPENAI_API_KEY;
-  if (!openAiApiKey || process.env.NODE_ENV === 'test' || process.env.VITEST) {
-    // Fallback jika API key tidak diset atau saat unit test: loloskan query apa adanya
+  // Fast-Path 3: Bypass panggilan LLM Router jika tidak diaktifkan secara eksplisit (hemat 1.5 - 3 detik per pesan)
+  if (!openAiApiKey || process.env.NODE_ENV === 'test' || process.env.VITEST || process.env.ENABLE_LLM_ROUTER !== 'true') {
     return {
       isBlocked: false,
       isDirectGreeting: false,
-      optimizedQuery: userQuery.trim(),
+      optimizedQuery: trimmed,
     };
   }
 
@@ -79,7 +104,7 @@ Balas HANYA dalam format JSON valid berikut (tanpa markdown blok, tanpa teks tam
           blockReason: parsed.blockReason || '',
           isDirectGreeting: Boolean(parsed.isDirectGreeting),
           directGreetingResponse: parsed.directGreetingResponse || '',
-          optimizedQuery: parsed.optimizedQuery || userQuery,
+          optimizedQuery: parsed.optimizedQuery || trimmed,
         };
       }
     }
@@ -91,7 +116,7 @@ Balas HANYA dalam format JSON valid berikut (tanpa markdown blok, tanpa teks tam
   return {
     isBlocked: false,
     isDirectGreeting: false,
-    optimizedQuery: userQuery.trim(),
+    optimizedQuery: trimmed,
   };
 }
 
@@ -278,16 +303,17 @@ export async function runSafetyEvaluator(
     return rawAnswer;
   }
 
-  const openAiApiKey = process.env.OPENAI_API_KEY;
-  if (!openAiApiKey) {
-    return rawAnswer;
-  }
-
-  // Jika jawaban sudah merupakan "Data tidak ditemukan", langsung kembalikan
+  // Fast-Path: Jika jawaban "Data tidak ditemukan" atau LLM Evaluator dinonaktifkan (default hemat)
   if (
+    process.env.ENABLE_LLM_SAFETY_EVALUATOR !== 'true' ||
     rawAnswer.includes('Data tidak ditemukan') ||
     rawAnswer.includes('tidak ditemukan di dalam dokumen')
   ) {
+    return rawAnswer;
+  }
+
+  const openAiApiKey = process.env.OPENAI_API_KEY;
+  if (!openAiApiKey) {
     return rawAnswer;
   }
 

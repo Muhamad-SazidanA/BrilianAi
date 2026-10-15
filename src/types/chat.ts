@@ -6,6 +6,8 @@ export interface ChatSource {
   pageEnd: number;
   content: string;
   similarity: number;
+  classification?: string;
+  version?: string;
 }
 
 export interface ChatMessageVariant {

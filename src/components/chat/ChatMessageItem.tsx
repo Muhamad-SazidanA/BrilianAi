@@ -12,6 +12,10 @@ import {
   ChevronUp,
   ChevronLeft,
   ChevronRight,
+  ThumbsUp,
+  ThumbsDown,
+  Send,
+  X,
 } from 'lucide-react';
 import { ChatMessage, ChatSource } from '@/types/chat';
 import MarkdownContent from '@/components/ui/MarkdownContent';
@@ -37,6 +41,13 @@ export default function ChatMessageItem({
   const [isCopied, setIsCopied] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // Feedback loop states (PRD v2.0 Section B8)
+  const [feedbackRating, setFeedbackRating] = useState<'helpful' | 'incorrect' | 'outdated' | null>(null);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackReason, setFeedbackReason] = useState<'incorrect' | 'outdated'>('incorrect');
+  const [feedbackComment, setFeedbackComment] = useState('');
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
 
   // Determine active response variant for AI messages
   const variants =
@@ -111,6 +122,56 @@ export default function ChatMessageItem({
           ? 'Regenerating AI response...'
           : 'Mengulang penyusunan jawaban AI...'
       );
+    }
+  };
+
+  const handleRateHelpful = async () => {
+    if (feedbackRating) return;
+    setFeedbackRating('helpful');
+    toast.success(
+      language === 'en'
+        ? 'Thank you for your feedback!'
+        : 'Terima kasih! Umpan balik Anda membantu meningkatkan kualitas AI.'
+    );
+    try {
+      await fetch('/api/chat/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          queryText: 'Chat Query',
+          answerText: activeAiText,
+          rating: 'helpful',
+        }),
+      });
+    } catch {
+      // quiet
+    }
+  };
+
+  const handleSubmitNegativeFeedback = async () => {
+    setIsSubmittingFeedback(true);
+    try {
+      await fetch('/api/chat/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          queryText: 'Chat Query',
+          answerText: activeAiText,
+          rating: feedbackReason,
+          feedbackText: feedbackComment,
+        }),
+      });
+      setFeedbackRating(feedbackReason);
+      setShowFeedbackModal(false);
+      toast.success(
+        language === 'en'
+          ? 'Feedback submitted. Knowledge gap recorded.'
+          : 'Umpan balik tersimpan. Kesenjangan pengetahuan telah dicatat untuk ditinjau tim ahli.'
+      );
+    } catch {
+      toast.error('Gagal mengirim umpan balik');
+    } finally {
+      setIsSubmittingFeedback(false);
     }
   };
 
@@ -372,7 +433,138 @@ export default function ChatMessageItem({
               >
                 <RefreshCw size={16} />
               </button>
+
+              {/* 4. Thumbs Up (Helpful) */}
+              <button
+                type="button"
+                onClick={handleRateHelpful}
+                title="Bermanfaat (Helpful)"
+                style={{
+                  padding: '6px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: feedbackRating === 'helpful' ? 'var(--color-success-subtle)' : 'transparent',
+                  color: feedbackRating === 'helpful' ? 'var(--color-success)' : 'var(--text-muted)',
+                  cursor: feedbackRating ? 'default' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.15s ease',
+                }}
+                className="hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200"
+              >
+                <ThumbsUp size={15} />
+              </button>
+
+              {/* 5. Thumbs Down (Feedback / Outdated / Incorrect) */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (!feedbackRating) setShowFeedbackModal((prev) => !prev);
+                }}
+                title="Kurang tepat atau usang"
+                style={{
+                  padding: '6px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor:
+                    feedbackRating === 'incorrect' || feedbackRating === 'outdated'
+                      ? 'var(--color-danger-subtle)'
+                      : 'transparent',
+                  color:
+                    feedbackRating === 'incorrect' || feedbackRating === 'outdated'
+                      ? 'var(--color-danger)'
+                      : 'var(--text-muted)',
+                  cursor: feedbackRating ? 'default' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.15s ease',
+                }}
+                className="hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200"
+              >
+                <ThumbsDown size={15} />
+              </button>
             </div>
+
+            {/* Negative Feedback Sub-Panel */}
+            {showFeedbackModal && (
+              <div
+                style={{
+                  padding: '12px 14px',
+                  borderRadius: 'var(--radius-sm)',
+                  backgroundColor: 'var(--bg-app)',
+                  border: '1px solid var(--border-default)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  maxWidth: '380px',
+                  animation: 'fadeIn 0.2s ease',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    Beri Masukan Terhadap Jawaban:
+                  </span>
+                  <button
+                    onClick={() => setShowFeedbackModal(false)}
+                    className="btn btn-ghost"
+                    style={{ padding: '2px', borderRadius: '4px' }}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setFeedbackReason('incorrect')}
+                    className={`btn btn-xs ${feedbackReason === 'incorrect' ? 'btn-primary' : 'btn-outline'}`}
+                    style={{ fontSize: '11px', flex: 1, padding: '4px 6px' }}
+                  >
+                    Kurang Tepat
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFeedbackReason('outdated')}
+                    className={`btn btn-xs ${feedbackReason === 'outdated' ? 'btn-primary' : 'btn-outline'}`}
+                    style={{ fontSize: '11px', flex: 1, padding: '4px 6px' }}
+                  >
+                    Dokumen Usang
+                  </button>
+                </div>
+
+                <input
+                  type="text"
+                  placeholder="Catatan tambahan untuk tim ahli (opsional)..."
+                  value={feedbackComment}
+                  onChange={(e) => setFeedbackComment(e.target.value)}
+                  className="input-text"
+                  style={{ fontSize: '12px', padding: '6px 10px' }}
+                />
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px', marginTop: '2px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowFeedbackModal(false)}
+                    className="btn btn-ghost btn-xs"
+                    style={{ fontSize: '11px' }}
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSubmitNegativeFeedback}
+                    disabled={isSubmittingFeedback}
+                    className="btn btn-primary btn-xs"
+                    style={{ fontSize: '11px', gap: '4px' }}
+                  >
+                    <Send size={11} />
+                    <span>{isSubmittingFeedback ? 'Mengirim...' : 'Kirim Feedback'}</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Verified Sources Pill Citations */}
             {activeAiSources && activeAiSources.length > 0 && (

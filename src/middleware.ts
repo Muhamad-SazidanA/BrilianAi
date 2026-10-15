@@ -27,24 +27,63 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const activeUserId = request.cookies.get('brilian_active_user_id')?.value;
+  const rawUserId = request.cookies.get('brilian_active_user_id')?.value;
+  const isValidUuid = Boolean(
+    rawUserId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawUserId)
+  );
+  const activeUserId = isValidUuid ? rawUserId : undefined;
   const userStatus = request.cookies.get('brilian_user_status')?.value;
 
-  // 2. Unauthenticated handling
+  // 2. Unauthenticated handling (Guest)
   if (!activeUserId) {
-    if (pathname === '/login') {
-      return NextResponse.next();
+    // Unauthenticated guest accessing root URL (/) goes directly to /chat
+    if (pathname === '/') {
+      const chatUrl = new URL('/chat', request.url);
+      request.nextUrl.searchParams.forEach((val, key) => {
+        chatUrl.searchParams.set(key, val);
+      });
+      const response = NextResponse.redirect(chatUrl);
+      if (rawUserId && !isValidUuid) {
+        response.cookies.delete('brilian_active_user_id');
+        response.cookies.delete('brilian_user_status');
+        response.cookies.delete('brilian_chat_access');
+      }
+      return response;
+    }
+
+    // Only /login and /chat (and /chat/...) are accessible to unauthenticated guests
+    if (pathname === '/login' || pathname === '/chat' || pathname.startsWith('/chat/')) {
+      const response = NextResponse.next();
+      if (rawUserId && !isValidUuid) {
+        response.cookies.delete('brilian_active_user_id');
+        response.cookies.delete('brilian_user_status');
+        response.cookies.delete('brilian_chat_access');
+      }
+      return response;
     }
 
     if (pathname.startsWith('/api/')) {
-      return NextResponse.json({ error: 'Unauthorized: Session required.' }, { status: 401 });
+      const response = NextResponse.json({ error: 'Unauthorized: Session required.' }, { status: 401 });
+      if (rawUserId && !isValidUuid) {
+        response.cookies.delete('brilian_active_user_id');
+        response.cookies.delete('brilian_user_status');
+        response.cookies.delete('brilian_chat_access');
+      }
+      return response;
     }
 
+    // Specific protected routes (e.g. /dashboard, /documents, /upload, /users, etc.)
     const loginUrl = new URL('/login', request.url);
-    if (pathname !== '/' && pathname !== '/dashboard' && pathname !== '/pending-approval') {
+    if (pathname !== '/login' && pathname !== '/pending-approval') {
       loginUrl.searchParams.set('redirect', pathname);
     }
-    return NextResponse.redirect(loginUrl);
+    const response = NextResponse.redirect(loginUrl);
+    if (rawUserId && !isValidUuid) {
+      response.cookies.delete('brilian_active_user_id');
+      response.cookies.delete('brilian_user_status');
+      response.cookies.delete('brilian_chat_access');
+    }
+    return response;
   }
 
   // 3. User is authenticated, check account status
@@ -90,10 +129,19 @@ export function middleware(request: NextRequest) {
   }
 
   // 3c. Account is active:
+  // If user hits root URL (/), redirect directly to /chat
+  if (pathname === '/') {
+    const chatUrl = new URL('/chat', request.url);
+    request.nextUrl.searchParams.forEach((val, key) => {
+      chatUrl.searchParams.set(key, val);
+    });
+    return NextResponse.redirect(chatUrl);
+  }
+
   if (pathname === '/login' || pathname === '/pending-approval') {
-    let redirectTarget = request.nextUrl.searchParams.get('redirect') || '/';
-    if (redirectTarget === '/login' || redirectTarget === '/pending-approval') {
-      redirectTarget = '/';
+    let redirectTarget = request.nextUrl.searchParams.get('redirect') || '/chat';
+    if (redirectTarget === '/login' || redirectTarget === '/pending-approval' || redirectTarget === '/') {
+      redirectTarget = '/chat';
     }
     return NextResponse.redirect(new URL(redirectTarget, request.url));
   }

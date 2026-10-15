@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { CheckCircle2, ArrowRight } from 'lucide-react';
 import AppShell from '@/components/layout/AppShell';
-import Dropzone from '@/components/upload/Dropzone';
+import Dropzone, { DocumentUploadMetadata } from '@/components/upload/Dropzone';
 import PipelineStepper from '@/components/upload/PipelineStepper';
 import { PipelineStep, IngestionResult } from '@/types/document';
 import { useLanguage } from '@/context/LanguageContext';
@@ -80,7 +80,7 @@ export default function UploadPage() {
     return () => stopPolling();
   }, []);
 
-  const handleUpload = async (file: File) => {
+  const handleUpload = async (file: File, metadata?: DocumentUploadMetadata) => {
     setIsUploading(true);
     setUploadError(null);
     setResult(null);
@@ -106,8 +106,19 @@ export default function UploadPage() {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('clientId', clientIdRef.current || '');
+      if (metadata) {
+        if (metadata.divisionId) formData.append('divisionId', metadata.divisionId);
+        if (metadata.classification) formData.append('classification', metadata.classification);
+        if (metadata.status) formData.append('status', metadata.status);
+        if (metadata.version) formData.append('version', metadata.version);
+        if (metadata.reviewDueDate) formData.append('reviewDueDate', metadata.reviewDueDate);
+        if (metadata.userGrants && metadata.userGrants.length > 0) {
+          formData.append('userGrants', JSON.stringify(metadata.userGrants));
+        }
+      }
 
       progressPollRef.current = setInterval(fetchUploadProgress, 900);
+
 
       // Simulating visual progression based on server timestamps
       const timer1 = setTimeout(() => {

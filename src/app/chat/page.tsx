@@ -14,7 +14,7 @@ export default function ChatPage() {
       subtitle={t('chat.subtitle')}
       noPadding={true}
       hideHeader={true}
-      requiredPermission="chat:query"
+      allowGuest={true}
     >
       <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center' }}>Memuat Chat Workspace...</div>}>
         <ChatWorkspace />

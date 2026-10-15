@@ -1,21 +1,107 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
-import { UploadCloud, FileText, X, AlertCircle, ArrowRight, Loader2 } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { UploadCloud, FileText, X, AlertCircle, ArrowRight, Loader2, Shield, Calendar, GitBranch, Building2, Sliders, Users, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { DocumentClassification, DocumentStatus } from '@/types/document';
 import { toast } from 'sonner';
 
+export interface UserGrantSelection {
+  userId: string;
+  userName: string;
+  userEmail: string;
+  accessLevel: 'viewer' | 'editor';
+}
+
+export interface DocumentUploadMetadata {
+  divisionId: string;
+  classification: DocumentClassification;
+  status: DocumentStatus;
+  version: string;
+  reviewDueDate: string;
+  userGrants?: UserGrantSelection[];
+}
+
 interface DropzoneProps {
-  onUpload: (file: File) => Promise<void>;
+  onUpload: (file: File, metadata: DocumentUploadMetadata) => Promise<void>;
   isUploading: boolean;
   uploadError: string | null;
 }
+
+const DEFAULT_DIVISIONS = [
+  'General',
+  'Direksi',
+  'Manajemen Eksekutif',
+  'HRD',
+  'Legal & Compliance',
+  'Keuangan (Finance)',
+  'Operasional',
+  'IT & Engineering',
+  'Marketing & Bisnis',
+];
 
 export default function Dropzone({ onUpload, isUploading, uploadError }: DropzoneProps) {
   const { language, t } = useLanguage();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Enterprise KMS Metadata States
+  const [divisionId, setDivisionId] = useState<string>('General');
+  const [customDivision, setCustomDivision] = useState<string>('');
+  const [classification, setClassification] = useState<DocumentClassification>('Internal');
+  const [docStatus, setDocStatus] = useState<DocumentStatus>('Aktif');
+  const [version, setVersion] = useState<string>('1.0');
+
+  // Default review date: 1 year from today (YYYY-MM-DD)
+  const defaultNextYear = new Date();
+  defaultNextYear.setFullYear(defaultNextYear.getFullYear() + 1);
+  const [reviewDueDate, setReviewDueDate] = useState<string>(
+    defaultNextYear.toISOString().split('T')[0]
+  );
+
+  // User Grants State
+  const [availableUsers, setAvailableUsers] = useState<Array<{ id: string; name: string; email: string; department: string }>>([]);
+  const [userGrants, setUserGrants] = useState<UserGrantSelection[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
+  const [selectedAccessLevel, setSelectedAccessLevel] = useState<'viewer' | 'editor'>('viewer');
+  const [isGrantsExpanded, setIsGrantsExpanded] = useState<boolean>(false);
+
+  useEffect(() => {
+    fetch('/api/users')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.users) {
+          setAvailableUsers(data.users);
+        }
+      })
+      .catch((err) => console.error('Error fetching users:', err));
+  }, []);
+
+  const handleAddUserGrant = () => {
+    if (!selectedUserId) return;
+    const user = availableUsers.find((u) => u.id === selectedUserId);
+    if (!user) return;
+    if (userGrants.some((g) => g.userId === selectedUserId)) {
+      toast.error('Pengguna sudah ada dalam daftar akses khusus.');
+      return;
+    }
+    setUserGrants((prev) => [
+      ...prev,
+      {
+        userId: user.id,
+        userName: user.name,
+        userEmail: user.email,
+        accessLevel: selectedAccessLevel,
+      },
+    ]);
+    setSelectedUserId('');
+    setSelectedAccessLevel('viewer');
+  };
+
+  const handleRemoveUserGrant = (userId: string) => {
+    setUserGrants((prev) => prev.filter((g) => g.userId !== userId));
+  };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -68,7 +154,15 @@ export default function Dropzone({ onUpload, isUploading, uploadError }: Dropzon
 
   const handleSubmit = async () => {
     if (!selectedFile || isUploading) return;
-    await onUpload(selectedFile);
+    const finalDivision = divisionId === 'custom' ? customDivision.trim() || 'General' : divisionId;
+    await onUpload(selectedFile, {
+      divisionId: finalDivision,
+      classification,
+      status: docStatus,
+      version: version.trim() || '1.0',
+      reviewDueDate,
+      userGrants,
+    });
   };
 
   return (
@@ -77,14 +171,14 @@ export default function Dropzone({ onUpload, isUploading, uploadError }: Dropzon
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <h2 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text-primary)' }}>
-            Unggah Dokumen PDF
+            Unggah Dokumen PDF & Tata Kelola Pengetahuan (KMS)
           </h2>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-            Setiap halaman diekstrak oleh Vision OCR Engine & diindeks ke representasi vektor
+            Setiap halaman diekstrak oleh Vision OCR Engine, diindeks ke pgvector, dan diamankan dengan ABAC
           </p>
         </div>
         <span className="badge badge-accent" style={{ fontSize: '11px', padding: '3px 9px' }}>
-          PDF Only
+          PDF Only · pgvector
         </span>
       </div>
 
@@ -98,7 +192,7 @@ export default function Dropzone({ onUpload, isUploading, uploadError }: Dropzon
           border: `2px dashed ${isDragging ? 'var(--color-primary)' : 'var(--border-default)'}`,
           backgroundColor: isDragging ? 'var(--color-primary-subtle)' : 'var(--bg-app)',
           borderRadius: 'var(--radius-lg)',
-          padding: '3rem 1.5rem',
+          padding: '2.5rem 1.5rem',
           textAlign: 'center',
           cursor: 'pointer',
           transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -183,6 +277,260 @@ export default function Dropzone({ onUpload, isUploading, uploadError }: Dropzon
         )}
       </div>
 
+      {/* Enterprise KMS Metadata Settings Panel */}
+      <div
+        style={{
+          backgroundColor: 'var(--bg-app)',
+          border: '1px solid var(--border-default)',
+          borderRadius: 'var(--radius-md)',
+          padding: '1.25rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1.25rem',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem' }}>
+          <Sliders size={16} color="var(--color-primary)" />
+          <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+            Metadata Dokumen & Kontrol Akses (ABAC + Lifecycle)
+          </span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+          {/* Divisi / Departemen */}
+          <div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+              <Building2 size={13} />
+              <span>Divisi Pemilik</span>
+            </label>
+            <select
+              value={divisionId}
+              onChange={(e) => setDivisionId(e.target.value)}
+              className="input-text"
+              style={{ width: '100%', fontSize: '13px' }}
+            >
+              {DEFAULT_DIVISIONS.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+              <option value="custom">+ Divisi Lainnya...</option>
+            </select>
+            {divisionId === 'custom' && (
+              <input
+                type="text"
+                placeholder="Nama divisi khusus..."
+                value={customDivision}
+                onChange={(e) => setCustomDivision(e.target.value)}
+                className="input-text"
+                style={{ width: '100%', marginTop: '6px', fontSize: '13px' }}
+              />
+            )}
+          </div>
+
+          {/* Klasifikasi Keamanan (ABAC) */}
+          <div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+              <Shield size={13} />
+              <span>Klasifikasi Keamanan</span>
+            </label>
+            <select
+              value={classification}
+              onChange={(e) => setClassification(e.target.value as DocumentClassification)}
+              className="input-text"
+              style={{ width: '100%', fontSize: '13px' }}
+            >
+              <option value="Publik">Publik (Dapat diakses semua)</option>
+              <option value="Internal">Internal (Karyawan perusahaan)</option>
+              <option value="Rahasia">Rahasia (Divisi terkait & Manajerial)</option>
+              <option value="Sangat Rahasia">Sangat Rahasia (Admin & Pemilik)</option>
+            </select>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+              {classification === 'Publik' && 'Terbuka untuk semua pengguna & tamu.'}
+              {classification === 'Internal' && 'Standar dokumen operasional karyawan.'}
+              {classification === 'Rahasia' && 'Hanya divisimu dan tim manajemen yang dapat melihat.'}
+              {classification === 'Sangat Rahasia' && 'Enkripsi tinggi, hanya admin & pemilik.'}
+            </div>
+          </div>
+
+          {/* Status Siklus Hidup Dokumen */}
+          <div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+              <GitBranch size={13} />
+              <span>Status Siklus Hidup</span>
+            </label>
+            <select
+              value={docStatus}
+              onChange={(e) => setDocStatus(e.target.value as DocumentStatus)}
+              className="input-text"
+              style={{ width: '100%', fontSize: '13px' }}
+            >
+              <option value="Aktif">Aktif (Langsung terindeks ke AI RAG)</option>
+              <option value="Draft">Draft (Tersimpan di Studio, belum di RAG)</option>
+              <option value="Review">Review (Menunggu validasi reviewer)</option>
+            </select>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+              {docStatus === 'Aktif' ? 'Siap dijawab oleh Chatbot AI.' : 'Tidak akan muncul di pencarian AI sampai berstatus Aktif.'}
+            </div>
+          </div>
+
+          {/* Versi Dokumen & Review Due Date */}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                Versi
+              </label>
+              <input
+                type="text"
+                value={version}
+                onChange={(e) => setVersion(e.target.value)}
+                placeholder="1.0"
+                className="input-text font-mono"
+                style={{ width: '100%', fontSize: '13px' }}
+              />
+            </div>
+            <div style={{ flex: 2 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                <Calendar size={12} />
+                <span>Jadwal Tinjau</span>
+              </label>
+              <input
+                type="date"
+                value={reviewDueDate}
+                onChange={(e) => setReviewDueDate(e.target.value)}
+                className="input-text"
+                style={{ width: '100%', fontSize: '13px' }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* User Whitelist / Direct Grants Accordion */}
+        <div
+          style={{
+            borderTop: '1px solid var(--border-subtle)',
+            paddingTop: '0.75rem',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setIsGrantsExpanded(!isGrantsExpanded)}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: 'none',
+              border: 'none',
+              padding: '6px 0',
+              cursor: 'pointer',
+              color: 'var(--text-primary)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Users size={15} style={{ color: 'var(--text-secondary)' }} />
+              <span style={{ fontSize: '13px', fontWeight: 600 }}>
+                Beri Hak Akses Khusus ke Pengguna (Opsional)
+              </span>
+              {userGrants.length > 0 && (
+                <span className="badge badge-accent font-mono" style={{ fontSize: '10.5px' }}>
+                  {userGrants.length} Pengguna
+                </span>
+              )}
+            </div>
+            {isGrantsExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+
+          {isGrantsExpanded && (
+            <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>
+                Pengguna yang dipilih akan dapat mengakses dokumen ini meskipun klasifikasi atau divisinya berbeda.
+              </p>
+
+              {/* Add Grant Controls */}
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <select
+                  value={selectedUserId}
+                  onChange={(e) => setSelectedUserId(e.target.value)}
+                  className="input-text"
+                  style={{ flex: 2, minWidth: '220px', fontSize: '12.5px' }}
+                >
+                  <option value="">-- Pilih Pengguna --</option>
+                  {availableUsers
+                    .filter((u) => !userGrants.some((g) => g.userId === u.id))
+                    .map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} ({u.email}) - {u.department || 'General'}
+                      </option>
+                    ))}
+                </select>
+
+                <select
+                  value={selectedAccessLevel}
+                  onChange={(e) => setSelectedAccessLevel(e.target.value as 'viewer' | 'editor')}
+                  className="input-text"
+                  style={{ flex: 1, minWidth: '130px', fontSize: '12.5px' }}
+                >
+                  <option value="viewer">Viewer (Baca)</option>
+                  <option value="editor">Editor (Penuh)</option>
+                </select>
+
+                <button
+                  type="button"
+                  onClick={handleAddUserGrant}
+                  disabled={!selectedUserId}
+                  className="btn btn-outline btn-sm"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                >
+                  <Plus size={14} />
+                  <span>Tambah</span>
+                </button>
+              </div>
+
+              {/* Added User List */}
+              {userGrants.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
+                  {userGrants.map((grant) => (
+                    <div
+                      key={grant.userId}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '6px 10px',
+                        backgroundColor: 'var(--bg-card)',
+                        border: '1px solid var(--border-default)',
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: '12.5px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{grant.userName}</span>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>({grant.userEmail})</span>
+                        <span
+                          className={`badge ${grant.accessLevel === 'editor' ? 'badge-accent' : 'badge-neutral'}`}
+                          style={{ fontSize: '10px' }}
+                        >
+                          {grant.accessLevel === 'editor' ? 'Editor' : 'Viewer'}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveUserGrant(grant.userId)}
+                        className="btn btn-ghost-danger btn-xs"
+                        style={{ padding: '2px 6px' }}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Error Message */}
       {uploadError && (
         <div
@@ -218,7 +566,7 @@ export default function Dropzone({ onUpload, isUploading, uploadError }: Dropzon
         ) : (
           <>
             <UploadCloud size={18} />
-            <span>Jalankan Ingestion Sekarang</span>
+            <span>Jalankan Ingestion & Indeks ke KMS</span>
             <ArrowRight size={16} />
           </>
         )}
@@ -226,3 +574,4 @@ export default function Dropzone({ onUpload, isUploading, uploadError }: Dropzon
     </div>
   );
 }
+

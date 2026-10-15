@@ -1,3 +1,6 @@
+export type DocumentClassification = 'Publik' | 'Internal' | 'Rahasia' | 'Sangat Rahasia';
+export type DocumentStatus = 'Draft' | 'Review' | 'Aktif' | 'Superseded' | 'Arsip';
+
 export interface UploadBatch {
   id: string;
   original_filename: string;
@@ -7,6 +10,31 @@ export interface UploadBatch {
   is_active_knowledge?: boolean;
   curated_count?: number;
   processed_chunks?: number;
+  // PRD v2.0 Enterprise KMS & ABAC fields:
+  owner_id?: string | null;
+  division_id?: string;
+  classification?: DocumentClassification;
+  status?: DocumentStatus;
+  version?: string;
+  supersedes_id?: string | null;
+  effective_date?: string;
+  review_due_date?: string | null;
+  has_user_grant?: boolean;
+}
+
+export interface DocumentGrant {
+  id: string | number;
+  upload_batch_id: string;
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  user_department: string;
+  user_role_id: string;
+  access_level: 'viewer' | 'editor';
+  granted_by?: string | null;
+  granted_by_name?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface DocumentChunk {

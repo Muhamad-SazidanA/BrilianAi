@@ -17,11 +17,19 @@ export async function GET(req: NextRequest) {
       userId = req.headers.get('x-user-id') || undefined;
     }
 
-    if (!userId) {
-      return NextResponse.json(
+    const isUuid = Boolean(
+      userId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)
+    );
+
+    if (!userId || !isUuid) {
+      const response = NextResponse.json(
         { authenticated: false, error: 'No active session found.' },
         { status: 401 }
       );
+      response.cookies.delete('brilian_active_user_id');
+      response.cookies.delete('brilian_user_status');
+      response.cookies.delete('brilian_chat_access');
+      return response;
     }
 
     const user = await getUserById(userId);
@@ -32,6 +40,7 @@ export async function GET(req: NextRequest) {
       );
       response.cookies.delete('brilian_active_user_id');
       response.cookies.delete('brilian_user_status');
+      response.cookies.delete('brilian_chat_access');
       return response;
     }
 
@@ -62,9 +71,13 @@ export async function GET(req: NextRequest) {
     return response;
   } catch (err: any) {
     console.error('[/api/auth/me GET Error]:', err);
-    return NextResponse.json(
+    const response = NextResponse.json(
       { authenticated: false, error: err.message || 'Internal server error' },
-      { status: 500 }
+      { status: 401 }
     );
+    response.cookies.delete('brilian_active_user_id');
+    response.cookies.delete('brilian_user_status');
+    response.cookies.delete('brilian_chat_access');
+    return response;
   }
 }

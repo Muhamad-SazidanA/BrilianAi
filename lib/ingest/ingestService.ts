@@ -11,10 +11,19 @@ export interface UploadResult {
   chunkCount: number;
 }
 
+import type { DocumentClassification, DocumentStatus } from '@/types/document';
+
 export interface IngestOptions {
   chunkSize?: number;
   chunkOverlap?: number;
   minDigitalTextLength?: number;
+  // PRD v2.0 A5 Metadata Wajib:
+  ownerId?: string | null;
+  divisionId?: string;
+  classification?: DocumentClassification;
+  status?: DocumentStatus;
+  version?: string;
+  reviewDueDate?: Date | string | null;
 }
 
 function resolveClientId(clientId?: string): string {
@@ -119,8 +128,8 @@ export async function ingestPdf(
     });
     const chunkContents = chunks.map((c) => c.content);
 
-    // Process embeddings in micro-batches of 10 chunks to prevent HeadersTimeoutError
-    const EMBED_BATCH_SIZE = 10;
+    // Process embeddings in optimized batches of 100 chunks to maximize throughput and minimize network round-trips
+    const EMBED_BATCH_SIZE = 100;
     for (let i = 0; i < chunkContents.length; i += EMBED_BATCH_SIZE) {
       const slice = chunkContents.slice(i, i + EMBED_BATCH_SIZE);
       const batchEmbeds = await embedTexts(slice);
@@ -156,7 +165,14 @@ export async function ingestPdf(
     processedChunks: chunkCount,
     progressPercent: 92,
   });
-  const batchId = await createUploadBatch(filename, pageCount);
+  const batchId = await createUploadBatch(filename, pageCount, {
+    ownerId: options?.ownerId,
+    divisionId: options?.divisionId,
+    classification: options?.classification,
+    status: options?.status,
+    version: options?.version,
+    reviewDueDate: options?.reviewDueDate,
+  });
 
   // 6. Insert all document chunks with pgvector embeddings
   if (chunkCount > 0) {

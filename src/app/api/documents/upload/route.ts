@@ -63,7 +63,39 @@ export async function POST(req: NextRequest) {
       progressPercent: 5,
     });
 
-    const result = await queuePdfIngestion(buffer, filename, undefined, clientId);
+    const ownerId = (formData.get('ownerId') as string) || null;
+    const divisionId = (formData.get('divisionId') as string) || 'General';
+    const classification = (formData.get('classification') as any) || 'Internal';
+    const status = (formData.get('status') as any) || 'Aktif';
+    const version = (formData.get('version') as string) || '1.0';
+    const reviewDueDate = (formData.get('reviewDueDate') as string) || null;
+
+    const userGrantsRaw = formData.get('userGrants') as string | null;
+    let userGrants: Array<{ userId: string; accessLevel: 'viewer' | 'editor' }> = [];
+    if (userGrantsRaw) {
+      try {
+        userGrants = JSON.parse(userGrantsRaw);
+      } catch {
+        // quiet fallback
+      }
+    }
+
+    const options = {
+      ownerId,
+      divisionId,
+      classification,
+      status,
+      version,
+      reviewDueDate,
+    };
+
+    const result = await queuePdfIngestion(buffer, filename, options, clientId);
+
+    if (Array.isArray(userGrants) && userGrants.length > 0) {
+      const { bulkGrantDocumentAccess } = await import('@lib/db/documentGrantStore');
+      await bulkGrantDocumentAccess(result.uploadBatchId, userGrants, ownerId);
+    }
+
     clearIngestProgress(clientId);
 
     return NextResponse.json(

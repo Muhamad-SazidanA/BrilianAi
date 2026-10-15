@@ -96,6 +96,25 @@ export default function ChatWorkspace({
     }
   }, [searchParams, sessionId]);
 
+  // Restore pending prompt draft after guest logs in
+  useEffect(() => {
+    if (currentUser) {
+      try {
+        const savedDraft = localStorage.getItem('brilian_pending_prompt');
+        if (savedDraft) {
+          setInputQuery(savedDraft);
+          localStorage.removeItem('brilian_pending_prompt');
+          toast.success('Draf pertanyaan Anda dipulihkan. Silakan periksa kembali dan kirim.');
+          setTimeout(() => {
+            inputRef.current?.focus();
+          }, 200);
+        }
+      } catch {
+        // quiet fallback
+      }
+    }
+  }, [currentUser]);
+
   // Citation inspection
   const [inspectingSource, setInspectingSource] = useState<ChatSource | null>(null);
 
@@ -409,6 +428,24 @@ export default function ChatWorkspace({
 
     const textToSend = (queryText || inputQuery).trim();
 
+    // Jika belum login, simpan draf ke localStorage dan arahkan ke login
+    if (!currentUser) {
+      if (textToSend) {
+        try {
+          localStorage.setItem('brilian_pending_prompt', textToSend);
+        } catch {
+          // quiet fallback
+        }
+        toast.info('Silakan login terlebih dahulu untuk mengirim pertanyaan.');
+      }
+      const currentPath =
+        typeof window !== 'undefined'
+          ? `${window.location.pathname}${window.location.search}`
+          : '/chat';
+      router.push(`/login?redirect=${encodeURIComponent(currentPath)}`);
+      return;
+    }
+
     if (!textToSend) {
       if (messages.length > 0 && !isLoading) {
         const lastMsg = messages[messages.length - 1];
@@ -691,26 +728,60 @@ export default function ChatWorkspace({
       }}
     >
       {/* ── 1. FLOATING TOP HEADER BAR ──────────────────────────────── */}
-      {!isPublicShare && (
-        <header
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            padding: '1rem 1.75rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            backgroundColor: 'transparent',
-            borderBottom: 'none',
-            zIndex: 30,
-            pointerEvents: 'none',
-          }}
-        >
-          {/* Left: Session title indicator */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', pointerEvents: 'auto' }}>
-            {hasMessages && (
+      <header
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          padding: '1rem 1.75rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          backgroundColor: 'transparent',
+          borderBottom: 'none',
+          zIndex: 30,
+          pointerEvents: 'none',
+        }}
+      >
+        {/* Left: Session title indicator or Public Share badge */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', pointerEvents: 'auto' }}>
+          {isPublicShare ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span
+                className="badge badge-accent"
+                style={{
+                  fontSize: '11px',
+                  padding: '4px 10px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  borderRadius: '9999px',
+                  fontWeight: 600,
+                }}
+              >
+                <Share2 size={12} />
+                <span>{language === 'en' ? 'Shared Conversation' : 'Tautan Dibagikan'}</span>
+              </span>
+              {sessionTitle && (
+                <span
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    color: 'var(--text-secondary)',
+                    maxWidth: '300px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                  title={sessionTitle}
+                >
+                  {sessionTitle}
+                </span>
+              )}
+            </div>
+          ) : (
+            hasMessages && (
               <span
                 style={{
                   fontSize: '13px',
@@ -725,45 +796,35 @@ export default function ChatWorkspace({
               >
                 {sessionTitle}
               </span>
-            )}
-          </div>
+            )
+          )}
+        </div>
 
-          {/* Right: Actions */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', pointerEvents: 'auto' }}>
-            {hasMessages && (
-              <button
-                onClick={handleShareConversation}
-                disabled={isSharing}
-                className="btn btn-outline btn-sm"
-                style={{
-                  borderRadius: '9999px',
-                  padding: '6px 14px',
-                  fontSize: '12.5px',
-                  backgroundColor: 'var(--bg-card)',
-                  backdropFilter: 'blur(12px)',
-                  WebkitBackdropFilter: 'blur(12px)',
-                  borderColor: 'var(--border-default)',
-                  color: 'var(--text-primary)',
-                  boxShadow: '0 2px 10px rgba(15, 23, 42, 0.06)',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  opacity: isSharing ? 0.7 : 1,
-                  cursor: isSharing ? 'not-allowed' : 'pointer',
-                }}
-                title="Salin tautan publik percakapan ini"
-              >
-                {isSharing ? (
-                  <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
-                ) : (
-                  <Share2 size={13} />
-                )}
-                <span>{isSharing ? 'Menyimpan...' : language === 'en' ? 'Share' : 'Share Conversation'}</span>
-              </button>
-            )}
-
+        {/* Right: Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', pointerEvents: 'auto' }}>
+          {isGuestOnShare && (
             <button
-              onClick={handleNewChat}
+              onClick={handleLoginRedirect}
+              className="btn btn-primary btn-sm"
+              style={{
+                borderRadius: '9999px',
+                padding: '6px 14px',
+                fontSize: '12.5px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 2px 10px rgba(15, 23, 42, 0.08)',
+              }}
+            >
+              <LogIn size={13} />
+              <span>{language === 'en' ? 'Log in' : 'Masuk ke Akun'}</span>
+            </button>
+          )}
+
+          {hasMessages && !isPublicShare && (
+            <button
+              onClick={handleShareConversation}
+              disabled={isSharing}
               className="btn btn-outline btn-sm"
               style={{
                 borderRadius: '9999px',
@@ -775,35 +836,70 @@ export default function ChatWorkspace({
                 borderColor: 'var(--border-default)',
                 color: 'var(--text-primary)',
                 boxShadow: '0 2px 10px rgba(15, 23, 42, 0.06)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                opacity: isSharing ? 0.7 : 1,
+                cursor: isSharing ? 'not-allowed' : 'pointer',
+              }}
+              title="Salin tautan publik percakapan ini"
+            >
+              {isSharing ? (
+                <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+              ) : (
+                <Share2 size={13} />
+              )}
+              <span>{isSharing ? 'Menyimpan...' : language === 'en' ? 'Share' : 'Share Conversation'}</span>
+            </button>
+          )}
+
+          <button
+            onClick={handleNewChat}
+            className="btn btn-outline btn-sm"
+            style={{
+              borderRadius: '9999px',
+              padding: '6px 14px',
+              fontSize: '12.5px',
+              backgroundColor: 'var(--bg-card)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              borderColor: 'var(--border-default)',
+              color: 'var(--text-primary)',
+              boxShadow: '0 2px 10px rgba(15, 23, 42, 0.06)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+            }}
+          >
+            <Plus size={13} />
+            <span>{language === 'en' ? 'New Chat' : 'Chat Baru'}</span>
+          </button>
+
+          {hasPermission('documents:upload') && (
+            <button
+              onClick={() => router.push('/upload')}
+              className="btn btn-outline btn-sm"
+              style={{
+                borderRadius: '9999px',
+                padding: '6px 14px',
+                fontSize: '12.5px',
+                backgroundColor: 'var(--bg-card)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                borderColor: 'var(--border-default)',
+                color: 'var(--text-primary)',
+                boxShadow: '0 2px 10px rgba(15, 23, 42, 0.06)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
               }}
             >
               <Plus size={13} />
-              <span>{language === 'en' ? 'New Chat' : 'Chat Baru'}</span>
+              <span>{language === 'en' ? 'Upload PDF' : 'Unggah PDF'}</span>
             </button>
-
-            {hasPermission('documents:upload') && (
-              <button
-                onClick={() => router.push('/upload')}
-                className="btn btn-outline btn-sm"
-                style={{
-                  borderRadius: '9999px',
-                  padding: '6px 14px',
-                  fontSize: '12.5px',
-                  backgroundColor: 'var(--bg-card)',
-                  backdropFilter: 'blur(12px)',
-                  WebkitBackdropFilter: 'blur(12px)',
-                  borderColor: 'var(--border-default)',
-                  color: 'var(--text-primary)',
-                  boxShadow: '0 2px 10px rgba(15, 23, 42, 0.06)',
-                }}
-              >
-                <Plus size={13} />
-                <span>{language === 'en' ? 'Upload PDF' : 'Unggah PDF'}</span>
-              </button>
-            )}
-          </div>
-        </header>
-      )}
+          )}
+        </div>
+      </header>
 
       {/* ── 2. SCROLLABLE MIDDLE CONTAINER ───────────────────────────── */}
       <div
@@ -821,9 +917,7 @@ export default function ChatWorkspace({
             width: '100%',
             maxWidth: '52rem',
             margin: '0 auto',
-            padding: isPublicShare
-              ? '2.25rem 1.5rem 8.5rem'
-              : hasMessages
+            padding: hasMessages
               ? '4.75rem 1.5rem 8.5rem'
               : '4.5rem 1.5rem 7.5rem',
             flex: 1,
@@ -1100,6 +1194,10 @@ export default function ChatWorkspace({
                   ? (language === 'en'
                       ? 'This shared conversation is read-only. Log in to chat...'
                       : 'Percakapan ini dibagikan (Read-only). Masuk untuk mulai chat...')
+                  : !currentUser
+                  ? (language === 'en'
+                      ? 'Ask Apps Brilian RAG... (Login required to send)'
+                      : 'Tanya Brilian.Ai seputar dokumen... (Login untuk mengirim)')
                   : isPublicShare
                   ? (language === 'en'
                       ? 'Continue this conversation with Apps Brilian...'

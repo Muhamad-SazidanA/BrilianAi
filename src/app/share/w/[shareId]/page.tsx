@@ -11,12 +11,9 @@ function SharedChatWorkspaceContent() {
   const shareId = typeof params?.shareId === 'string' ? params.shareId : '';
   const { currentUser } = useUserSession();
 
-  // Sembunyikan sidebar jika pengguna yang mengakses tautan share belum login
-  const hideSidebar = !currentUser;
-
   if (!shareId) {
     return (
-      <AppShell allowGuest={true} hideSidebar={hideSidebar}>
+      <AppShell allowGuest={true}>
         <div className="ui-card" style={{ margin: '5rem auto', maxWidth: '560px', padding: '2rem', textAlign: 'center' }}>
           <h2 style={{ marginBottom: '0.5rem' }}>Tautan Tidak Valid</h2>
           <p style={{ color: 'var(--text-secondary)' }}>Identifier percakapan tidak ditemukan.</p>
@@ -30,7 +27,6 @@ function SharedChatWorkspaceContent() {
       noPadding={true}
       hideHeader={true}
       allowGuest={true}
-      hideSidebar={hideSidebar}
     >
       <ChatWorkspace shareId={shareId} isPublicShare={true} />
     </AppShell>

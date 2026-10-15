@@ -23,6 +23,9 @@ import {
   GOLDEN_FISIOTERAPI_ANSWER,
 } from '../db/chatCacheStore';
 
+import { logKnowledgeGap } from '../db/knowledgeGapStore';
+import type { DocumentClassification } from '@/types/document';
+
 export { isDataNotFoundAnswer, GOLDEN_FISIOTERAPI_ANSWER };
 
 export interface ChatSource {
@@ -33,6 +36,8 @@ export interface ChatSource {
   pageEnd: number;
   content: string;
   similarity: number;
+  classification?: string;
+  version?: string;
 }
 
 export interface ChatRequestOptions {
@@ -41,6 +46,11 @@ export interface ChatRequestOptions {
   topK?: number;
   minSimilarity?: number;
   bypassCache?: boolean;
+  // PRD v2.0 ABAC & Lifecycle
+  userId?: string;
+  divisionId?: string;
+  allowedClassifications?: DocumentClassification[];
+  grantedBatchIds?: string[];
 }
 
 export interface ChatResponseResult {
@@ -189,6 +199,10 @@ export async function askDocumentChat(
     minSimilarity,
     onlyActiveKnowledge: true,
     textQuery: effectiveQuery,
+    divisionId: options?.divisionId,
+    allowedClassifications: options?.allowedClassifications,
+    onlyActiveStatus: true,
+    grantedBatchIds: options?.grantedBatchIds,
   });
 
   try {
@@ -198,6 +212,10 @@ export async function askDocumentChat(
       minSimilarity,
       onlyActiveKnowledge: true,
       textQuery: effectiveQuery,
+      divisionId: options?.divisionId,
+      allowedClassifications: options?.allowedClassifications,
+      onlyActiveStatus: true,
+      grantedBatchIds: options?.grantedBatchIds,
     });
   } catch {
     // Fallback gracefully if curated insights table is not yet populated
@@ -205,8 +223,11 @@ export async function askDocumentChat(
 
   // Jika tidak ada konteks dokumen yang relevan dan mode publik mati
   if (!allowPublicKnowledge && similarChunks.length === 0 && similarCurated.length === 0) {
+    // PRD v2.0 B2, F3: Catat pertanyaan yang gagal dijawab ke knowledge_gaps
+    logKnowledgeGap(trimmedQuery, { userId: options?.userId, divisionId: options?.divisionId }).catch(() => {});
+
     return {
-      answer: 'Data tidak ditemukan di dalam dokumen.',
+      answer: 'Data tidak ditemukan di dalam dokumen yang dapat Anda akses.',
       sources: [],
       allowPublicKnowledge: false,
       retrievedCount: 0,
@@ -263,6 +284,7 @@ export async function askDocumentChat(
 
   if (isNotFound) {
     formattedAnswer = formattedAnswer.replace(/\n*Sumber:\s*.*$/i, '').trim();
+    logKnowledgeGap(trimmedQuery, { userId: options?.userId, divisionId: options?.divisionId }).catch(() => {});
   } else {
     const { primaryFilename, pageLabel, filteredSources } = determineAccurateSources(
       evaluatedAnswer,
@@ -476,6 +498,8 @@ export function determineAccurateSources(
       pageEnd: c.sourcePageEnd,
       content: c.content,
       similarity: safeSimilarity(c.similarity),
+      classification: c.classification,
+      version: c.version,
     });
   }
 
@@ -504,6 +528,8 @@ export function determineAccurateSources(
       pageEnd: c.sourcePageEnd,
       content: c.content,
       similarity: safeSimilarity(c.similarity),
+      classification: c.classification,
+      version: c.version,
     });
   }
 

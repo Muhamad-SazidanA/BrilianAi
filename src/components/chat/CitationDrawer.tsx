@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { X, FileText } from 'lucide-react';
+import Link from 'next/link';
+import { X, FileText, Shield, Lock, ExternalLink } from 'lucide-react';
 import { ChatSource } from '@/types/chat';
 import MarkdownContent from '@/components/ui/MarkdownContent';
 import { useLanguage } from '@/context/LanguageContext';
@@ -75,20 +76,55 @@ export default function CitationDrawer({ source, isOpen, onClose }: CitationDraw
             gap: '8px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <FileText size={16} color="var(--color-primary)" />
-            <span style={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--text-primary)', wordBreak: 'break-all' }}>
-              {source.filename}
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+              <FileText size={16} color="var(--color-primary)" style={{ flexShrink: 0 }} />
+              <span style={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--text-primary)', wordBreak: 'break-all' }}>
+                {source.filename}
+              </span>
+            </div>
+            {source.uploadBatchId && (
+              <Link
+                href={`/documents/${source.uploadBatchId}`}
+                className="btn btn-ghost btn-xs"
+                style={{ flexShrink: 0, gap: '4px', fontSize: '11px' }}
+                title="Buka dokumen di Document Studio"
+              >
+                <span>Studio</span>
+                <ExternalLink size={11} />
+              </Link>
+            )}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
             <span className="badge badge-accent">
               {language === 'en' ? 'Page' : 'Halaman'} {source.pageStart === source.pageEnd ? source.pageStart : `${source.pageStart} - ${source.pageEnd}`}
             </span>
             <span className="badge badge-neutral font-mono">
               Chunk #{source.chunkId}
             </span>
+            {source.classification && (
+              <span
+                className={`badge ${
+                  source.classification === 'Publik'
+                    ? 'badge-success'
+                    : source.classification === 'Rahasia'
+                    ? 'badge-warning'
+                    : source.classification === 'Sangat Rahasia'
+                    ? 'badge-danger'
+                    : 'badge-neutral'
+                }`}
+                style={{ fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+              >
+                {source.classification === 'Sangat Rahasia' ? <Lock size={10} /> : <Shield size={10} />}
+                <span>{source.classification}</span>
+              </span>
+            )}
+            {source.version && (
+              <span className="badge badge-neutral font-mono" style={{ fontSize: '11px' }}>
+                v{source.version}
+              </span>
+            )}
             <span className="badge badge-success">
               {language === 'en' ? 'Relevance' : 'Relevansi'}: {similarityPercent}%
             </span>

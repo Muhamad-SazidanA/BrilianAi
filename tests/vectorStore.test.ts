@@ -40,7 +40,12 @@ describe('vectorStore (PostgreSQL + pgvector Store)', () => {
 
     const [sql, params] = mockPool.query.mock.calls[0];
     expect(sql).toContain('INSERT INTO upload_batches');
-    expect(params).toEqual(['sample_dokumen.pdf', 12]);
+    expect(params[0]).toBe('sample_dokumen.pdf');
+    expect(params[1]).toBe(12);
+    expect(params[3]).toBe('General');
+    expect(params[4]).toBe('Internal');
+    expect(params[5]).toBe('Aktif');
+    expect(params[6]).toBe('1.0');
   });
 
   it('2. insertChunks() with 5 dummy chunks should perform single multi-row insert and update chunk_count to 5', async () => {

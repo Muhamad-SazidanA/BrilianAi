@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { listChunks } from '@lib/db/vectorStore';
-
+import { listChunks, getBatchById } from '@lib/db/vectorStore';
+import { getAuthenticatedUser, canUserAccessDocument } from '@lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +16,18 @@ export async function GET(
         { error: 'Document batch ID is required.' },
         { status: 400 }
       );
+    }
+
+    const user = await getAuthenticatedUser(req);
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (isUuid) {
+      const batch = await getBatchById(id);
+      if (batch && !canUserAccessDocument(user, batch)) {
+        return NextResponse.json(
+          { error: 'Dokumen tidak ditemukan atau akses ditolak.' },
+          { status: 404 }
+        );
+      }
     }
 
     const chunks = await listChunks(id);
