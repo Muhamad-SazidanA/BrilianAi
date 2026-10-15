@@ -12,13 +12,24 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useUserSession } from '@/context/UserSessionContext';
 import { toast } from 'sonner';
 
+import DocumentUploadModal from '@/components/documents/DocumentUploadModal';
+import { useSearchParams } from 'next/navigation';
+
 export default function DocumentsPage() {
   const { language, t } = useLanguage();
   const { hasPermission } = useUserSession();
+  const searchParams = useSearchParams();
   const [batches, setBatches] = useState<UploadBatch[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [deletingDoc, setDeletingDoc] = useState<{ id: string; filename: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get('action') === 'upload') {
+      setIsUploadOpen(true);
+    }
+  }, [searchParams]);
 
   const fetchBatches = async () => {
     setIsLoading(true);
@@ -163,10 +174,14 @@ export default function DocumentsPage() {
       actions={
         <div style={{ display: 'flex', gap: '8px' }}>
           {hasPermission('documents:upload') && (
-            <Link href="/upload" className="btn btn-primary btn-sm">
+            <button
+              type="button"
+              onClick={() => setIsUploadOpen(true)}
+              className="btn btn-primary btn-sm"
+            >
               <UploadCloud size={15} />
               <span>{t('dash.upload_new')}</span>
-            </Link>
+            </button>
           )}
           {hasPermission('chat:query') && (
             <Link href="/chat" className="btn btn-outline btn-sm">
@@ -196,6 +211,18 @@ export default function DocumentsPage() {
           onActivateAll={handleActivateAll}
         />
       </div>
+
+      {/* Upload Modal */}
+      <DocumentUploadModal
+        isOpen={isUploadOpen}
+        onClose={() => {
+          setIsUploadOpen(false);
+          if (typeof window !== 'undefined' && window.location.search.includes('action=upload')) {
+            window.history.replaceState({}, '', '/documents');
+          }
+        }}
+        onSuccess={fetchBatches}
+      />
 
       {/* Confirmation Modal for Document Deletion */}
       <ConfirmationModal

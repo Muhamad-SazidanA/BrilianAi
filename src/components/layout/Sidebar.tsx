@@ -6,7 +6,6 @@ import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
-  UploadCloud,
   FolderTree,
   MessageSquare,
   ChevronsLeft,
@@ -16,7 +15,6 @@ import {
   ScrollText,
   Plus,
   LogIn,
-  FileQuestion,
 } from 'lucide-react';
 
 import NavUser from './NavUser';
@@ -256,15 +254,6 @@ export default function Sidebar({
           isActive: pathname === '/dashboard',
           permission: null,
         },
-
-        {
-          label: t('nav.upload'),
-          href: '/upload',
-          icon: UploadCloud,
-          badge: null,
-          isActive: pathname === '/upload',
-          permission: 'documents:upload' as PermissionKey,
-        },
         {
           label: t('nav.documents'),
           href: '/documents',
@@ -274,41 +263,25 @@ export default function Sidebar({
           isActive: pathname.startsWith('/documents'),
           permission: 'documents:read' as PermissionKey,
         },
-        {
-          label: language === 'en' ? 'Knowledge Gaps' : 'Kesenjangan Dokumen',
-          href: '/knowledge-gaps',
-          icon: FileQuestion,
-          badge: null,
-          isActive: pathname.startsWith('/knowledge-gaps'),
-          permission: 'documents:read' as PermissionKey,
-        },
       ].filter((item) => !item.permission || hasPermission(item.permission)),
     },
     {
       group: language === 'en' ? 'Administration & Audit' : 'Administrasi & Keamanan',
       items: [
         {
-          label: t('nav.users'),
+          label: language === 'en' ? 'Users & Access Control' : 'Pengguna & Hak Akses',
           href: '/users',
           icon: Users,
           badge: null,
-          isActive: pathname.startsWith('/users'),
+          isActive: pathname.startsWith('/users') || pathname.startsWith('/roles'),
           permission: 'users:manage' as PermissionKey,
         },
         {
-          label: t('nav.roles'),
-          href: '/roles',
-          icon: ShieldCheck,
-          badge: null,
-          isActive: pathname.startsWith('/roles'),
-          permission: 'roles:manage' as PermissionKey,
-        },
-        {
-          label: t('nav.audit_logs'),
+          label: language === 'en' ? 'Audit & Observability' : 'Audit & Observabilitas',
           href: '/logs',
           icon: ScrollText,
           badge: null,
-          isActive: pathname.startsWith('/logs'),
+          isActive: pathname.startsWith('/logs') || pathname.startsWith('/knowledge-gaps'),
           permission: 'audit:read' as PermissionKey,
         },
       ].filter((item) => !item.permission || hasPermission(item.permission)),
