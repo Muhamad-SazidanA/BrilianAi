@@ -42,7 +42,7 @@ export default function DocumentStatsCards({
         title={language === 'en' ? 'Vision OCR Pages' : 'Halaman AI Vision OCR'}
         value={`${totalPages} Halaman`}
         badge="Vision OCR"
-        badgeType="success"
+        badgeType="neutral"
         statusDot="live"
         footerText={language === 'en' ? 'Precision text extraction' : 'Ekstraksi teks presisi'}
         isLoading={isLoading}
@@ -52,7 +52,7 @@ export default function DocumentStatsCards({
         title={language === 'en' ? 'Knowledge Vectors' : 'Vektor Pengetahuan'}
         value={`${totalChunks} Chunks`}
         badge="1024-dim"
-        badgeType="accent"
+        badgeType="neutral"
         footerText={language === 'en' ? 'Sliding window 800c' : 'Sliding window 800c'}
         isLoading={isLoading}
       />
@@ -61,7 +61,7 @@ export default function DocumentStatsCards({
         title={language === 'en' ? 'Active Knowledge Base' : 'Basis Pengetahuan Aktif'}
         value={`${activeCount} Aktif`}
         badge="100% Siap"
-        badgeType="success"
+        badgeType="neutral"
         statusDot="live"
         footerText={language === 'en' ? 'RAG organizational reference' : 'Rujukan RAG organisasi'}
         isLoading={isLoading}

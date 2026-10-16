@@ -6,7 +6,6 @@ import {
   FileQuestion,
   Search,
   CheckCircle2,
-  Building2,
   MessageSquare,
   RefreshCw,
   Check,
@@ -163,7 +162,7 @@ export default function KnowledgeGapsPage() {
           isLoading={isLoading}
         />
 
-        {/* 4 Pure Enterprise Metric Cards */}
+        {/* 4 Pure Enterprise Metric Cards (Strict Monochrome Slate) */}
         <div
           style={{
             display: 'grid',
@@ -175,7 +174,7 @@ export default function KnowledgeGapsPage() {
             title={language === 'en' ? 'Open Gaps' : 'Kesenjangan Terbuka'}
             value={`${stats.open} Isu`}
             badge="Open"
-            badgeType="warning"
+            badgeType="neutral"
             statusDot="live"
             footerText={language === 'en' ? 'Requires new SOP reference' : 'Memerlukan dokumen SOP baru'}
             isLoading={isLoading}
@@ -186,8 +185,8 @@ export default function KnowledgeGapsPage() {
             title={language === 'en' ? 'In Progress' : 'Sedang Ditangani'}
             value={`${stats.inProgress} Proses`}
             badge="In Progress"
-            badgeType="accent"
-            statusDot="live"
+            badgeType="neutral"
+            statusDot="blue"
             footerText={language === 'en' ? 'Under SME curation' : 'Dalam proses kurasi tim SME'}
             isLoading={isLoading}
             onClick={() => setStatusFilter('in_progress')}
@@ -197,7 +196,7 @@ export default function KnowledgeGapsPage() {
             title={language === 'en' ? 'Resolved' : 'Telah Diselesaikan'}
             value={`${stats.resolved} Selesai`}
             badge="Resolved"
-            badgeType="success"
+            badgeType="neutral"
             footerText={language === 'en' ? 'SOP indexed to RAG' : 'Dokumen rujukan terunggah'}
             isLoading={isLoading}
             onClick={() => setStatusFilter('resolved')}
@@ -206,7 +205,7 @@ export default function KnowledgeGapsPage() {
           <DashboardMetricCard
             title={language === 'en' ? 'Total Gaps' : 'Total Kesenjangan'}
             value={`${stats.total} Total`}
-            badge="KMS Feedback"
+            badge="KMS Total"
             badgeType="neutral"
             footerText={language === 'en' ? 'Accumulated queries' : 'Akumulasi query pengguna'}
             isLoading={isLoading}
@@ -214,213 +213,184 @@ export default function KnowledgeGapsPage() {
           />
         </div>
 
-        {/* Controls Bar: High-Density Search, Status Switcher, Actions */}
-        <div className="enterprise-card" style={{ padding: '0.65rem 0.85rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-            {/* Search Box with Ctrl+K badge */}
-            <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
-              <Search
-                size={13}
-                color="var(--text-muted)"
-                style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }}
-              />
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder={language === 'en' ? 'Search query or requesting division...' : 'Cari pertanyaan atau divisi pemohon...'}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="input-text"
-                style={{
-                  paddingLeft: '30px',
-                  paddingRight: '62px',
-                  borderRadius: 'var(--radius-xs)',
-                  fontSize: '12px',
-                  height: '30px',
-                }}
-              />
-              <div
-                style={{
-                  position: 'absolute',
-                  right: '8px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  pointerEvents: 'none',
-                }}
-              >
-                <kbd className="kbd-shortcut">Ctrl K</kbd>
+        {/* ── Unified Knowledge Gaps Stream Card (Linear / Vercel style) ── */}
+        <div className="enterprise-card">
+          {/* Unified Header Controls */}
+          <div className="enterprise-card-header" style={{ flexWrap: 'wrap', gap: '8px' }}>
+            {/* Left: Title + Inline Segmented Switcher */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {language === 'en' ? 'Unanswered Queries' : 'Pertanyaan Tanpa Rujukan'}
+                </span>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                  · {filteredGaps.length} isu
+                </span>
               </div>
-            </div>
 
-            {/* Segmented Status Switcher */}
-            <div
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                backgroundColor: 'var(--bg-app)',
-                padding: '2px',
-                borderRadius: 'var(--radius-xs)',
-                border: '1px solid var(--border-default)',
-                gap: '2px',
-              }}
-            >
-              <button
-                onClick={() => setStatusFilter('open')}
-                style={{
-                  borderRadius: 'var(--radius-xs)',
-                  padding: '3px 9px',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  border: statusFilter === 'open' ? '1px solid var(--border-default)' : '1px solid transparent',
-                  backgroundColor: statusFilter === 'open' ? 'var(--bg-card)' : 'transparent',
-                  color: statusFilter === 'open' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  boxShadow: statusFilter === 'open' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                {language === 'en' ? 'Open' : 'Terbuka'} ({stats.open})
-              </button>
-              <button
-                onClick={() => setStatusFilter('in_progress')}
-                style={{
-                  borderRadius: 'var(--radius-xs)',
-                  padding: '3px 9px',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  border: statusFilter === 'in_progress' ? '1px solid var(--border-default)' : '1px solid transparent',
-                  backgroundColor: statusFilter === 'in_progress' ? 'var(--bg-card)' : 'transparent',
-                  color: statusFilter === 'in_progress' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  boxShadow: statusFilter === 'in_progress' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                {language === 'en' ? 'In Progress' : 'Diproses'} ({stats.inProgress})
-              </button>
-              <button
-                onClick={() => setStatusFilter('resolved')}
-                style={{
-                  borderRadius: 'var(--radius-xs)',
-                  padding: '3px 9px',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  border: statusFilter === 'resolved' ? '1px solid var(--border-default)' : '1px solid transparent',
-                  backgroundColor: statusFilter === 'resolved' ? 'var(--bg-card)' : 'transparent',
-                  color: statusFilter === 'resolved' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  boxShadow: statusFilter === 'resolved' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                {language === 'en' ? 'Resolved' : 'Selesai'} ({stats.resolved})
-              </button>
-              <button
-                onClick={() => setStatusFilter('all')}
-                style={{
-                  borderRadius: 'var(--radius-xs)',
-                  padding: '3px 9px',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  border: statusFilter === 'all' ? '1px solid var(--border-default)' : '1px solid transparent',
-                  backgroundColor: statusFilter === 'all' ? 'var(--bg-card)' : 'transparent',
-                  color: statusFilter === 'all' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  boxShadow: statusFilter === 'all' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                {language === 'en' ? 'All' : 'Semua'} ({stats.total})
-              </button>
-            </div>
-
-            {/* Refresh Action */}
-            <button
-              onClick={fetchGaps}
-              disabled={isLoading}
-              className="btn btn-outline btn-sm"
-              style={{ height: '30px', fontSize: '11.5px', gap: '5px' }}
-            >
-              <RefreshCw size={12} className={isLoading ? 'animate-spin' : ''} />
-              <span>{language === 'en' ? 'Refresh' : 'Segarkan'}</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Knowledge Gaps High-Density Enterprise List Card */}
-        <div className="enterprise-card" style={{ padding: 0, overflow: 'hidden' }}>
-          {isLoading ? (
-            <div style={{ padding: '0.25rem 0' }}>
-              {/* Table header placeholder */}
+              {/* Segmented Status Switcher */}
               <div
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'minmax(280px, 3fr) 110px 80px 110px 200px 90px',
-                  padding: '8px 12px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
                   backgroundColor: 'var(--bg-app)',
-                  borderBottom: '1px solid var(--border-default)',
-                  gap: '8px',
+                  padding: '2px',
+                  borderRadius: 'var(--radius-xs)',
+                  border: '1px solid var(--border-default)',
+                  gap: '2px',
                 }}
               >
-                {[1, 2, 3, 4, 5, 6].map((col) => (
-                  <div key={col} className="skeleton-shimmer" style={{ height: '11px', width: col === 1 ? '110px' : '50px' }} />
-                ))}
-              </div>
-
-              {/* 4 Skeleton Shimmer Rows */}
-              {[1, 2, 3, 4].map((i) => (
-                <div
-                  key={i}
+                <button
+                  onClick={() => setStatusFilter('open')}
                   style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'minmax(280px, 3fr) 110px 80px 110px 200px 90px',
-                    alignItems: 'center',
-                    padding: '10px 12px',
-                    borderBottom: i < 4 ? '1px solid var(--border-subtle)' : 'none',
-                    gap: '8px',
+                    borderRadius: 'var(--radius-xs)',
+                    padding: '2px 8px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    border: statusFilter === 'open' ? '1px solid var(--border-default)' : '1px solid transparent',
+                    backgroundColor: statusFilter === 'open' ? 'var(--bg-card)' : 'transparent',
+                    color: statusFilter === 'open' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                    boxShadow: statusFilter === 'open' ? '0 1px 2px rgba(0,0,0,0.04)' : 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div className="skeleton-shimmer" style={{ width: '24px', height: '24px', borderRadius: '4px', flexShrink: 0 }} />
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
-                      <div className="skeleton-shimmer" style={{ width: `${180 + i * 30}px`, height: '13px' }} />
-                      <div className="skeleton-shimmer" style={{ width: '100px', height: '10px' }} />
-                    </div>
+                  {language === 'en' ? 'Open' : 'Terbuka'} ({stats.open})
+                </button>
+                <button
+                  onClick={() => setStatusFilter('in_progress')}
+                  style={{
+                    borderRadius: 'var(--radius-xs)',
+                    padding: '2px 8px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    border: statusFilter === 'in_progress' ? '1px solid var(--border-default)' : '1px solid transparent',
+                    backgroundColor: statusFilter === 'in_progress' ? 'var(--bg-card)' : 'transparent',
+                    color: statusFilter === 'in_progress' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                    boxShadow: statusFilter === 'in_progress' ? '0 1px 2px rgba(0,0,0,0.04)' : 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {language === 'en' ? 'In Progress' : 'Diproses'} ({stats.inProgress})
+                </button>
+                <button
+                  onClick={() => setStatusFilter('resolved')}
+                  style={{
+                    borderRadius: 'var(--radius-xs)',
+                    padding: '2px 8px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    border: statusFilter === 'resolved' ? '1px solid var(--border-default)' : '1px solid transparent',
+                    backgroundColor: statusFilter === 'resolved' ? 'var(--bg-card)' : 'transparent',
+                    color: statusFilter === 'resolved' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                    boxShadow: statusFilter === 'resolved' ? '0 1px 2px rgba(0,0,0,0.04)' : 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {language === 'en' ? 'Resolved' : 'Selesai'} ({stats.resolved})
+                </button>
+                <button
+                  onClick={() => setStatusFilter('all')}
+                  style={{
+                    borderRadius: 'var(--radius-xs)',
+                    padding: '2px 8px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    border: statusFilter === 'all' ? '1px solid var(--border-default)' : '1px solid transparent',
+                    backgroundColor: statusFilter === 'all' ? 'var(--bg-card)' : 'transparent',
+                    color: statusFilter === 'all' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                    boxShadow: statusFilter === 'all' ? '0 1px 2px rgba(0,0,0,0.04)' : 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {language === 'en' ? 'All' : 'Semua'} ({stats.total})
+                </button>
+              </div>
+            </div>
+
+            {/* Right: Slim Search + Actions */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ position: 'relative', width: '200px' }}>
+                <Search
+                  size={12}
+                  color="var(--text-muted)"
+                  style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)' }}
+                />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder={language === 'en' ? 'Search query...' : 'Cari pertanyaan...'}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="input-text"
+                  style={{
+                    paddingLeft: '26px',
+                    paddingRight: '54px',
+                    borderRadius: 'var(--radius-xs)',
+                    fontSize: '11.5px',
+                    height: '26px',
+                  }}
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    right: '6px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    pointerEvents: 'none',
+                  }}
+                >
+                  <kbd className="kbd-shortcut" style={{ fontSize: '9px', padding: '1px 4px' }}>Ctrl K</kbd>
+                </div>
+              </div>
+
+              <button
+                onClick={fetchGaps}
+                disabled={isLoading}
+                className="btn btn-ghost btn-xs"
+                style={{ height: '26px', width: '26px', padding: 0 }}
+                title={language === 'en' ? 'Refresh' : 'Segarkan'}
+              >
+                <RefreshCw size={12} className={isLoading ? 'animate-spin' : ''} color="var(--text-secondary)" />
+              </button>
+            </div>
+          </div>
+
+          {/* Stream Body */}
+          {isLoading ? (
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <div
+                  key={n}
+                  className="enterprise-list-item"
+                  style={{
+                    borderBottom: n === 5 ? 'none' : '1px solid var(--border-default)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '9px', flex: 1 }}>
+                    <span className="skeleton-shimmer" style={{ width: '24px', height: '24px', borderRadius: '5px', flexShrink: 0 }} />
+                    <span className="skeleton-shimmer" style={{ width: `${160 + n * 30}px`, height: '13px', borderRadius: '3px' }} />
+                    <span className="skeleton-shimmer" style={{ width: '120px', height: '11px', borderRadius: '3px' }} />
                   </div>
-                  <div className="skeleton-shimmer" style={{ width: '55px', height: '14px', borderRadius: '3px' }} />
-                  <div className="skeleton-shimmer" style={{ width: '35px', height: '14px', borderRadius: '3px' }} />
-                  <div className="skeleton-shimmer" style={{ width: '70px', height: '16px', borderRadius: '10px' }} />
-                  <div className="skeleton-shimmer" style={{ width: '130px', height: '12px' }} />
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '4px' }}>
-                    <div className="skeleton-shimmer" style={{ width: '22px', height: '22px', borderRadius: '3px' }} />
-                    <div className="skeleton-shimmer" style={{ width: '50px', height: '22px', borderRadius: '3px' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span className="skeleton-shimmer" style={{ width: '45px', height: '13px', borderRadius: '3px' }} />
+                    <span className="skeleton-shimmer" style={{ width: '55px', height: '20px', borderRadius: '4px' }} />
                   </div>
                 </div>
               ))}
             </div>
           ) : filteredGaps.length === 0 ? (
-            <div style={{ padding: '3.5rem 0', textAlign: 'center', color: 'var(--text-secondary)' }}>
-              <div
-                style={{
-                  width: '42px',
-                  height: '42px',
-                  borderRadius: '50%',
-                  backgroundColor: 'var(--bg-subtle)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  margin: '0 auto 10px',
-                  color: 'var(--color-success)',
-                }}
-              >
-                <CheckCircle2 size={20} />
-              </div>
-              <p style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text-primary)', margin: 0 }}>
+            <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+              <CheckCircle2 size={20} style={{ margin: '0 auto 6px', color: 'var(--text-muted)', opacity: 0.6 }} />
+              <p style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)', margin: 0 }}>
                 {statusFilter === 'open'
                   ? (language === 'en' ? 'No Open Knowledge Gaps' : 'Tidak Ada Kesenjangan Pengetahuan Terbuka')
                   : (language === 'en' ? 'No Gaps Recorded' : 'Tidak Ada Data Kesenjangan')}
               </p>
-              <p style={{ fontSize: '12px', marginTop: '4px', maxWidth: '380px', margin: '4px auto 0', color: 'var(--text-secondary)' }}>
+              <p style={{ fontSize: '11.5px', marginTop: '3px', color: 'var(--text-secondary)' }}>
                 {statusFilter === 'open'
                   ? (language === 'en'
                       ? 'All user questions are addressed or indexed in active knowledge bases.'
@@ -429,152 +399,158 @@ export default function KnowledgeGapsPage() {
               </p>
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px' }}>
-                <thead>
-                  <tr
-                    style={{
-                      backgroundColor: 'var(--bg-app)',
-                      borderBottom: '1px solid var(--border-default)',
-                      color: 'var(--text-secondary)',
-                      fontSize: '10.5px',
-                      fontWeight: 700,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.04em',
-                    }}
-                  >
-                    <th style={{ padding: '7px 12px' }}>{language === 'en' ? 'User Question' : 'Pertanyaan Pengguna'}</th>
-                    <th style={{ padding: '7px 10px' }}>{language === 'en' ? 'Division' : 'Divisi'}</th>
-                    <th style={{ padding: '7px 10px' }}>{language === 'en' ? 'Freq' : 'Frekuensi'}</th>
-                    <th style={{ padding: '7px 10px' }}>{language === 'en' ? 'Status' : 'Status'}</th>
-                    <th style={{ padding: '7px 10px' }}>{language === 'en' ? 'Resolution / Note' : 'Penyelesaian / Catatan'}</th>
-                    <th style={{ padding: '7px 12px', textAlign: 'right' }}>{language === 'en' ? 'Actions' : 'Aksi'}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredGaps.map((gap) => (
-                    <tr
-                      key={gap.id}
-                      style={{ borderBottom: '1px solid var(--border-subtle)', transition: 'background-color 0.15s ease' }}
-                      className="hover:bg-subtle"
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {filteredGaps.map((gap, idx) => (
+                <div
+                  key={gap.id}
+                  className="enterprise-list-item"
+                  style={{
+                    borderBottom: idx === filteredGaps.length - 1 ? 'none' : '1px solid var(--border-default)',
+                    backgroundColor: 'var(--bg-card)',
+                  }}
+                >
+                  {/* ── Left: Icon + Question Title + Strict Monochrome Dot Metadata ── */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0, flex: 1, marginRight: '12px' }}>
+                    <div
+                      style={{
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '5px',
+                        backgroundColor: 'var(--bg-subtle)',
+                        color: 'var(--text-secondary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
                     >
-                      {/* Query Text */}
-                      <td style={{ padding: '8px 12px', maxWidth: '380px' }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                          <div
-                            style={{
-                              width: '22px',
-                              height: '22px',
-                              borderRadius: 'var(--radius-xs)',
-                              backgroundColor: gap.status === 'open' ? 'var(--color-warning-subtle)' : 'var(--bg-subtle)',
-                              color: gap.status === 'open' ? 'var(--color-warning)' : 'var(--text-muted)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              flexShrink: 0,
-                              marginTop: '1px',
-                            }}
-                          >
-                            <FileQuestion size={12} />
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 600, color: 'var(--text-primary)', wordBreak: 'break-word', fontSize: '12px' }}>
-                              &ldquo;{gap.query_text}&rdquo;
-                            </div>
-                            <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                              {language === 'en' ? 'Last queried: ' : 'Terakhir ditanyakan: '}
-                              {new Date(gap.updated_at).toLocaleDateString(language === 'en' ? 'en-US' : 'id-ID', {
-                                day: 'numeric',
-                                month: 'short',
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
+                      <FileQuestion size={13} />
+                    </div>
 
-                      {/* Division */}
-                      <td style={{ padding: '8px 10px' }}>
-                        <span className="badge badge-neutral" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '10px', padding: '1px 5px' }}>
-                          <Building2 size={9} />
-                          <span>{gap.division_id || 'General'}</span>
+                    <span
+                      style={{
+                        fontWeight: 600,
+                        fontSize: '12px',
+                        color: 'var(--text-primary)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        maxWidth: '300px',
+                        flexShrink: 0,
+                      }}
+                      title={gap.query_text}
+                    >
+                      &ldquo;{gap.query_text}&rdquo;
+                    </span>
+
+                    {/* Strict Monochrome Slate Inline Metadata */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        fontSize: '11px',
+                        color: 'var(--text-muted)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      <span>· {gap.frequency}x Ditanyakan</span>
+                      <span>· {gap.division_id || 'General'}</span>
+                      <span>
+                        · {new Date(gap.updated_at).toLocaleDateString(language === 'en' ? 'en-US' : 'id-ID', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </span>
+                      {gap.resolution_note && (
+                        <span>
+                          · Selesai: {gap.resolved_by ? `${gap.resolved_by}: ` : ''}{gap.resolution_note}
                         </span>
-                      </td>
+                      )}
+                    </div>
+                  </div>
 
-                      {/* Frequency */}
-                      <td style={{ padding: '8px 10px' }}>
-                        <span className="badge badge-accent font-mono font-bold tabular-nums" style={{ fontSize: '10.5px', padding: '1px 6px' }}>
-                          {gap.frequency}x
-                        </span>
-                      </td>
+                  {/* ── Right: Live Status Dot + Sleek Actions ── */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                    {gap.status === 'resolved' ? (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          fontSize: '11px',
+                          fontWeight: 500,
+                          color: 'var(--text-secondary)',
+                        }}
+                      >
+                        <span className="pulse-dot-live" />
+                        {language === 'en' ? 'Resolved' : 'Selesai'}
+                      </span>
+                    ) : gap.status === 'in_progress' ? (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          fontSize: '11px',
+                          fontWeight: 500,
+                          color: 'var(--text-secondary)',
+                        }}
+                      >
+                        <span className="pulse-dot-blue" />
+                        {language === 'en' ? 'In Progress' : 'Diproses'}
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          fontSize: '11px',
+                          color: 'var(--text-muted)',
+                        }}
+                      >
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--border-default)' }} />
+                        {language === 'en' ? 'Open' : 'Terbuka'}
+                      </span>
+                    )}
 
-                      {/* Status */}
-                      <td style={{ padding: '8px 10px' }}>
-                        <span
-                          className={`badge ${
-                            gap.status === 'resolved'
-                              ? 'badge-success'
-                              : gap.status === 'in_progress'
-                              ? 'badge-accent'
-                              : 'badge-warning'
-                          }`}
-                          style={{ fontSize: '10px', fontWeight: 600, padding: '1px 6px' }}
-                        >
-                          {gap.status === 'open'
-                            ? (language === 'en' ? 'Open' : 'Terbuka')
-                            : gap.status === 'in_progress'
-                            ? (language === 'en' ? 'In Progress' : 'Diproses')
-                            : (language === 'en' ? 'Resolved' : 'Selesai')}
-                        </span>
-                      </td>
+                    <div style={{ width: '1px', height: '14px', backgroundColor: 'var(--border-default)', margin: '0 2px' }} />
 
-                      {/* Resolution Note */}
-                      <td style={{ padding: '8px 10px', maxWidth: '240px' }}>
-                        {gap.resolution_note ? (
-                          <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                            <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                              {gap.resolved_by ? `${gap.resolved_by}: ` : ''}
-                            </span>
-                            {gap.resolution_note}
-                          </div>
-                        ) : (
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                            {language === 'en' ? 'No notes yet' : 'Belum ada catatan'}
-                          </span>
-                        )}
-                      </td>
+                    {/* Subtle Actions */}
+                    <Link
+                      href={`/chat?q=${encodeURIComponent(gap.query_text)}`}
+                      className="btn btn-ghost btn-xs"
+                      title={language === 'en' ? 'Ask AI Chatbot' : 'Coba tanyakan ke AI Chatbot'}
+                      style={{ padding: '3px 5px', color: 'var(--text-secondary)' }}
+                    >
+                      <MessageSquare size={12} />
+                    </Link>
 
-                      {/* Actions */}
-                      <td style={{ padding: '8px 12px', textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                          <Link
-                            href={`/chat?q=${encodeURIComponent(gap.query_text)}`}
-                            className="btn btn-ghost btn-xs"
-                            title={language === 'en' ? 'Ask AI Chatbot' : 'Coba tanyakan ke AI Chatbot'}
-                            style={{ color: 'var(--color-primary)', padding: '3px 5px' }}
-                          >
-                            <MessageSquare size={13} />
-                          </Link>
-
-                          {gap.status !== 'resolved' && (
-                            <button
-                              onClick={() => handleOpenResolveModal(gap)}
-                              className="btn btn-outline btn-xs"
-                              style={{ gap: '3px', fontSize: '10.5px', padding: '2px 7px' }}
-                              title="Tandai kesenjangan ini telah diselesaikan setelah mengunggah SOP terkait"
-                            >
-                              <Check size={11} />
-                              <span>{language === 'en' ? 'Resolve' : 'Selesaikan'}</span>
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                    {gap.status !== 'resolved' && (
+                      <button
+                        onClick={() => handleOpenResolveModal(gap)}
+                        className="btn btn-outline btn-xs"
+                        style={{
+                          gap: '3px',
+                          fontSize: '10.5px',
+                          padding: '0 7px',
+                          height: '24px',
+                          color: 'var(--text-primary)',
+                          borderRadius: '4px',
+                        }}
+                        title="Tandai kesenjangan ini telah diselesaikan setelah mengunggah SOP terkait"
+                      >
+                        <Check size={11} />
+                        <span>{language === 'en' ? 'Resolve' : 'Selesaikan'}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
