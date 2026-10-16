@@ -461,6 +461,7 @@ export default function KnowledgeGapsPage() {
 
           {/* Stream Body */}
           <div
+            className="enterprise-table-wrapper"
             style={{
               flex: 1,
               display: 'flex',

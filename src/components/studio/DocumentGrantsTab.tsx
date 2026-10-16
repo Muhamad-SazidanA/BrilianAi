@@ -188,7 +188,7 @@ export default function DocumentGrantsTab({ batchId }: DocumentGrantsTabProps) {
               </div>
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
+            <div className="enterprise-table-wrapper">
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border-default)', color: 'var(--text-secondary)' }}>

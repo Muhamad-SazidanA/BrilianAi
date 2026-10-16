@@ -564,7 +564,7 @@ export default function AuditLogsView() {
         {/* ── TAB 1: SEMUA PERCAKAPAN ── */}
         {activeTab === 'logs' && (
           <>
-            <div style={{ overflow: 'visible', flex: 1 }}>
+            <div className="enterprise-table-wrapper">
               <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '12.5px' }}>
                 <thead>
                   <tr>
@@ -758,7 +758,7 @@ export default function AuditLogsView() {
 
         {/* ── TAB 2: PENGGUNA PALING AKTIF ── */}
         {activeTab === 'topUsers' && (
-          <div style={{ overflow: 'visible', flex: 1 }}>
+          <div className="enterprise-table-wrapper">
             <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '12.5px' }}>
               <thead>
                 <tr>

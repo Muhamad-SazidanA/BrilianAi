@@ -286,6 +286,7 @@ export default function DocumentTable({
         </div>
       </div>
         <div
+          className="enterprise-table-wrapper"
           style={{
             flex: 1,
             display: 'flex',

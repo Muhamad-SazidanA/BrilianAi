@@ -827,7 +827,7 @@ export default function UsersManagementView() {
         </div>
 
         {/* ── Table Content ── */}
-        <div style={{ overflow: 'visible', flex: 1 }}>
+        <div className="enterprise-table-wrapper">
           <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '12.5px' }}>
             <thead>
               <tr>

@@ -783,6 +783,43 @@ table tbody td {
   border-bottom: 1px solid var(--border-subtle);
 }
 
+/* =====================================================
+   Global Table Scrollbar Suppression & Clean Layout
+   Prevents accidental internal scrollbars/sliders on tables
+   ===================================================== */
+.enterprise-card,
+.enterprise-card *,
+.enterprise-table-wrapper,
+.enterprise-table-container,
+table,
+tbody {
+  scrollbar-width: none !important; /* Firefox */
+  -ms-overflow-style: none !important; /* IE & Edge */
+}
+
+.enterprise-card::-webkit-scrollbar,
+.enterprise-card *::-webkit-scrollbar,
+.enterprise-table-wrapper::-webkit-scrollbar,
+.enterprise-table-container::-webkit-scrollbar,
+table::-webkit-scrollbar,
+tbody::-webkit-scrollbar {
+  display: none !important; /* Chrome, Safari, Opera, Edge */
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.enterprise-table-wrapper {
+  overflow: visible;
+  flex: 1;
+}
+
+@media (max-width: 1024px) {
+  .enterprise-table-wrapper {
+    overflow-x: auto;
+    overflow-y: visible;
+  }
+}
+
 /* Hero Gradient Banner - Clean, Minimal & Slim */
 .hero-gradient {
   background: var(--bg-card);
@@ -1988,7 +2025,7 @@ table tbody td {
   border: 1px solid var(--border-default, #e2e8f0);
   border-radius: var(--radius-lg, 12px);
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
-  overflow: hidden;
+  overflow: visible;
   display: flex;
   flex-direction: column;
 }
