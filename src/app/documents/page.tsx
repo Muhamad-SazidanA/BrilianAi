@@ -28,19 +28,24 @@ function DocumentsContent() {
 
   // Dynamic sticky measurement for 4 stats cards
   const statsRef = useRef<HTMLDivElement>(null);
-  const [statsHeight, setStatsHeight] = useState(130);
+  const [statsHeight, setStatsHeight] = useState(110);
 
   useEffect(() => {
     if (!statsRef.current) return;
     const updateHeight = () => {
       if (statsRef.current) {
-        setStatsHeight(statsRef.current.offsetHeight);
+        const h = Math.round(statsRef.current.getBoundingClientRect().height);
+        if (h > 0) setStatsHeight(h);
       }
     };
     updateHeight();
     const observer = new ResizeObserver(updateHeight);
     observer.observe(statsRef.current);
-    return () => observer.disconnect();
+    window.addEventListener('resize', updateHeight);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateHeight);
+    };
   }, [batches]);
 
   useEffect(() => {
@@ -220,7 +225,7 @@ function DocumentsContent() {
           onToggleActive={handleToggleActive}
           onActivateAll={handleActivateAll}
           onUpload={() => setIsUploadOpen(true)}
-          stickyTop={48 + statsHeight}
+          stickyTop={48 + statsHeight - 1}
         />
       </div>
 

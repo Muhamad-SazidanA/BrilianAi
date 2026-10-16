@@ -111,12 +111,11 @@ export default function DocumentTable({
             flexWrap: 'wrap',
             gap: '8px',
             position: 'sticky',
-            top: stickyTop ? `${stickyTop}px` : '176px',
+            top: stickyTop ? `${stickyTop}px` : '157px',
             zIndex: 20,
             backgroundColor: 'var(--bg-card, #ffffff)',
-            borderTopLeftRadius: 'var(--radius-lg, 12px)',
-            borderTopRightRadius: 'var(--radius-lg, 12px)',
             boxShadow: '0 2px 4px rgba(15, 23, 42, 0.04)',
+            borderBottom: '1px solid var(--border-default, #e2e8f0)',
           }}
         >
         {/* Left: Title + Inline Segmented Switcher */}

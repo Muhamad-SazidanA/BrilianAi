@@ -58,19 +58,24 @@ export default function KnowledgeGapsPage() {
 
   // Dynamic sticky measurement for 4 stats cards
   const statsRef = useRef<HTMLDivElement>(null);
-  const [statsHeight, setStatsHeight] = useState(130);
+  const [statsHeight, setStatsHeight] = useState(110);
 
   useEffect(() => {
     if (!statsRef.current) return;
     const updateHeight = () => {
       if (statsRef.current) {
-        setStatsHeight(statsRef.current.offsetHeight);
+        const h = Math.round(statsRef.current.getBoundingClientRect().height);
+        if (h > 0) setStatsHeight(h);
       }
     };
     updateHeight();
     const observer = new ResizeObserver(updateHeight);
     observer.observe(statsRef.current);
-    return () => observer.disconnect();
+    window.addEventListener('resize', updateHeight);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateHeight);
+    };
   }, [gaps]);
 
   // Reset to page 1 on search or filter change
@@ -205,11 +210,12 @@ export default function KnowledgeGapsPage() {
             zIndex: 30,
             backgroundColor: 'var(--bg-app)',
             paddingTop: '6px',
-            paddingBottom: '12px',
+            paddingBottom: '8px',
             borderBottom: '1px solid var(--border-default)',
             backdropFilter: 'blur(10px)',
             WebkitBackdropFilter: 'blur(10px)',
             boxShadow: '0 2px 4px rgba(15, 23, 42, 0.03)',
+            boxSizing: 'border-box',
           }}
         >
           <div
@@ -280,12 +286,11 @@ export default function KnowledgeGapsPage() {
               flexWrap: 'wrap',
               gap: '8px',
               position: 'sticky',
-              top: `${48 + statsHeight}px`,
+              top: `${48 + statsHeight - 1}px`,
               zIndex: 20,
               backgroundColor: 'var(--bg-card, #ffffff)',
-              borderTopLeftRadius: 'var(--radius-lg, 12px)',
-              borderTopRightRadius: 'var(--radius-lg, 12px)',
               boxShadow: '0 2px 4px rgba(15, 23, 42, 0.04)',
+              borderBottom: '1px solid var(--border-default, #e2e8f0)',
             }}
           >
             {/* Left: Title + Inline Segmented Switcher */}

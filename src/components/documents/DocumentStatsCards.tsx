@@ -32,11 +32,12 @@ export default function DocumentStatsCards({
         zIndex: 30,
         backgroundColor: 'var(--bg-app)',
         paddingTop: '6px',
-        paddingBottom: '12px',
+        paddingBottom: '8px',
         borderBottom: '1px solid var(--border-default)',
         backdropFilter: 'blur(10px)',
         WebkitBackdropFilter: 'blur(10px)',
         boxShadow: '0 2px 4px rgba(15, 23, 42, 0.03)',
+        boxSizing: 'border-box',
       }}
     >
       <div
