@@ -5,6 +5,7 @@ import { UploadCloud, FileText, X, AlertCircle, ArrowRight, Loader2, Shield, Cal
 import { useLanguage } from '@/context/LanguageContext';
 import { DocumentClassification, DocumentStatus } from '@/types/document';
 import { toast } from 'sonner';
+import EnterpriseSelect from '@/components/ui/EnterpriseSelect';
 
 export interface UserGrantSelection {
   userId: string;
@@ -303,19 +304,15 @@ export default function Dropzone({ onUpload, isUploading, uploadError }: Dropzon
               <Building2 size={13} />
               <span>Divisi Pemilik</span>
             </label>
-            <select
+            <EnterpriseSelect
               value={divisionId}
-              onChange={(e) => setDivisionId(e.target.value)}
-              className="input-text"
-              style={{ width: '100%', fontSize: '13px' }}
-            >
-              {DEFAULT_DIVISIONS.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-              <option value="custom">+ Divisi Lainnya...</option>
-            </select>
+              onChange={(val) => setDivisionId(String(val))}
+              options={[
+                ...DEFAULT_DIVISIONS.map((d) => ({ value: d, label: d })),
+                { value: 'custom', label: '+ Divisi Lainnya...' },
+              ]}
+              size="sm"
+            />
             {divisionId === 'custom' && (
               <input
                 type="text"
@@ -334,17 +331,17 @@ export default function Dropzone({ onUpload, isUploading, uploadError }: Dropzon
               <Shield size={13} />
               <span>Klasifikasi Keamanan</span>
             </label>
-            <select
+            <EnterpriseSelect
               value={classification}
-              onChange={(e) => setClassification(e.target.value as DocumentClassification)}
-              className="input-text"
-              style={{ width: '100%', fontSize: '13px' }}
-            >
-              <option value="Publik">Publik (Dapat diakses semua)</option>
-              <option value="Internal">Internal (Karyawan perusahaan)</option>
-              <option value="Rahasia">Rahasia (Divisi terkait & Manajerial)</option>
-              <option value="Sangat Rahasia">Sangat Rahasia (Admin & Pemilik)</option>
-            </select>
+              onChange={(val) => setClassification(val as DocumentClassification)}
+              options={[
+                { value: 'Publik', label: 'Publik (Dapat diakses semua)' },
+                { value: 'Internal', label: 'Internal (Karyawan perusahaan)' },
+                { value: 'Rahasia', label: 'Rahasia (Divisi terkait & Manajerial)' },
+                { value: 'Sangat Rahasia', label: 'Sangat Rahasia (Admin & Pemilik)' },
+              ]}
+              size="sm"
+            />
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
               {classification === 'Publik' && 'Terbuka untuk semua pengguna & tamu.'}
               {classification === 'Internal' && 'Standar dokumen operasional karyawan.'}
@@ -359,16 +356,16 @@ export default function Dropzone({ onUpload, isUploading, uploadError }: Dropzon
               <GitBranch size={13} />
               <span>Status Siklus Hidup</span>
             </label>
-            <select
+            <EnterpriseSelect
               value={docStatus}
-              onChange={(e) => setDocStatus(e.target.value as DocumentStatus)}
-              className="input-text"
-              style={{ width: '100%', fontSize: '13px' }}
-            >
-              <option value="Aktif">Aktif (Langsung terindeks ke AI RAG)</option>
-              <option value="Draft">Draft (Tersimpan di Studio, belum di RAG)</option>
-              <option value="Review">Review (Menunggu validasi reviewer)</option>
-            </select>
+              onChange={(val) => setDocStatus(val as DocumentStatus)}
+              options={[
+                { value: 'Aktif', label: 'Aktif (Langsung terindeks ke AI RAG)' },
+                { value: 'Draft', label: 'Draft (Tersimpan di Studio, belum di RAG)' },
+                { value: 'Review', label: 'Review (Menunggu validasi reviewer)' },
+              ]}
+              size="sm"
+            />
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
               {docStatus === 'Aktif' ? 'Siap dijawab oleh Chatbot AI.' : 'Tidak akan muncul di pencarian AI sampai berstatus Aktif.'}
             </div>
@@ -449,31 +446,35 @@ export default function Dropzone({ onUpload, isUploading, uploadError }: Dropzon
 
               {/* Add Grant Controls */}
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                <select
-                  value={selectedUserId}
-                  onChange={(e) => setSelectedUserId(e.target.value)}
-                  className="input-text"
-                  style={{ flex: 2, minWidth: '220px', fontSize: '12.5px' }}
-                >
-                  <option value="">-- Pilih Pengguna --</option>
-                  {availableUsers
-                    .filter((u) => !userGrants.some((g) => g.userId === u.id))
-                    .map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name} ({u.email}) - {u.department || 'General'}
-                      </option>
-                    ))}
-                </select>
+                <div style={{ flex: 2, minWidth: '220px' }}>
+                  <EnterpriseSelect
+                    value={selectedUserId}
+                    onChange={(val) => setSelectedUserId(String(val))}
+                    options={availableUsers
+                      .filter((u) => !userGrants.some((g) => g.userId === u.id))
+                      .map((u) => ({
+                        value: u.id,
+                        label: `${u.name} (${u.email})`,
+                        sublabel: u.department || 'General',
+                      }))}
+                    placeholder="-- Pilih Pengguna --"
+                    searchable={true}
+                    searchPlaceholder="Cari pengguna..."
+                    size="sm"
+                  />
+                </div>
 
-                <select
-                  value={selectedAccessLevel}
-                  onChange={(e) => setSelectedAccessLevel(e.target.value as 'viewer' | 'editor')}
-                  className="input-text"
-                  style={{ flex: 1, minWidth: '130px', fontSize: '12.5px' }}
-                >
-                  <option value="viewer">Viewer (Baca)</option>
-                  <option value="editor">Editor (Penuh)</option>
-                </select>
+                <div style={{ flex: 1, minWidth: '130px' }}>
+                  <EnterpriseSelect
+                    value={selectedAccessLevel}
+                    onChange={(val) => setSelectedAccessLevel(val as 'viewer' | 'editor')}
+                    options={[
+                      { value: 'viewer', label: 'Viewer (Baca)' },
+                      { value: 'editor', label: 'Editor (Penuh)' },
+                    ]}
+                    size="sm"
+                  />
+                </div>
 
                 <button
                   type="button"

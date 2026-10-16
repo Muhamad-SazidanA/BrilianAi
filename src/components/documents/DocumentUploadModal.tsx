@@ -23,6 +23,7 @@ import {
 import { useLanguage } from '@/context/LanguageContext';
 import { DocumentClassification, DocumentStatus, IngestionResult } from '@/types/document';
 import { toast } from 'sonner';
+import EnterpriseSelect, { EnterpriseSelectOption } from '@/components/ui/EnterpriseSelect';
 
 export interface UserGrantSelection {
   userId: string;
@@ -750,28 +751,15 @@ export default function DocumentUploadModal({
                     <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '3px' }}>
                       Divisi Pemilik
                     </label>
-                    <select
+                    <EnterpriseSelect
                       value={divisionId}
-                      onChange={(e) => setDivisionId(e.target.value)}
-                      style={{
-                        width: '100%',
-                        height: '30px',
-                        padding: '0 8px',
-                        fontSize: '11.5px',
-                        color: '#0F172A',
-                        backgroundColor: '#FFFFFF',
-                        border: '1px solid #CBD5E1',
-                        borderRadius: '6px',
-                        outline: 'none',
-                      }}
-                    >
-                      {DEFAULT_DIVISIONS.map((d) => (
-                        <option key={d} value={d}>
-                          {d}
-                        </option>
-                      ))}
-                      <option value="custom">+ Divisi Lainnya...</option>
-                    </select>
+                      onChange={(val) => setDivisionId(String(val))}
+                      options={[
+                        ...DEFAULT_DIVISIONS.map((d) => ({ value: d, label: d })),
+                        { value: 'custom', label: '+ Divisi Lainnya...' },
+                      ]}
+                      size="sm"
+                    />
                     {divisionId === 'custom' && (
                       <input
                         type="text"
@@ -789,6 +777,7 @@ export default function DocumentUploadModal({
                           borderRadius: '5px',
                           marginTop: '4px',
                           outline: 'none',
+                          boxSizing: 'border-box',
                         }}
                       />
                     )}
@@ -798,26 +787,17 @@ export default function DocumentUploadModal({
                     <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '3px' }}>
                       Klasifikasi Akses
                     </label>
-                    <select
+                    <EnterpriseSelect
                       value={classification}
-                      onChange={(e) => setClassification(e.target.value as DocumentClassification)}
-                      style={{
-                        width: '100%',
-                        height: '30px',
-                        padding: '0 8px',
-                        fontSize: '11.5px',
-                        color: '#0F172A',
-                        backgroundColor: '#FFFFFF',
-                        border: '1px solid #CBD5E1',
-                        borderRadius: '6px',
-                        outline: 'none',
-                      }}
-                    >
-                      <option value="Publik">Publik</option>
-                      <option value="Internal">Internal (Karyawan)</option>
-                      <option value="Rahasia">Rahasia (Divisi)</option>
-                      <option value="Sangat Rahasia">Sangat Rahasia</option>
-                    </select>
+                      onChange={(val) => setClassification(val as DocumentClassification)}
+                      options={[
+                        { value: 'Publik', label: 'Publik' },
+                        { value: 'Internal', label: 'Internal (Karyawan)' },
+                        { value: 'Rahasia', label: 'Rahasia (Divisi)' },
+                        { value: 'Sangat Rahasia', label: 'Sangat Rahasia' },
+                      ]}
+                      size="sm"
+                    />
                   </div>
                 </div>
 
@@ -827,24 +807,16 @@ export default function DocumentUploadModal({
                     <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '3px' }}>
                       Status Dokumen
                     </label>
-                    <select
+                    <EnterpriseSelect
                       value={docStatus}
-                      onChange={(e) => setDocStatus(e.target.value as DocumentStatus)}
-                      style={{
-                        width: '100%',
-                        height: '30px',
-                        padding: '0 8px',
-                        fontSize: '11.5px',
-                        backgroundColor: '#FFFFFF',
-                        border: '1px solid #CBD5E1',
-                        borderRadius: '6px',
-                        outline: 'none',
-                      }}
-                    >
-                      <option value="Aktif">Aktif (Masuk RAG)</option>
-                      <option value="Draft">Draft</option>
-                      <option value="Review">Review</option>
-                    </select>
+                      onChange={(val) => setDocStatus(val as DocumentStatus)}
+                      options={[
+                        { value: 'Aktif', label: 'Aktif (Masuk RAG)' },
+                        { value: 'Draft', label: 'Draft' },
+                        { value: 'Review', label: 'Review' },
+                      ]}
+                      size="sm"
+                    />
                   </div>
 
                   <div>
@@ -866,6 +838,7 @@ export default function DocumentUploadModal({
                         borderRadius: '6px',
                         fontFamily: 'monospace',
                         outline: 'none',
+                        boxSizing: 'border-box',
                       }}
                     />
                   </div>
@@ -889,6 +862,7 @@ export default function DocumentUploadModal({
                       border: '1px solid #CBD5E1',
                       borderRadius: '6px',
                       outline: 'none',
+                      boxSizing: 'border-box',
                     }}
                   />
                 </div>
@@ -898,55 +872,45 @@ export default function DocumentUploadModal({
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '3px' }}>
                     Beri Akses Khusus ke User
                   </label>
-                  <div style={{ display: 'flex', gap: '5px' }}>
-                    <select
-                      value={selectedUserId}
-                      onChange={(e) => setSelectedUserId(e.target.value)}
-                      style={{
-                        flex: 1,
-                        height: '28px',
-                        padding: '0 6px',
-                        fontSize: '11px',
-                        backgroundColor: '#FFFFFF',
-                        border: '1px solid #CBD5E1',
-                        borderRadius: '6px',
-                        outline: 'none',
-                        minWidth: 0,
-                      }}
-                    >
-                      <option value="">Pilih pengguna...</option>
-                      {availableUsers.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.name} ({u.department || 'General'})
-                        </option>
-                      ))}
-                    </select>
+                  <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <EnterpriseSelect
+                        value={selectedUserId}
+                        onChange={(val) => setSelectedUserId(String(val))}
+                        options={availableUsers.map((u) => ({
+                          value: u.id,
+                          label: u.name,
+                          sublabel: `${u.department || 'General'} · ${u.email}`,
+                        }))}
+                        placeholder="Pilih pengguna..."
+                        searchable={true}
+                        searchPlaceholder="Cari nama / email..."
+                        size="xs"
+                        direction="up"
+                        menuWidth="240px"
+                      />
+                    </div>
 
-                    <select
-                      value={selectedAccessLevel}
-                      onChange={(e) => setSelectedAccessLevel(e.target.value as 'viewer' | 'editor')}
-                      style={{
-                        width: '74px',
-                        height: '28px',
-                        padding: '0 4px',
-                        fontSize: '11px',
-                        backgroundColor: '#FFFFFF',
-                        border: '1px solid #CBD5E1',
-                        borderRadius: '6px',
-                        outline: 'none',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <option value="viewer">Viewer</option>
-                      <option value="editor">Editor</option>
-                    </select>
+                    <div style={{ width: '80px', flexShrink: 0 }}>
+                      <EnterpriseSelect
+                        value={selectedAccessLevel}
+                        onChange={(val) => setSelectedAccessLevel(val as 'viewer' | 'editor')}
+                        options={[
+                          { value: 'viewer', label: 'Viewer' },
+                          { value: 'editor', label: 'Editor' },
+                        ]}
+                        size="xs"
+                        direction="up"
+                        width="80px"
+                      />
+                    </div>
 
                     <button
                       type="button"
                       onClick={handleAddUserGrant}
                       disabled={!selectedUserId}
                       style={{
-                        height: '28px',
+                        height: '24px',
                         padding: '0 8px',
                         backgroundColor: selectedUserId ? '#F1F5F9' : '#F8FAFC',
                         border: '1px solid #CBD5E1',

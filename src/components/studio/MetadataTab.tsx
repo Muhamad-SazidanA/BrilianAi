@@ -6,6 +6,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { formatDateTime } from '@lib/utils/formatters';
 import { Shield, GitBranch, Building2, Calendar, Lock, Pencil, Check, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import EnterpriseSelect from '@/components/ui/EnterpriseSelect';
 
 interface MetadataTabProps {
   batch: UploadBatch | null;
@@ -184,17 +185,17 @@ export default function MetadataTab({ batch, chunks, onBatchUpdated }: MetadataT
               <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
                 Klasifikasi Keamanan
               </label>
-              <select
+              <EnterpriseSelect
                 value={editClassification}
-                onChange={(e) => setEditClassification(e.target.value as DocumentClassification)}
-                className="input-text"
-                style={{ width: '100%', fontSize: '13px' }}
-              >
-                <option value="Publik">Publik</option>
-                <option value="Internal">Internal</option>
-                <option value="Rahasia">Rahasia</option>
-                <option value="Sangat Rahasia">Sangat Rahasia</option>
-              </select>
+                onChange={(val) => setEditClassification(val as DocumentClassification)}
+                options={[
+                  { value: 'Publik', label: 'Publik' },
+                  { value: 'Internal', label: 'Internal' },
+                  { value: 'Rahasia', label: 'Rahasia' },
+                  { value: 'Sangat Rahasia', label: 'Sangat Rahasia' },
+                ]}
+                size="sm"
+              />
             </div>
 
             {/* Status Siklus Hidup */}
@@ -202,18 +203,18 @@ export default function MetadataTab({ batch, chunks, onBatchUpdated }: MetadataT
               <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
                 Status Siklus Hidup
               </label>
-              <select
+              <EnterpriseSelect
                 value={editStatus}
-                onChange={(e) => setEditStatus(e.target.value as DocumentStatus)}
-                className="input-text"
-                style={{ width: '100%', fontSize: '13px' }}
-              >
-                <option value="Aktif">Aktif (Terindeks AI Chatbot)</option>
-                <option value="Draft">Draft (Belum diindeks)</option>
-                <option value="Review">Review (Menunggu tinjauan)</option>
-                <option value="Superseded">Superseded (Digantikan versi baru)</option>
-                <option value="Arsip">Arsip (Diarsipkan)</option>
-              </select>
+                onChange={(val) => setEditStatus(val as DocumentStatus)}
+                options={[
+                  { value: 'Aktif', label: 'Aktif (Terindeks AI Chatbot)' },
+                  { value: 'Draft', label: 'Draft (Belum diindeks)' },
+                  { value: 'Review', label: 'Review (Menunggu tinjauan)' },
+                  { value: 'Superseded', label: 'Superseded (Digantikan versi baru)' },
+                  { value: 'Arsip', label: 'Arsip (Diarsipkan)' },
+                ]}
+                size="sm"
+              />
             </div>
 
             {/* Tanggal Tinjau */}

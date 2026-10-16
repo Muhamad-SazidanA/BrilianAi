@@ -6,6 +6,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { formatDateTime } from '@lib/utils/formatters';
 import { Users, UserPlus, Trash2, Shield, Loader2, Check, AlertCircle, Info } from 'lucide-react';
 import { toast } from 'sonner';
+import EnterpriseSelect from '@/components/ui/EnterpriseSelect';
 
 interface DocumentGrantsTabProps {
   batchId: string;
@@ -284,25 +285,23 @@ export default function DocumentGrantsTab({ batchId }: DocumentGrantsTabProps) {
               >
                 Pilih Pengguna
               </label>
-              <select
-                className="input input-sm"
+              <EnterpriseSelect
                 value={selectedUserId}
-                onChange={(e) => setSelectedUserId(e.target.value)}
-                style={{ width: '100%', fontSize: '12.5px' }}
-                disabled={isSubmitting}
-                required
-              >
-                <option value="">-- Pilih Pengguna --</option>
-                {allUsers.map((user) => {
+                onChange={(val) => setSelectedUserId(String(val))}
+                options={allUsers.map((user) => {
                   const alreadyGranted = grantedUserIds.has(user.id);
-                  return (
-                    <option key={user.id} value={user.id}>
-                      {user.name} ({user.email}) - {user.department || 'General'}
-                      {alreadyGranted ? ' [Sudah Memiliki Akses]' : ''}
-                    </option>
-                  );
+                  return {
+                    value: user.id,
+                    label: `${user.name} (${user.email})`,
+                    sublabel: `${user.department || 'General'}${alreadyGranted ? ' · [Sudah Memiliki Akses]' : ''}`,
+                  };
                 })}
-              </select>
+                placeholder="-- Pilih Pengguna --"
+                searchable={true}
+                searchPlaceholder="Cari pengguna..."
+                disabled={isSubmitting}
+                size="sm"
+              />
             </div>
 
             <div>

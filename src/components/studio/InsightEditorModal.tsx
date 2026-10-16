@@ -5,6 +5,7 @@ import { X, BookOpen, Eye, Edit3 } from 'lucide-react';
 import { CuratedInsightItem, InsightImportance } from '@/types/curation';
 import MarkdownContent from '@/components/ui/MarkdownContent';
 import { useLanguage } from '@/context/LanguageContext';
+import EnterpriseSelect from '@/components/ui/EnterpriseSelect';
 
 interface InsightEditorModalProps {
   insight: CuratedInsightItem | null;
@@ -128,15 +129,16 @@ export default function InsightEditorModal({ insight, isOpen, onClose, onSave }:
               <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '5px' }}>
                 {t('insight.importance')}
               </label>
-              <select
+              <EnterpriseSelect
                 value={importance}
-                onChange={(e) => setImportance(e.target.value as InsightImportance)}
-                className="input-text"
-              >
-                <option value="high">{t('insight.importance_high')}</option>
-                <option value="medium">{t('insight.importance_med')}</option>
-                <option value="low">{t('insight.importance_low')}</option>
-              </select>
+                onChange={(val) => setImportance(val as InsightImportance)}
+                options={[
+                  { value: 'high', label: t('insight.importance_high') },
+                  { value: 'medium', label: t('insight.importance_med') },
+                  { value: 'low', label: t('insight.importance_low') },
+                ]}
+                size="sm"
+              />
             </div>
 
             <div>

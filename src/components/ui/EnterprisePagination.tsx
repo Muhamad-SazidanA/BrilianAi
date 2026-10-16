@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import EnterpriseSelect from './EnterpriseSelect';
 
 export interface EnterprisePaginationProps {
   currentPage: number;
@@ -64,29 +65,20 @@ export default function EnterprisePagination({
         {onPageSizeChange && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>|</span>
-            <select
+            <EnterpriseSelect
               value={pageSize}
-              onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              aria-label="Item per halaman"
-              style={{
-                fontSize: '11px',
-                height: '24px',
-                padding: '0 6px',
-                borderRadius: '9999px',
-                border: '1px solid var(--border-default, #e2e8f0)',
-                backgroundColor: 'var(--bg-subtle, #f8fafc)',
-                color: 'var(--text-secondary, #64748b)',
-                outline: 'none',
-                cursor: 'pointer',
-                fontWeight: 500,
-              }}
-            >
-              {pageSizeOptions.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt} / {language === 'en' ? 'page' : 'hal'}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => onPageSizeChange(Number(val))}
+              options={pageSizeOptions.map((opt) => ({
+                value: opt,
+                label: `${opt} / ${language === 'en' ? 'page' : 'hal'}`,
+              }))}
+              size="xs"
+              variant="pill"
+              direction="up"
+              width="auto"
+              menuWidth="105px"
+              ariaLabel="Item per halaman"
+            />
           </div>
         )}
       </div>
