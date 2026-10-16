@@ -24,11 +24,25 @@ export default function DocumentStatsCards({
   return (
     <div
       style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
-        gap: '0.85rem',
+        position: 'sticky',
+        top: 'var(--header-height, 48px)',
+        zIndex: 30,
+        backgroundColor: 'var(--bg-app)',
+        paddingTop: '6px',
+        paddingBottom: '12px',
+        borderBottom: '1px solid var(--border-default)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
+        boxShadow: '0 2px 4px rgba(15, 23, 42, 0.03)',
       }}
     >
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
+          gap: '0.85rem',
+        }}
+      >
       <DashboardMetricCard
         title={language === 'en' ? 'Total Documents' : 'Total Dokumen'}
         value={`${totalDocuments} Dokumen`}
@@ -67,5 +81,6 @@ export default function DocumentStatsCards({
         isLoading={isLoading}
       />
     </div>
+  </div>
   );
 }

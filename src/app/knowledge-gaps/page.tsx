@@ -179,55 +179,70 @@ export default function KnowledgeGapsPage() {
           isLoading={isLoading}
         />
 
-        {/* 4 Pure Enterprise Metric Cards (Strict Monochrome Slate) */}
+        {/* 4 Pure Enterprise Metric Cards (Sticky Freeze below Header) */}
         <div
           style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
-            gap: '0.85rem',
+            position: 'sticky',
+            top: 'var(--header-height, 48px)',
+            zIndex: 30,
+            backgroundColor: 'var(--bg-app)',
+            paddingTop: '6px',
+            paddingBottom: '12px',
+            borderBottom: '1px solid var(--border-default)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            boxShadow: '0 2px 4px rgba(15, 23, 42, 0.03)',
           }}
         >
-          <DashboardMetricCard
-            title={language === 'en' ? 'Open Gaps' : 'Kesenjangan Terbuka'}
-            value={`${stats.open} Isu`}
-            badge="Open"
-            badgeType="neutral"
-            statusDot="live"
-            footerText={language === 'en' ? 'Requires new SOP reference' : 'Memerlukan dokumen SOP baru'}
-            isLoading={isLoading}
-            onClick={() => setStatusFilter('open')}
-          />
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
+              gap: '0.85rem',
+            }}
+          >
+            <DashboardMetricCard
+              title={language === 'en' ? 'Open Gaps' : 'Kesenjangan Terbuka'}
+              value={`${stats.open} Isu`}
+              badge="Open"
+              badgeType="neutral"
+              statusDot="live"
+              footerText={language === 'en' ? 'Requires new SOP reference' : 'Memerlukan dokumen SOP baru'}
+              isLoading={isLoading}
+              onClick={() => setStatusFilter('open')}
+            />
 
-          <DashboardMetricCard
-            title={language === 'en' ? 'In Progress' : 'Sedang Ditangani'}
-            value={`${stats.inProgress} Proses`}
-            badge="In Progress"
-            badgeType="neutral"
-            statusDot="blue"
-            footerText={language === 'en' ? 'Under SME curation' : 'Dalam proses kurasi tim SME'}
-            isLoading={isLoading}
-            onClick={() => setStatusFilter('in_progress')}
-          />
+            <DashboardMetricCard
+              title={language === 'en' ? 'In Progress' : 'Sedang Ditangani'}
+              value={`${stats.inProgress} Proses`}
+              badge="In Progress"
+              badgeType="neutral"
+              statusDot="blue"
+              footerText={language === 'en' ? 'Under SME curation' : 'Dalam proses kurasi tim SME'}
+              isLoading={isLoading}
+              onClick={() => setStatusFilter('in_progress')}
+            />
 
-          <DashboardMetricCard
-            title={language === 'en' ? 'Resolved' : 'Telah Diselesaikan'}
-            value={`${stats.resolved} Selesai`}
-            badge="Resolved"
-            badgeType="neutral"
-            footerText={language === 'en' ? 'SOP indexed to RAG' : 'Dokumen rujukan terunggah'}
-            isLoading={isLoading}
-            onClick={() => setStatusFilter('resolved')}
-          />
+            <DashboardMetricCard
+              title={language === 'en' ? 'Resolved' : 'Telah Diselesaikan'}
+              value={`${stats.resolved} Selesai`}
+              badge="Resolved"
+              badgeType="neutral"
+              footerText={language === 'en' ? 'SOP indexed to RAG' : 'Dokumen rujukan terunggah'}
+              isLoading={isLoading}
+              onClick={() => setStatusFilter('resolved')}
+            />
 
-          <DashboardMetricCard
-            title={language === 'en' ? 'Total Gaps' : 'Total Kesenjangan'}
-            value={`${stats.total} Total`}
-            badge="KMS Total"
-            badgeType="neutral"
-            footerText={language === 'en' ? 'Accumulated queries' : 'Akumulasi query pengguna'}
-            isLoading={isLoading}
-            onClick={() => setStatusFilter('all')}
-          />
+            <DashboardMetricCard
+              title={language === 'en' ? 'Total Gaps' : 'Total Kesenjangan'}
+              value={`${stats.total} Total`}
+              badge="KMS Total"
+              badgeType="neutral"
+              footerText={language === 'en' ? 'Accumulated queries' : 'Akumulasi query pengguna'}
+              isLoading={isLoading}
+              onClick={() => setStatusFilter('all')}
+            />
+          </div>
         </div>
 
         {/* ── Unified Knowledge Gaps Stream Card (Linear / Vercel style) ── */}
