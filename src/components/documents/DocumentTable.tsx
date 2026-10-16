@@ -91,30 +91,34 @@ export default function DocumentTable({
           </div>
 
           {/* Segmented Filter Switcher */}
+          {/* Segmented Filter Switcher (Smooth Pill) */}
           <div
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              backgroundColor: 'var(--bg-app)',
+              backgroundColor: 'var(--bg-subtle, #f1f5f9)',
+              border: '1px solid var(--border-default, #e2e8f0)',
+              borderRadius: '9999px',
               padding: '2px',
-              borderRadius: 'var(--radius-xs)',
-              border: '1px solid var(--border-default)',
               gap: '2px',
+              height: '26px',
             }}
           >
             <button
               onClick={() => setFilterActive('all')}
               style={{
-                borderRadius: 'var(--radius-xs)',
-                padding: '2px 8px',
+                borderRadius: '9999px',
+                padding: '2px 10px',
                 fontSize: '11px',
-                fontWeight: 600,
-                border: filterActive === 'all' ? '1px solid var(--border-default)' : '1px solid transparent',
-                backgroundColor: filterActive === 'all' ? 'var(--bg-card)' : 'transparent',
+                height: '22px',
+                fontWeight: filterActive === 'all' ? 600 : 500,
+                border: 'none',
+                backgroundColor: filterActive === 'all' ? 'var(--bg-card, #ffffff)' : 'transparent',
                 color: filterActive === 'all' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                boxShadow: filterActive === 'all' ? '0 1px 2px rgba(0,0,0,0.04)' : 'none',
+                boxShadow: filterActive === 'all' ? '0 1px 2px rgba(15, 23, 42, 0.06)' : 'none',
                 cursor: 'pointer',
-                transition: 'all 0.15s ease',
+                transition: 'all 0.12s ease',
+                whiteSpace: 'nowrap',
               }}
             >
               {language === 'en' ? 'All' : 'Semua'} ({batches.length})
@@ -122,16 +126,18 @@ export default function DocumentTable({
             <button
               onClick={() => setFilterActive('active')}
               style={{
-                borderRadius: 'var(--radius-xs)',
-                padding: '2px 8px',
+                borderRadius: '9999px',
+                padding: '2px 10px',
                 fontSize: '11px',
-                fontWeight: 600,
-                border: filterActive === 'active' ? '1px solid var(--border-default)' : '1px solid transparent',
-                backgroundColor: filterActive === 'active' ? 'var(--bg-card)' : 'transparent',
+                height: '22px',
+                fontWeight: filterActive === 'active' ? 600 : 500,
+                border: 'none',
+                backgroundColor: filterActive === 'active' ? 'var(--bg-card, #ffffff)' : 'transparent',
                 color: filterActive === 'active' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                boxShadow: filterActive === 'active' ? '0 1px 2px rgba(0,0,0,0.04)' : 'none',
+                boxShadow: filterActive === 'active' ? '0 1px 2px rgba(15, 23, 42, 0.06)' : 'none',
                 cursor: 'pointer',
-                transition: 'all 0.15s ease',
+                transition: 'all 0.12s ease',
+                whiteSpace: 'nowrap',
               }}
             >
               {language === 'en' ? 'Active' : 'Aktif'} ({activeCount})
@@ -139,16 +145,18 @@ export default function DocumentTable({
             <button
               onClick={() => setFilterActive('inactive')}
               style={{
-                borderRadius: 'var(--radius-xs)',
-                padding: '2px 8px',
+                borderRadius: '9999px',
+                padding: '2px 10px',
                 fontSize: '11px',
-                fontWeight: 600,
-                border: filterActive === 'inactive' ? '1px solid var(--border-default)' : '1px solid transparent',
-                backgroundColor: filterActive === 'inactive' ? 'var(--bg-card)' : 'transparent',
+                height: '22px',
+                fontWeight: filterActive === 'inactive' ? 600 : 500,
+                border: 'none',
+                backgroundColor: filterActive === 'inactive' ? 'var(--bg-card, #ffffff)' : 'transparent',
                 color: filterActive === 'inactive' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                boxShadow: filterActive === 'inactive' ? '0 1px 2px rgba(0,0,0,0.04)' : 'none',
+                boxShadow: filterActive === 'inactive' ? '0 1px 2px rgba(15, 23, 42, 0.06)' : 'none',
                 cursor: 'pointer',
-                transition: 'all 0.15s ease',
+                transition: 'all 0.12s ease',
+                whiteSpace: 'nowrap',
               }}
             >
               {language === 'en' ? 'Standby' : 'Standby'} ({inactiveCount})
@@ -158,12 +166,24 @@ export default function DocumentTable({
 
         {/* Right: Slim Search + Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          {/* Search box with Ctrl+K */}
-          <div style={{ position: 'relative', width: '200px' }}>
+          {/* Search box with smooth pill & Ctrl+K */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              backgroundColor: 'var(--bg-subtle, #f8fafc)',
+              border: '1px solid var(--border-default, #e2e8f0)',
+              borderRadius: '9999px',
+              padding: '0 8px 0 10px',
+              height: '26px',
+              width: '210px',
+              gap: '6px',
+            }}
+          >
             <Search
               size={12}
               color="var(--text-muted)"
-              style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)' }}
+              style={{ flexShrink: 0 }}
             />
             <input
               ref={searchInputRef}
@@ -171,26 +191,28 @@ export default function DocumentTable({
               placeholder={language === 'en' ? 'Search documents...' : 'Cari dokumen...'}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="input-text"
               style={{
-                paddingLeft: '26px',
-                paddingRight: '54px',
-                borderRadius: 'var(--radius-xs)',
+                flex: 1,
+                border: 'none',
+                background: 'transparent',
+                outline: 'none',
                 fontSize: '11.5px',
-                height: '26px',
+                color: 'var(--text-primary)',
+                padding: 0,
+                minWidth: 0,
               }}
             />
-            <div
+            <kbd
+              className="kbd-shortcut"
               style={{
-                position: 'absolute',
-                right: '6px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                pointerEvents: 'none',
+                fontSize: '9px',
+                padding: '1px 5px',
+                borderRadius: '9999px',
+                flexShrink: 0,
               }}
             >
-              <kbd className="kbd-shortcut" style={{ fontSize: '9px', padding: '1px 4px' }}>Ctrl K</kbd>
-            </div>
+              Ctrl K
+            </kbd>
           </div>
 
           {onActivateAll && inactiveCount > 0 && hasPermission('documents:toggle_active') && (

@@ -228,31 +228,34 @@ export default function KnowledgeGapsPage() {
                 </span>
               </div>
 
-              {/* Segmented Status Switcher */}
+              {/* Segmented Status Switcher (Smooth Pill Style) */}
               <div
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  backgroundColor: 'var(--bg-app)',
+                  backgroundColor: 'var(--bg-subtle, #f1f5f9)',
+                  border: '1px solid var(--border-default, #e2e8f0)',
+                  borderRadius: '9999px',
                   padding: '2px',
-                  borderRadius: 'var(--radius-xs)',
-                  border: '1px solid var(--border-default)',
                   gap: '2px',
+                  height: '26px',
                 }}
               >
                 <button
                   onClick={() => setStatusFilter('open')}
                   style={{
-                    borderRadius: 'var(--radius-xs)',
-                    padding: '2px 8px',
+                    borderRadius: '9999px',
+                    padding: '2px 10px',
                     fontSize: '11px',
-                    fontWeight: 600,
-                    border: statusFilter === 'open' ? '1px solid var(--border-default)' : '1px solid transparent',
-                    backgroundColor: statusFilter === 'open' ? 'var(--bg-card)' : 'transparent',
+                    height: '22px',
+                    fontWeight: statusFilter === 'open' ? 600 : 500,
+                    border: 'none',
+                    backgroundColor: statusFilter === 'open' ? 'var(--bg-card, #ffffff)' : 'transparent',
                     color: statusFilter === 'open' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                    boxShadow: statusFilter === 'open' ? '0 1px 2px rgba(0,0,0,0.04)' : 'none',
+                    boxShadow: statusFilter === 'open' ? '0 1px 2px rgba(15, 23, 42, 0.06)' : 'none',
                     cursor: 'pointer',
-                    transition: 'all 0.15s ease',
+                    transition: 'all 0.12s ease',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {language === 'en' ? 'Open' : 'Terbuka'} ({stats.open})
@@ -260,16 +263,18 @@ export default function KnowledgeGapsPage() {
                 <button
                   onClick={() => setStatusFilter('in_progress')}
                   style={{
-                    borderRadius: 'var(--radius-xs)',
-                    padding: '2px 8px',
+                    borderRadius: '9999px',
+                    padding: '2px 10px',
                     fontSize: '11px',
-                    fontWeight: 600,
-                    border: statusFilter === 'in_progress' ? '1px solid var(--border-default)' : '1px solid transparent',
-                    backgroundColor: statusFilter === 'in_progress' ? 'var(--bg-card)' : 'transparent',
+                    height: '22px',
+                    fontWeight: statusFilter === 'in_progress' ? 600 : 500,
+                    border: 'none',
+                    backgroundColor: statusFilter === 'in_progress' ? 'var(--bg-card, #ffffff)' : 'transparent',
                     color: statusFilter === 'in_progress' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                    boxShadow: statusFilter === 'in_progress' ? '0 1px 2px rgba(0,0,0,0.04)' : 'none',
+                    boxShadow: statusFilter === 'in_progress' ? '0 1px 2px rgba(15, 23, 42, 0.06)' : 'none',
                     cursor: 'pointer',
-                    transition: 'all 0.15s ease',
+                    transition: 'all 0.12s ease',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {language === 'en' ? 'In Progress' : 'Diproses'} ({stats.inProgress})
@@ -277,16 +282,18 @@ export default function KnowledgeGapsPage() {
                 <button
                   onClick={() => setStatusFilter('resolved')}
                   style={{
-                    borderRadius: 'var(--radius-xs)',
-                    padding: '2px 8px',
+                    borderRadius: '9999px',
+                    padding: '2px 10px',
                     fontSize: '11px',
-                    fontWeight: 600,
-                    border: statusFilter === 'resolved' ? '1px solid var(--border-default)' : '1px solid transparent',
-                    backgroundColor: statusFilter === 'resolved' ? 'var(--bg-card)' : 'transparent',
+                    height: '22px',
+                    fontWeight: statusFilter === 'resolved' ? 600 : 500,
+                    border: 'none',
+                    backgroundColor: statusFilter === 'resolved' ? 'var(--bg-card, #ffffff)' : 'transparent',
                     color: statusFilter === 'resolved' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                    boxShadow: statusFilter === 'resolved' ? '0 1px 2px rgba(0,0,0,0.04)' : 'none',
+                    boxShadow: statusFilter === 'resolved' ? '0 1px 2px rgba(15, 23, 42, 0.06)' : 'none',
                     cursor: 'pointer',
-                    transition: 'all 0.15s ease',
+                    transition: 'all 0.12s ease',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {language === 'en' ? 'Resolved' : 'Selesai'} ({stats.resolved})
@@ -294,16 +301,18 @@ export default function KnowledgeGapsPage() {
                 <button
                   onClick={() => setStatusFilter('all')}
                   style={{
-                    borderRadius: 'var(--radius-xs)',
-                    padding: '2px 8px',
+                    borderRadius: '9999px',
+                    padding: '2px 10px',
                     fontSize: '11px',
-                    fontWeight: 600,
-                    border: statusFilter === 'all' ? '1px solid var(--border-default)' : '1px solid transparent',
-                    backgroundColor: statusFilter === 'all' ? 'var(--bg-card)' : 'transparent',
+                    height: '22px',
+                    fontWeight: statusFilter === 'all' ? 600 : 500,
+                    border: 'none',
+                    backgroundColor: statusFilter === 'all' ? 'var(--bg-card, #ffffff)' : 'transparent',
                     color: statusFilter === 'all' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                    boxShadow: statusFilter === 'all' ? '0 1px 2px rgba(0,0,0,0.04)' : 'none',
+                    boxShadow: statusFilter === 'all' ? '0 1px 2px rgba(15, 23, 42, 0.06)' : 'none',
                     cursor: 'pointer',
-                    transition: 'all 0.15s ease',
+                    transition: 'all 0.12s ease',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {language === 'en' ? 'All' : 'Semua'} ({stats.total})
@@ -313,11 +322,24 @@ export default function KnowledgeGapsPage() {
 
             {/* Right: Slim Search + Actions */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div style={{ position: 'relative', width: '200px' }}>
+              {/* Search box with smooth pill & Ctrl+K */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  backgroundColor: 'var(--bg-subtle, #f8fafc)',
+                  border: '1px solid var(--border-default, #e2e8f0)',
+                  borderRadius: '9999px',
+                  padding: '0 8px 0 10px',
+                  height: '26px',
+                  width: '210px',
+                  gap: '6px',
+                }}
+              >
                 <Search
                   size={12}
                   color="var(--text-muted)"
-                  style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)' }}
+                  style={{ flexShrink: 0 }}
                 />
                 <input
                   ref={searchInputRef}
@@ -325,26 +347,28 @@ export default function KnowledgeGapsPage() {
                   placeholder={language === 'en' ? 'Search query...' : 'Cari pertanyaan...'}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="input-text"
                   style={{
-                    paddingLeft: '26px',
-                    paddingRight: '54px',
-                    borderRadius: 'var(--radius-xs)',
+                    flex: 1,
+                    border: 'none',
+                    background: 'transparent',
+                    outline: 'none',
                     fontSize: '11.5px',
-                    height: '26px',
+                    color: 'var(--text-primary)',
+                    padding: 0,
+                    minWidth: 0,
                   }}
                 />
-                <div
+                <kbd
+                  className="kbd-shortcut"
                   style={{
-                    position: 'absolute',
-                    right: '6px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    pointerEvents: 'none',
+                    fontSize: '9px',
+                    padding: '1px 5px',
+                    borderRadius: '9999px',
+                    flexShrink: 0,
                   }}
                 >
-                  <kbd className="kbd-shortcut" style={{ fontSize: '9px', padding: '1px 4px' }}>Ctrl K</kbd>
-                </div>
+                  Ctrl K
+                </kbd>
               </div>
 
               <button
