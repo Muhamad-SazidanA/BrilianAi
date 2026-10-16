@@ -12,6 +12,7 @@ export interface DashboardMetricCardProps {
   badgeType?: 'success' | 'warning' | 'neutral' | 'accent';
   footerText?: string;
   href?: string;
+  onClick?: () => void;
   isLoading?: boolean;
   statusDot?: 'live' | 'blue' | 'none';
 }
@@ -24,12 +25,14 @@ export default function DashboardMetricCard({
   badgeType = 'neutral',
   footerText,
   href,
+  onClick,
   isLoading = false,
   statusDot = 'none',
 }: DashboardMetricCardProps) {
   const content = (
     <div
-      className={`enterprise-card ${href ? 'hover-elevate cursor-pointer' : ''}`}
+      onClick={onClick}
+      className={`enterprise-card ${href || onClick ? 'hover-elevate cursor-pointer' : ''}`}
       style={{
         padding: '12px 16px',
         justifyContent: 'space-between',

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import {
   FileText,
@@ -19,7 +19,7 @@ import {
   Users,
   UploadCloud,
 } from 'lucide-react';
-import { UploadBatch, DocumentClassification, DocumentStatus } from '@/types/document';
+import { UploadBatch } from '@/types/document';
 import RenameModal from './RenameModal';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserSession } from '@/context/UserSessionContext';
@@ -52,8 +52,25 @@ export default function DocumentTable({
   const [filterActive, setFilterActive] = useState<'all' | 'active' | 'inactive'>('all');
   const [selectedForRename, setSelectedForRename] = useState<UploadBatch | null>(null);
   const [isActivatingAll, setIsActivatingAll] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Keyboard shortcut Ctrl+K and /
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      } else if (e.key === '/' && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const inactiveCount = batches.filter((b) => !b.is_active_knowledge).length;
+  const activeCount = batches.filter((b) => b.is_active_knowledge).length;
 
   // Filter batches
   const filteredBatches = batches.filter((batch) => {
@@ -65,11 +82,11 @@ export default function DocumentTable({
   });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-      {/* Controls Bar: Search, Filter Tabs, Refresh Button */}
-      <div className="ui-card" style={{ padding: '0.65rem 0.85rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      {/* Controls Bar: High-Density Search, Filter Pills, Actions */}
+      <div className="enterprise-card" style={{ padding: '0.65rem 0.85rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-          {/* Search box */}
+          {/* Search box with Ctrl+K badge */}
           <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
             <Search
               size={13}
@@ -77,19 +94,37 @@ export default function DocumentTable({
               style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }}
             />
             <input
+              ref={searchInputRef}
               type="text"
               placeholder={t('table.search_placeholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="input-text"
-              style={{ paddingLeft: '30px', borderRadius: 'var(--radius-xs)' }}
+              style={{
+                paddingLeft: '30px',
+                paddingRight: '62px',
+                borderRadius: 'var(--radius-xs)',
+                fontSize: '12px',
+                height: '30px',
+              }}
             />
+            <div
+              style={{
+                position: 'absolute',
+                right: '8px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                pointerEvents: 'none',
+              }}
+            >
+              <kbd className="kbd-shortcut">Ctrl K</kbd>
+            </div>
           </div>
 
-          {/* Filter Pills */}
+          {/* Segmented Filter Switcher */}
           <div
             style={{
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
               backgroundColor: 'var(--bg-app)',
               padding: '2px',
@@ -100,44 +135,59 @@ export default function DocumentTable({
           >
             <button
               onClick={() => setFilterActive('all')}
-              className={`btn btn-sm ${filterActive === 'all' ? 'btn-primary' : 'btn-ghost'}`}
               style={{
                 borderRadius: 'var(--radius-xs)',
                 padding: '3px 9px',
                 fontSize: '11px',
                 fontWeight: 600,
+                border: filterActive === 'all' ? '1px solid var(--border-default)' : '1px solid transparent',
+                backgroundColor: filterActive === 'all' ? 'var(--bg-card)' : 'transparent',
+                color: filterActive === 'all' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                boxShadow: filterActive === 'all' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
               }}
             >
               {t('table.filter_all')} ({batches.length})
             </button>
             <button
               onClick={() => setFilterActive('active')}
-              className={`btn btn-sm ${filterActive === 'active' ? 'btn-primary' : 'btn-ghost'}`}
               style={{
                 borderRadius: 'var(--radius-xs)',
                 padding: '3px 9px',
                 fontSize: '11px',
                 fontWeight: 600,
+                border: filterActive === 'active' ? '1px solid var(--border-default)' : '1px solid transparent',
+                backgroundColor: filterActive === 'active' ? 'var(--bg-card)' : 'transparent',
+                color: filterActive === 'active' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                boxShadow: filterActive === 'active' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
               }}
             >
-              {t('table.filter_active')} ({batches.filter((b) => b.is_active_knowledge).length})
+              {t('table.filter_active')} ({activeCount})
             </button>
             <button
               onClick={() => setFilterActive('inactive')}
-              className={`btn btn-sm ${filterActive === 'inactive' ? 'btn-primary' : 'btn-ghost'}`}
               style={{
                 borderRadius: 'var(--radius-xs)',
                 padding: '3px 9px',
                 fontSize: '11px',
                 fontWeight: 600,
+                border: filterActive === 'inactive' ? '1px solid var(--border-default)' : '1px solid transparent',
+                backgroundColor: filterActive === 'inactive' ? 'var(--bg-card)' : 'transparent',
+                color: filterActive === 'inactive' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                boxShadow: filterActive === 'inactive' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
               }}
             >
-              {t('table.filter_inactive')} ({batches.filter((b) => !b.is_active_knowledge).length})
+              {t('table.filter_inactive')} ({inactiveCount})
             </button>
           </div>
 
           {/* Action Group: Activate All & Refresh */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             {onActivateAll && inactiveCount > 0 && hasPermission('documents:toggle_active') && (
               <button
                 onClick={async () => {
@@ -150,10 +200,10 @@ export default function DocumentTable({
                 }}
                 disabled={isLoading || isActivatingAll}
                 className="btn btn-primary btn-sm"
-                style={{ fontWeight: 600 }}
+                style={{ fontWeight: 600, height: '30px', fontSize: '11.5px', gap: '5px' }}
                 title="Aktifkan seluruh dokumen yang masih Standby agar dapat langsung dijawab oleh AI Chatbot"
               >
-                <CheckCircle2 size={14} className={isActivatingAll ? 'animate-spin' : ''} />
+                <CheckCircle2 size={13} className={isActivatingAll ? 'animate-spin' : ''} />
                 <span>
                   {language === 'en'
                     ? `Activate All (${inactiveCount})`
@@ -163,8 +213,13 @@ export default function DocumentTable({
             )}
 
             {/* Refresh Action */}
-            <button onClick={onRefresh} disabled={isLoading} className="btn btn-outline btn-sm">
-              <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
+            <button
+              onClick={onRefresh}
+              disabled={isLoading}
+              className="btn btn-outline btn-sm"
+              style={{ height: '30px', fontSize: '11.5px', gap: '5px' }}
+            >
+              <RefreshCw size={12} className={isLoading ? 'animate-spin' : ''} />
               <span>{t('table.refresh')}</span>
             </button>
 
@@ -174,9 +229,9 @@ export default function DocumentTable({
                 type="button"
                 onClick={onUpload}
                 className="btn btn-primary btn-sm"
-                style={{ fontWeight: 600, gap: '6px' }}
+                style={{ fontWeight: 600, gap: '5px', height: '30px', fontSize: '11.5px' }}
               >
-                <UploadCloud size={14} />
+                <UploadCloud size={13} />
                 <span>{t('dash.upload_new')}</span>
               </button>
             )}
@@ -184,44 +239,82 @@ export default function DocumentTable({
         </div>
       </div>
 
-      {/* Table Card (Brilian.Ai Clean Look) */}
-      <div className="ui-card" style={{ padding: 0, overflow: 'hidden' }}>
+      {/* Table Card (Zero-CLS Shimmer Skeleton & Monochrome Minimalist Table) */}
+      <div className="enterprise-card" style={{ padding: 0, overflow: 'hidden' }}>
         {isLoading ? (
-          <div style={{ padding: '4rem 0', textAlign: 'center', color: 'var(--text-secondary)' }}>
+          <div style={{ padding: '0.25rem 0' }}>
+            {/* Header placeholder */}
             <div
-              className="animate-spin"
               style={{
-                width: '26px',
-                height: '26px',
-                border: '2px solid var(--border-default)',
-                borderTopColor: 'var(--color-primary)',
-                borderRadius: '50%',
-                margin: '0 auto 12px',
+                display: 'grid',
+                gridTemplateColumns: 'minmax(240px, 2fr) 90px 100px 140px 150px 120px 110px',
+                padding: '8px 12px',
+                backgroundColor: 'var(--bg-app)',
+                borderBottom: '1px solid var(--border-default)',
+                gap: '8px',
               }}
-            />
-            <p style={{ fontSize: '13.5px', fontWeight: 500 }}>{t('table.loading')}</p>
+            >
+              {[1, 2, 3, 4, 5, 6, 7].map((col) => (
+                <div key={col} className="skeleton-shimmer" style={{ height: '11px', width: col === 1 ? '70px' : '45px' }} />
+              ))}
+            </div>
+
+            {/* 4 Skeleton Shimmer Rows */}
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'minmax(240px, 2fr) 90px 100px 140px 150px 120px 110px',
+                  alignItems: 'center',
+                  padding: '10px 12px',
+                  borderBottom: i < 4 ? '1px solid var(--border-subtle)' : 'none',
+                  gap: '8px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div className="skeleton-shimmer" style={{ width: '24px', height: '24px', borderRadius: '4px', flexShrink: 0 }} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+                    <div className="skeleton-shimmer" style={{ width: `${140 + i * 25}px`, height: '13px' }} />
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <div className="skeleton-shimmer" style={{ width: '42px', height: '11px', borderRadius: '3px' }} />
+                      <div className="skeleton-shimmer" style={{ width: '50px', height: '11px', borderRadius: '3px' }} />
+                    </div>
+                  </div>
+                </div>
+                <div className="skeleton-shimmer" style={{ width: '45px', height: '14px', borderRadius: '3px' }} />
+                <div className="skeleton-shimmer" style={{ width: '55px', height: '14px', borderRadius: '3px' }} />
+                <div className="skeleton-shimmer" style={{ width: '90px', height: '12px' }} />
+                <div className="skeleton-shimmer" style={{ width: '110px', height: '16px', borderRadius: '10px' }} />
+                <div className="skeleton-shimmer" style={{ width: '70px', height: '16px', borderRadius: '10px' }} />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '4px' }}>
+                  <div className="skeleton-shimmer" style={{ width: '22px', height: '22px', borderRadius: '3px' }} />
+                  <div className="skeleton-shimmer" style={{ width: '22px', height: '22px', borderRadius: '3px' }} />
+                </div>
+              </div>
+            ))}
           </div>
         ) : filteredBatches.length === 0 ? (
-          <div style={{ padding: '4rem 0', textAlign: 'center', color: 'var(--text-secondary)' }}>
+          <div style={{ padding: '3.5rem 0', textAlign: 'center', color: 'var(--text-secondary)' }}>
             <div
               style={{
-                width: '48px',
-                height: '48px',
+                width: '42px',
+                height: '42px',
                 borderRadius: '50%',
                 backgroundColor: 'var(--bg-subtle)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                margin: '0 auto 12px',
+                margin: '0 auto 10px',
                 color: 'var(--text-muted)',
               }}
             >
-              <FileText size={24} />
+              <FileText size={20} />
             </div>
-            <p style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary)' }}>
+            <p style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text-primary)', margin: 0 }}>
               {searchQuery ? t('table.empty_search_title') : t('table.empty_title')}
             </p>
-            <p style={{ fontSize: '13px', marginTop: '4px', maxWidth: '340px', margin: '4px auto 0' }}>
+            <p style={{ fontSize: '12px', marginTop: '4px', maxWidth: '340px', margin: '4px auto 0', color: 'var(--text-secondary)' }}>
               {searchQuery ? t('table.empty_search_desc') : t('table.empty_desc')}
             </p>
           </div>
@@ -237,7 +330,7 @@ export default function DocumentTable({
                     fontSize: '10.5px',
                     fontWeight: 700,
                     textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
+                    letterSpacing: '0.04em',
                   }}
                 >
                   <th style={{ padding: '7px 10px' }}>{t('table.col_doc')}</th>

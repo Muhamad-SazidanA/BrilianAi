@@ -1,8 +1,10 @@
 'use client';
 
-import React, { useEffect, useState, useMemo, Suspense } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { UploadCloud } from 'lucide-react';
 import AppShell from '@/components/layout/AppShell';
+import EnterprisePageHeader from '@/components/layout/EnterprisePageHeader';
 import DocumentTable from '@/components/documents/DocumentTable';
 import DocumentStatsCards from '@/components/documents/DocumentStatsCards';
 import DocumentUploadModal from '@/components/documents/DocumentUploadModal';
@@ -19,6 +21,7 @@ function DocumentsContent() {
 
   const [batches, setBatches] = useState<UploadBatch[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [syncTime, setSyncTime] = useState<string>('');
   const [deletingDoc, setDeletingDoc] = useState<{ id: string; filename: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -36,6 +39,8 @@ function DocumentsContent() {
       if (res.ok) {
         const data: UploadBatch[] = await res.json();
         setBatches(data);
+        const d = new Date();
+        setSyncTime(d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
       }
     } catch (err) {
       console.error('Gagal mengambil daftar dokumen:', err);
@@ -149,38 +154,48 @@ function DocumentsContent() {
     );
   };
 
-  const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
-
-  const filteredBatches = useMemo(() => {
-    if (!selectedFilter || selectedFilter === 'total') return batches;
-    if (selectedFilter === 'published') {
-      return batches.filter((b) => b.is_active_knowledge !== false);
-    }
-    if (selectedFilter === 'active') {
-      return batches.filter((b) => !!b.is_active_knowledge);
-    }
-    if (selectedFilter === 'inactive') {
-      return batches.filter((b) => b.is_active_knowledge === false);
-    }
-    return batches;
-  }, [batches, selectedFilter]);
-
   return (
-    <AppShell
-      requiredPermission="documents:read"
-      subtitle={t('docs.subtitle')}
-    >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-        {/* Document Stats Cards */}
-        <DocumentStatsCards
-          batches={batches}
-          activeFilter={selectedFilter}
-          onSelectFilter={setSelectedFilter}
+    <AppShell requiredPermission="documents:read">
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1.25rem',
+          padding: '0 0.25rem 3.5rem',
+        }}
+      >
+        {/* Enterprise Page Header */}
+        <EnterprisePageHeader
+          title={language === 'en' ? 'Knowledge Base' : 'Basis Pengetahuan'}
+          subtitle={
+            language === 'en'
+              ? 'Vision OCR per page, document volume, and curated insights.'
+              : 'Vision OCR per halaman, volume dokumen, dan kurasi analitik.'
+          }
+          syncTime={syncTime}
+          onRefresh={fetchBatches}
+          isLoading={isLoading}
+          actions={
+            hasPermission('documents:upload') ? (
+              <button
+                type="button"
+                onClick={() => setIsUploadOpen(true)}
+                className="btn btn-primary btn-sm"
+                style={{ fontWeight: 600, gap: '6px' }}
+              >
+                <UploadCloud size={13} />
+                <span>{language === 'en' ? 'Upload Document' : 'Unggah Dokumen'}</span>
+              </button>
+            ) : null
+          }
         />
 
-        {/* Document Table */}
+        {/* Document Stats Cards (Pure 4-card enterprise metrics) */}
+        <DocumentStatsCards batches={batches} isLoading={isLoading} />
+
+        {/* Document Table with High-Density Controls & Shimmer Skeleton */}
         <DocumentTable
-          batches={filteredBatches}
+          batches={batches}
           isLoading={isLoading}
           onRefresh={fetchBatches}
           onDelete={handleDelete}
