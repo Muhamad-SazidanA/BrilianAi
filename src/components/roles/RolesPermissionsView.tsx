@@ -171,26 +171,34 @@ export default function RolesPermissionsView() {
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const statsRef = useRef<HTMLDivElement>(null);
+  const cardHeaderRef = useRef<HTMLDivElement>(null);
   const [statsHeight, setStatsHeight] = useState(110);
+  const [cardHeaderHeight, setCardHeaderHeight] = useState(42);
 
-  // Dynamic sticky measurement for 4 stats cards
+  // Dynamic sticky measurement for 4 stats cards & card header
   useEffect(() => {
-    if (!statsRef.current) return;
-    const updateHeight = () => {
+    const updateHeights = () => {
       if (statsRef.current) {
         const h = Math.round(statsRef.current.getBoundingClientRect().height);
         if (h > 0) setStatsHeight(h);
       }
+      if (cardHeaderRef.current) {
+        const ch = Math.round(cardHeaderRef.current.getBoundingClientRect().height);
+        if (ch > 0) setCardHeaderHeight(ch);
+      }
     };
-    updateHeight();
-    const observer = new ResizeObserver(updateHeight);
-    observer.observe(statsRef.current);
-    window.addEventListener('resize', updateHeight);
+    updateHeights();
+    const observer = new ResizeObserver(updateHeights);
+    if (statsRef.current) observer.observe(statsRef.current);
+    if (cardHeaderRef.current) observer.observe(cardHeaderRef.current);
+    window.addEventListener('resize', updateHeights);
     return () => {
       observer.disconnect();
-      window.removeEventListener('resize', updateHeight);
+      window.removeEventListener('resize', updateHeights);
     };
   }, [roles]);
+
+  const tableHeaderStickyTop = 48 + statsHeight - 1 + cardHeaderHeight - 1;
 
   // Keyboard shortcut Ctrl+K and /
   useEffect(() => {
@@ -529,13 +537,14 @@ export default function RolesPermissionsView() {
       >
         {/* Sticky Freeze Header below 4 Stats Cards */}
         <div
+          ref={cardHeaderRef}
           className="enterprise-card-header"
           style={{
             flexWrap: 'wrap',
             gap: '8px',
             position: 'sticky',
             top: `${48 + statsHeight - 1}px`,
-            zIndex: 20,
+            zIndex: 25,
             backgroundColor: 'var(--bg-card, #ffffff)',
             boxShadow: '0 2px 4px rgba(15, 23, 42, 0.04)',
             borderBottom: '1px solid var(--border-default, #e2e8f0)',
@@ -592,10 +601,10 @@ export default function RolesPermissionsView() {
         </div>
 
         {/* ── Table Content ── */}
-        <div style={{ overflowX: 'auto', flex: 1 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px' }}>
+        <div style={{ overflow: 'visible', flex: 1 }}>
+          <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '12.5px' }}>
             <thead>
-              <tr style={{ backgroundColor: 'var(--bg-subtle, #f8fafc)', borderBottom: '1px solid var(--border-default, #e2e8f0)' }}>
+              <tr>
                 {[
                   { label: 'Role & Deskripsi', width: '50%' },
                   { label: 'Pengguna', width: '14%' },
@@ -605,6 +614,10 @@ export default function RolesPermissionsView() {
                   <th
                     key={col.label}
                     style={{
+                      position: 'sticky',
+                      top: `${tableHeaderStickyTop}px`,
+                      zIndex: 20,
+                      backgroundColor: 'var(--bg-subtle, #f8fafc)',
                       padding: '8px 14px',
                       fontWeight: 600,
                       fontSize: '11px',
@@ -613,6 +626,8 @@ export default function RolesPermissionsView() {
                       textAlign: (col.align as any) || 'left',
                       width: col.width,
                       whiteSpace: 'nowrap',
+                      borderBottom: '1px solid var(--border-default, #e2e8f0)',
+                      boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
                     }}
                   >
                     {col.label}

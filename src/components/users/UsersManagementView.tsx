@@ -203,26 +203,34 @@ export default function UsersManagementView() {
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const statsRef = useRef<HTMLDivElement>(null);
+  const cardHeaderRef = useRef<HTMLDivElement>(null);
   const [statsHeight, setStatsHeight] = useState(110);
+  const [cardHeaderHeight, setCardHeaderHeight] = useState(42);
 
-  // Dynamic sticky measurement for 4 stats cards
+  // Dynamic sticky measurement for 4 stats cards & card header
   useEffect(() => {
-    if (!statsRef.current) return;
-    const updateHeight = () => {
+    const updateHeights = () => {
       if (statsRef.current) {
         const h = Math.round(statsRef.current.getBoundingClientRect().height);
         if (h > 0) setStatsHeight(h);
       }
+      if (cardHeaderRef.current) {
+        const ch = Math.round(cardHeaderRef.current.getBoundingClientRect().height);
+        if (ch > 0) setCardHeaderHeight(ch);
+      }
     };
-    updateHeight();
-    const observer = new ResizeObserver(updateHeight);
-    observer.observe(statsRef.current);
-    window.addEventListener('resize', updateHeight);
+    updateHeights();
+    const observer = new ResizeObserver(updateHeights);
+    if (statsRef.current) observer.observe(statsRef.current);
+    if (cardHeaderRef.current) observer.observe(cardHeaderRef.current);
+    window.addEventListener('resize', updateHeights);
     return () => {
       observer.disconnect();
-      window.removeEventListener('resize', updateHeight);
+      window.removeEventListener('resize', updateHeights);
     };
-  }, [users]);
+  }, [users, statusFilter]);
+
+  const tableHeaderStickyTop = 48 + statsHeight - 1 + cardHeaderHeight - 1;
 
   // Keyboard shortcut Ctrl+K and /
   useEffect(() => {
@@ -616,6 +624,56 @@ export default function UsersManagementView() {
         </div>
       </div>
 
+      {/* ── Pending Users Action Callout Banner (if pending users exist) ── */}
+      {pendingUsers.length > 0 && statusFilter !== 'pending_approval' && (
+        <div
+          style={{
+            padding: '10px 14px',
+            borderRadius: '8px',
+            backgroundColor: '#fffbeb',
+            border: '1px solid #fde68a',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Clock size={16} color="#d97706" style={{ flexShrink: 0 }} />
+            <div>
+              <div style={{ fontWeight: 600, fontSize: '12px', color: '#92400e' }}>
+                Terdapat {pendingUsers.length} akun Google baru menunggu persetujuan
+              </div>
+              <div style={{ fontSize: '11.5px', color: '#b45309' }}>
+                Tinjau akun dan tetapkan hak akses (Role) sebelum pengguna dapat mengakses sistem KMS.
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setStatusFilter('pending_approval')}
+            style={{
+              padding: '4px 12px',
+              borderRadius: '9999px',
+              backgroundColor: '#d97706',
+              color: '#ffffff',
+              border: 'none',
+              fontSize: '11.5px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              boxShadow: '0 1px 2px rgba(217, 119, 6, 0.2)',
+            }}
+          >
+            <UserCheck size={13} />
+            Tinjau Sekarang ({pendingUsers.length})
+          </button>
+        </div>
+      )}
+
       {/* ── Main Stream Card (Linear / Vercel Enterprise Style) ── */}
       <div
         className="enterprise-card"
@@ -628,13 +686,14 @@ export default function UsersManagementView() {
       >
         {/* Sticky Freeze Header below 4 Stats Cards */}
         <div
+          ref={cardHeaderRef}
           className="enterprise-card-header"
           style={{
             flexWrap: 'wrap',
             gap: '8px',
             position: 'sticky',
             top: `${48 + statsHeight - 1}px`,
-            zIndex: 20,
+            zIndex: 25,
             backgroundColor: 'var(--bg-card, #ffffff)',
             boxShadow: '0 2px 4px rgba(15, 23, 42, 0.04)',
             borderBottom: '1px solid var(--border-default, #e2e8f0)',
@@ -767,66 +826,19 @@ export default function UsersManagementView() {
           </div>
         </div>
 
-        {/* ── Pending Users Action Callout Banner (if pending users exist) ── */}
-        {pendingUsers.length > 0 && statusFilter !== 'pending_approval' && (
-          <div
-            style={{
-              margin: '12px 14px 4px',
-              padding: '10px 14px',
-              borderRadius: '8px',
-              backgroundColor: '#fffbeb',
-              border: '1px solid #fde68a',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '12px',
-              flexWrap: 'wrap',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Clock size={16} color="#d97706" style={{ flexShrink: 0 }} />
-              <div>
-                <div style={{ fontWeight: 600, fontSize: '12px', color: '#92400e' }}>
-                  Terdapat {pendingUsers.length} akun Google baru menunggu persetujuan
-                </div>
-                <div style={{ fontSize: '11.5px', color: '#b45309' }}>
-                  Tinjau akun dan tetapkan hak akses (Role) sebelum pengguna dapat mengakses sistem KMS.
-                </div>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setStatusFilter('pending_approval')}
-              style={{
-                padding: '4px 12px',
-                borderRadius: '9999px',
-                backgroundColor: '#d97706',
-                color: '#ffffff',
-                border: 'none',
-                fontSize: '11.5px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
-                boxShadow: '0 1px 2px rgba(217, 119, 6, 0.2)',
-              }}
-            >
-              <UserCheck size={13} />
-              Tinjau Sekarang ({pendingUsers.length})
-            </button>
-          </div>
-        )}
-
         {/* ── Table Content ── */}
-        <div style={{ overflowX: 'auto', flex: 1 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px' }}>
+        <div style={{ overflow: 'visible', flex: 1 }}>
+          <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '12.5px' }}>
             <thead>
-              <tr style={{ backgroundColor: 'var(--bg-subtle, #f8fafc)', borderBottom: '1px solid var(--border-default, #e2e8f0)' }}>
+              <tr>
                 {['Pengguna', 'Username', 'Role Akses', 'Departemen', 'Pertanyaan AI', 'Login Terakhir', 'Status', 'Aksi'].map((h, idx) => (
                   <th
                     key={h}
                     style={{
+                      position: 'sticky',
+                      top: `${tableHeaderStickyTop}px`,
+                      zIndex: 20,
+                      backgroundColor: 'var(--bg-subtle, #f8fafc)',
                       padding: '8px 14px',
                       fontWeight: 600,
                       fontSize: '11px',
@@ -834,6 +846,8 @@ export default function UsersManagementView() {
                       color: 'var(--text-secondary)',
                       textAlign: idx === 7 ? 'right' : idx === 4 ? 'center' : 'left',
                       whiteSpace: 'nowrap',
+                      borderBottom: '1px solid var(--border-default, #e2e8f0)',
+                      boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
                     }}
                   >
                     {h}
