@@ -319,16 +319,17 @@ export default function DocumentUploadModal({
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 1000,
-        padding: '1.25rem',
+        padding: '1rem',
       }}
       onClick={handleModalClose}
     >
       <div
         style={{
           width: '100%',
-          maxWidth: '500px',
+          maxWidth: '780px',
+          maxHeight: 'min(90vh, 560px)',
           backgroundColor: '#FFFFFF',
-          borderRadius: '16px',
+          borderRadius: '14px',
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
           border: '1px solid #E2E8F0',
           display: 'flex',
@@ -341,17 +342,17 @@ export default function DocumentUploadModal({
         <div
           style={{
             display: 'flex',
-            alignItems: 'flex-start',
+            alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '20px 24px 16px',
+            padding: '14px 20px 12px',
             borderBottom: '1px solid #F1F5F9',
           }}
         >
           <div>
-            <h3 style={{ fontSize: '17px', fontWeight: 700, color: '#0F172A', letterSpacing: '-0.01em' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: 650, color: '#0F172A', letterSpacing: '-0.01em', margin: 0 }}>
               Unggah Dokumen
             </h3>
-            <p style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>
+            <p style={{ fontSize: '12px', color: '#64748B', marginTop: '2px', margin: 0 }}>
               Tambahkan file PDF ke Basis Pengetahuan (Knowledge Base)
             </p>
           </div>
@@ -363,8 +364,8 @@ export default function DocumentUploadModal({
             style={{
               background: 'none',
               border: 'none',
-              padding: '6px',
-              borderRadius: '8px',
+              padding: '5px',
+              borderRadius: '6px',
               color: '#94A3B8',
               cursor: isUploading ? 'not-allowed' : 'pointer',
               display: 'flex',
@@ -376,12 +377,12 @@ export default function DocumentUploadModal({
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
             aria-label="Tutup"
           >
-            <X size={18} />
+            <X size={16} />
           </button>
         </div>
 
         {/* ── Body Content ── */}
-        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ padding: '16px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {/* Result View */}
           {result ? (
             <div
@@ -390,14 +391,14 @@ export default function DocumentUploadModal({
                 flexDirection: 'column',
                 alignItems: 'center',
                 textAlign: 'center',
-                padding: '16px 0',
-                gap: '14px',
+                padding: '12px 0',
+                gap: '12px',
               }}
             >
               <div
                 style={{
-                  width: '48px',
-                  height: '48px',
+                  width: '40px',
+                  height: '40px',
                   borderRadius: '50%',
                   backgroundColor: '#DCFCE7',
                   color: '#16A34A',
@@ -406,14 +407,14 @@ export default function DocumentUploadModal({
                   justifyContent: 'center',
                 }}
               >
-                <CheckCircle2 size={26} />
+                <CheckCircle2 size={22} />
               </div>
 
               <div>
-                <h4 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>
+                <h4 style={{ fontSize: '15px', fontWeight: 650, color: '#0F172A', margin: 0 }}>
                   Dokumen Berhasil Diproses
                 </h4>
-                <p style={{ fontSize: '13px', color: '#64748B', marginTop: '3px', wordBreak: 'break-all' }}>
+                <p style={{ fontSize: '12.5px', color: '#64748B', marginTop: '3px', margin: 0, wordBreak: 'break-all' }}>
                   {result.original_filename}
                 </p>
                 <div
@@ -422,12 +423,12 @@ export default function DocumentUploadModal({
                     alignItems: 'center',
                     gap: '8px',
                     marginTop: '8px',
-                    padding: '4px 12px',
-                    borderRadius: '20px',
+                    padding: '3px 10px',
+                    borderRadius: '9999px',
                     backgroundColor: '#F1F5F9',
-                    fontSize: '12px',
+                    fontSize: '11.5px',
                     color: '#334155',
-                    fontWeight: 600,
+                    fontWeight: 550,
                   }}
                 >
                   <span>{result.page_count} Halaman</span>
@@ -436,27 +437,28 @@ export default function DocumentUploadModal({
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', marginTop: '8px', width: '100%' }}>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '6px', width: '100%', maxWidth: '320px' }}>
                 <Link
                   href={`/documents/${result.upload_batch_id}`}
                   onClick={handleModalClose}
                   style={{
                     flex: 1,
-                    height: '40px',
+                    height: '32px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '6px',
+                    gap: '5px',
                     backgroundColor: '#2563EB',
                     color: '#FFFFFF',
-                    borderRadius: '8px',
-                    fontSize: '13px',
-                    fontWeight: 600,
+                    borderRadius: '9999px',
+                    fontSize: '12px',
+                    fontWeight: 550,
                     textDecoration: 'none',
+                    boxShadow: '0 1px 2px rgba(37, 99, 235, 0.15)',
                   }}
                 >
                   <span>Buka di Studio</span>
-                  <ArrowRight size={14} />
+                  <ArrowRight size={13} />
                 </Link>
                 <button
                   type="button"
@@ -466,14 +468,14 @@ export default function DocumentUploadModal({
                     setLiveProgress(null);
                   }}
                   style={{
-                    height: '40px',
-                    padding: '0 16px',
+                    height: '32px',
+                    padding: '0 14px',
                     backgroundColor: '#FFFFFF',
-                    border: '1px solid #E2E8F0',
+                    border: '1px solid #CBD5E1',
                     color: '#334155',
-                    borderRadius: '8px',
-                    fontSize: '13px',
-                    fontWeight: 600,
+                    borderRadius: '9999px',
+                    fontSize: '12px',
+                    fontWeight: 500,
                     cursor: 'pointer',
                   }}
                 >
@@ -483,12 +485,12 @@ export default function DocumentUploadModal({
             </div>
           ) : isUploading ? (
             /* Uploading Progress View */
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '12px 0' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '10px 0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div
                   style={{
-                    width: '36px',
-                    height: '36px',
+                    width: '32px',
+                    height: '32px',
                     borderRadius: '50%',
                     backgroundColor: '#EFF6FF',
                     color: '#2563EB',
@@ -498,18 +500,18 @@ export default function DocumentUploadModal({
                     flexShrink: 0,
                   }}
                 >
-                  <Loader2 size={18} className="animate-spin" />
+                  <Loader2 size={16} className="animate-spin" />
                 </div>
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '13.5px', fontWeight: 600, color: '#0F172A' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>
                       Memproses Dokumen...
                     </span>
-                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#2563EB', fontFamily: 'monospace' }}>
+                    <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#2563EB', fontFamily: 'monospace' }}>
                       {liveProgress?.progressPercent || Math.min(currentStepIndex * 25, 95)}%
                     </span>
                   </div>
-                  <p style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
+                  <p style={{ fontSize: '11.5px', color: '#64748B', marginTop: '2px', margin: 0, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
                     {liveProgress?.message || 'Vision OCR Engine & pgvector embedding...'}
                   </p>
                 </div>
@@ -519,7 +521,7 @@ export default function DocumentUploadModal({
               <div
                 style={{
                   width: '100%',
-                  height: '6px',
+                  height: '5px',
                   borderRadius: '3px',
                   backgroundColor: '#E2E8F0',
                   overflow: 'hidden',
@@ -550,7 +552,7 @@ export default function DocumentUploadModal({
                     <div
                       key={s.id}
                       style={{
-                        padding: '6px 4px',
+                        padding: '5px 4px',
                         borderRadius: '6px',
                         fontSize: '11px',
                         fontWeight: isCurrent || isDone ? 600 : 500,
@@ -566,442 +568,446 @@ export default function DocumentUploadModal({
               </div>
             </div>
           ) : (
-            /* Idle Input Form */
-            <>
-              {/* Drop Area */}
-              <div
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                style={{
-                  border: `1.5px dashed ${isDragging ? '#2563EB' : '#CBD5E1'}`,
-                  backgroundColor: isDragging ? '#EFF6FF' : '#F8FAFC',
-                  borderRadius: '12px',
-                  padding: selectedFile ? '14px 16px' : '20px 16px',
-                  textAlign: 'center',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  userSelect: 'none',
-                }}
-              >
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                  accept="application/pdf"
-                  style={{ display: 'none' }}
-                />
+            /* Idle Input Form (Wide 2-Column Side-by-Side) */
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'minmax(260px, 1fr) minmax(310px, 1.15fr)',
+                gap: '16px',
+                alignItems: 'start',
+              }}
+            >
+              {/* ── Left Column: Upload Dropzone & Info ── */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    border: `1.5px dashed ${isDragging ? '#2563EB' : selectedFile ? '#93C5FD' : '#CBD5E1'}`,
+                    backgroundColor: isDragging ? '#EFF6FF' : selectedFile ? '#F0F7FF' : '#F8FAFC',
+                    borderRadius: '10px',
+                    padding: selectedFile ? '14px 12px' : '22px 14px',
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    userSelect: 'none',
+                    minHeight: '125px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                >
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    accept="application/pdf"
+                    style={{ display: 'none' }}
+                  />
 
-                {selectedFile ? (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                  {selectedFile ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', width: '100%' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, textAlign: 'left' }}>
+                        <div
+                          style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '6px',
+                            backgroundColor: '#EFF6FF',
+                            color: '#2563EB',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <FileText size={18} />
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: '12.5px',
+                              fontWeight: 600,
+                              color: '#0F172A',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              maxWidth: '180px',
+                            }}
+                            title={selectedFile.name}
+                          >
+                            {selectedFile.name}
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
+                            {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB · Ganti file
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedFile(null);
+                          if (fileInputRef.current) fileInputRef.current.value = '';
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#94A3B8',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          flexShrink: 0,
+                        }}
+                        title="Batalkan pilihan"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
                       <div
                         style={{
-                          width: '36px',
-                          height: '36px',
-                          borderRadius: '8px',
-                          backgroundColor: '#EFF6FF',
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          backgroundColor: '#FFFFFF',
+                          border: '1px solid #E2E8F0',
                           color: '#2563EB',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          flexShrink: 0,
+                          margin: '0 auto 6px',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
                         }}
                       >
-                        <FileText size={20} />
+                        <UploadCloud size={16} />
                       </div>
-                      <div style={{ textAlign: 'left', minWidth: 0 }}>
-                        <div
-                          style={{
-                            fontSize: '13.5px',
-                            fontWeight: 600,
-                            color: '#0F172A',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                          }}
-                        >
-                          {selectedFile.name}
-                        </div>
-                        <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '2px' }}>
-                          {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB · Klik untuk mengganti
-                        </div>
-                      </div>
+                      <p style={{ fontSize: '12px', fontWeight: 600, color: '#0F172A', margin: 0 }}>
+                        Tarik file PDF ke sini, atau <span style={{ color: '#2563EB' }}>pilih file</span>
+                      </p>
+                      <p style={{ fontSize: '11px', color: '#94A3B8', marginTop: '2px', margin: 0 }}>
+                        Format PDF hingga 50 MB
+                      </p>
                     </div>
+                  )}
+                </div>
 
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedFile(null);
-                        if (fileInputRef.current) fileInputRef.current.value = '';
-                      }}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#94A3B8',
-                        cursor: 'pointer',
-                        padding: '6px',
-                        borderRadius: '50%',
-                        display: 'flex',
-                      }}
-                      title="Batalkan pilihan"
-                    >
-                      <X size={16} />
-                    </button>
+                {/* Capability Hint Card */}
+                <div
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    backgroundColor: '#F8FAFC',
+                    border: '1px solid #E2E8F0',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Shield size={11} color="#2563EB" style={{ flexShrink: 0 }} />
+                    <span style={{ fontSize: '10.5px', fontWeight: 600, color: '#334155' }}>
+                      AI Vision OCR & pgvector
+                    </span>
                   </div>
-                ) : (
-                  <div>
-                    <div
-                      style={{
-                        width: '36px',
-                        height: '36px',
-                        borderRadius: '50%',
-                        backgroundColor: '#FFFFFF',
-                        border: '1px solid #E2E8F0',
-                        color: '#2563EB',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        margin: '0 auto 8px',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                      }}
-                    >
-                      <UploadCloud size={18} />
-                    </div>
-                    <p style={{ fontSize: '13px', fontWeight: 600, color: '#0F172A' }}>
-                      Tarik file PDF ke sini, atau <span style={{ color: '#2563EB' }}>pilih file</span>
-                    </p>
-                    <p style={{ fontSize: '11.5px', color: '#94A3B8', marginTop: '3px' }}>
-                      Format PDF hingga 50 MB
-                    </p>
+                  <p style={{ fontSize: '10px', color: '#64748B', margin: 0, lineHeight: 1.35 }}>
+                    Ekstraksi presisi per halaman dengan representasi vektor 1024-dimensi untuk rujukan chat AI.
+                  </p>
+                </div>
+
+                {/* Error Notice */}
+                {uploadError && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '7px 10px',
+                      borderRadius: '6px',
+                      backgroundColor: '#FEF2F2',
+                      border: '1px solid #FEE2E2',
+                      color: '#DC2626',
+                      fontSize: '11.5px',
+                    }}
+                  >
+                    <AlertCircle size={13} style={{ flexShrink: 0 }} />
+                    <span>{uploadError}</span>
                   </div>
                 )}
               </div>
 
-              {/* Error Notice */}
-              {uploadError && (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    backgroundColor: '#FEF2F2',
-                    border: '1px solid #FEE2E2',
-                    color: '#DC2626',
-                    fontSize: '12px',
-                  }}
-                >
-                  <AlertCircle size={14} />
-                  <span>{uploadError}</span>
-                </div>
-              )}
-
-              {/* Core 2-Column Selects */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      color: '#475569',
-                      marginBottom: '6px',
-                    }}
-                  >
-                    Divisi Pemilik
-                  </label>
-                  <select
-                    value={divisionId}
-                    onChange={(e) => setDivisionId(e.target.value)}
-                    style={{
-                      width: '100%',
-                      height: '38px',
-                      padding: '0 10px',
-                      fontSize: '13px',
-                      color: '#0F172A',
-                      backgroundColor: '#FFFFFF',
-                      border: '1px solid #CBD5E1',
-                      borderRadius: '8px',
-                      outline: 'none',
-                    }}
-                  >
-                    {DEFAULT_DIVISIONS.map((d) => (
-                      <option key={d} value={d}>
-                        {d}
-                      </option>
-                    ))}
-                    <option value="custom">+ Divisi Lainnya...</option>
-                  </select>
-                  {divisionId === 'custom' && (
-                    <input
-                      type="text"
-                      placeholder="Nama divisi..."
-                      value={customDivision}
-                      onChange={(e) => setCustomDivision(e.target.value)}
+              {/* ── Right Column: Metadata & Access Controls ── */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {/* Divisi & Klasifikasi */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '3px' }}>
+                      Divisi Pemilik
+                    </label>
+                    <select
+                      value={divisionId}
+                      onChange={(e) => setDivisionId(e.target.value)}
                       style={{
                         width: '100%',
-                        height: '34px',
-                        padding: '0 10px',
-                        fontSize: '12.5px',
+                        height: '30px',
+                        padding: '0 8px',
+                        fontSize: '11.5px',
                         color: '#0F172A',
                         backgroundColor: '#FFFFFF',
                         border: '1px solid #CBD5E1',
                         borderRadius: '6px',
-                        marginTop: '6px',
                         outline: 'none',
                       }}
-                    />
-                  )}
-                </div>
-
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      color: '#475569',
-                      marginBottom: '6px',
-                    }}
-                  >
-                    Klasifikasi Akses
-                  </label>
-                  <select
-                    value={classification}
-                    onChange={(e) => setClassification(e.target.value as DocumentClassification)}
-                    style={{
-                      width: '100%',
-                      height: '38px',
-                      padding: '0 10px',
-                      fontSize: '13px',
-                      color: '#0F172A',
-                      backgroundColor: '#FFFFFF',
-                      border: '1px solid #CBD5E1',
-                      borderRadius: '8px',
-                      outline: 'none',
-                    }}
-                  >
-                    <option value="Publik">Publik</option>
-                    <option value="Internal">Internal (Karyawan)</option>
-                    <option value="Rahasia">Rahasia (Divisi)</option>
-                    <option value="Sangat Rahasia">Sangat Rahasia</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Advanced Options Accordion */}
-              <div>
-                <button
-                  type="button"
-                  onClick={() => setShowAdvanced(!showAdvanced)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    background: 'none',
-                    border: 'none',
-                    padding: '4px 0',
-                    cursor: 'pointer',
-                    color: '#64748B',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                  }}
-                >
-                  <span>Opsi Lanjutan (Status, Versi, Hak Akses Khusus)</span>
-                  {showAdvanced ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                </button>
-
-                {showAdvanced && (
-                  <div
-                    style={{
-                      marginTop: '10px',
-                      padding: '14px',
-                      borderRadius: '10px',
-                      backgroundColor: '#F8FAFC',
-                      border: '1px solid #E2E8F0',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '12px',
-                    }}
-                  >
-                    {/* Status & Versi */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#64748B', marginBottom: '4px' }}>
-                          Status Dokumen
-                        </label>
-                        <select
-                          value={docStatus}
-                          onChange={(e) => setDocStatus(e.target.value as DocumentStatus)}
-                          style={{
-                            width: '100%',
-                            height: '34px',
-                            padding: '0 8px',
-                            fontSize: '12px',
-                            backgroundColor: '#FFFFFF',
-                            border: '1px solid #CBD5E1',
-                            borderRadius: '6px',
-                            outline: 'none',
-                          }}
-                        >
-                          <option value="Aktif">Aktif (Masuk RAG)</option>
-                          <option value="Draft">Draft</option>
-                          <option value="Review">Review</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#64748B', marginBottom: '4px' }}>
-                          Versi
-                        </label>
-                        <input
-                          type="text"
-                          value={version}
-                          onChange={(e) => setVersion(e.target.value)}
-                          placeholder="1.0"
-                          style={{
-                            width: '100%',
-                            height: '34px',
-                            padding: '0 8px',
-                            fontSize: '12px',
-                            backgroundColor: '#FFFFFF',
-                            border: '1px solid #CBD5E1',
-                            borderRadius: '6px',
-                            fontFamily: 'monospace',
-                            outline: 'none',
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Review Date */}
-                    <div>
-                      <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#64748B', marginBottom: '4px' }}>
-                        Jadwal Tinjau Berkala
-                      </label>
+                    >
+                      {DEFAULT_DIVISIONS.map((d) => (
+                        <option key={d} value={d}>
+                          {d}
+                        </option>
+                      ))}
+                      <option value="custom">+ Divisi Lainnya...</option>
+                    </select>
+                    {divisionId === 'custom' && (
                       <input
-                        type="date"
-                        value={reviewDueDate}
-                        onChange={(e) => setReviewDueDate(e.target.value)}
+                        type="text"
+                        placeholder="Nama divisi..."
+                        value={customDivision}
+                        onChange={(e) => setCustomDivision(e.target.value)}
                         style={{
                           width: '100%',
-                          height: '34px',
+                          height: '28px',
                           padding: '0 8px',
-                          fontSize: '12px',
+                          fontSize: '11.5px',
+                          color: '#0F172A',
                           backgroundColor: '#FFFFFF',
                           border: '1px solid #CBD5E1',
-                          borderRadius: '6px',
+                          borderRadius: '5px',
+                          marginTop: '4px',
                           outline: 'none',
                         }}
                       />
-                    </div>
-
-                    {/* User Grants */}
-                    <div style={{ borderTop: '1px dashed #E2E8F0', paddingTop: '10px' }}>
-                      <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
-                        Beri Akses Khusus ke User
-                      </label>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <select
-                          value={selectedUserId}
-                          onChange={(e) => setSelectedUserId(e.target.value)}
-                          style={{
-                            flex: 1,
-                            height: '32px',
-                            padding: '0 8px',
-                            fontSize: '11.5px',
-                            backgroundColor: '#FFFFFF',
-                            border: '1px solid #CBD5E1',
-                            borderRadius: '6px',
-                            outline: 'none',
-                          }}
-                        >
-                          <option value="">Pilih pengguna...</option>
-                          {availableUsers.map((u) => (
-                            <option key={u.id} value={u.id}>
-                              {u.name} ({u.department || 'General'})
-                            </option>
-                          ))}
-                        </select>
-
-                        <select
-                          value={selectedAccessLevel}
-                          onChange={(e) => setSelectedAccessLevel(e.target.value as 'viewer' | 'editor')}
-                          style={{
-                            width: '84px',
-                            height: '32px',
-                            padding: '0 6px',
-                            fontSize: '11.5px',
-                            backgroundColor: '#FFFFFF',
-                            border: '1px solid #CBD5E1',
-                            borderRadius: '6px',
-                            outline: 'none',
-                          }}
-                        >
-                          <option value="viewer">Viewer</option>
-                          <option value="editor">Editor</option>
-                        </select>
-
-                        <button
-                          type="button"
-                          onClick={handleAddUserGrant}
-                          disabled={!selectedUserId}
-                          style={{
-                            height: '32px',
-                            padding: '0 10px',
-                            backgroundColor: '#FFFFFF',
-                            border: '1px solid #CBD5E1',
-                            borderRadius: '6px',
-                            cursor: selectedUserId ? 'pointer' : 'not-allowed',
-                            color: '#334155',
-                          }}
-                        >
-                          <Plus size={13} />
-                        </button>
-                      </div>
-
-                      {userGrants.length > 0 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px' }}>
-                          {userGrants.map((grant) => (
-                            <div
-                              key={grant.userId}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                padding: '4px 8px',
-                                backgroundColor: '#FFFFFF',
-                                border: '1px solid #E2E8F0',
-                                borderRadius: '4px',
-                                fontSize: '11px',
-                              }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span style={{ fontWeight: 600, color: '#0F172A' }}>{grant.userName}</span>
-                                <span style={{ fontSize: '10px', padding: '1px 5px', borderRadius: '4px', backgroundColor: '#F1F5F9', color: '#64748B' }}>
-                                  {grant.accessLevel}
-                                </span>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveUserGrant(grant.userId)}
-                                style={{ background: 'none', border: 'none', color: '#DC2626', cursor: 'pointer', padding: '2px' }}
-                              >
-                                <Trash2 size={11} />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
-                )}
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '3px' }}>
+                      Klasifikasi Akses
+                    </label>
+                    <select
+                      value={classification}
+                      onChange={(e) => setClassification(e.target.value as DocumentClassification)}
+                      style={{
+                        width: '100%',
+                        height: '30px',
+                        padding: '0 8px',
+                        fontSize: '11.5px',
+                        color: '#0F172A',
+                        backgroundColor: '#FFFFFF',
+                        border: '1px solid #CBD5E1',
+                        borderRadius: '6px',
+                        outline: 'none',
+                      }}
+                    >
+                      <option value="Publik">Publik</option>
+                      <option value="Internal">Internal (Karyawan)</option>
+                      <option value="Rahasia">Rahasia (Divisi)</option>
+                      <option value="Sangat Rahasia">Sangat Rahasia</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Status & Versi */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '3px' }}>
+                      Status Dokumen
+                    </label>
+                    <select
+                      value={docStatus}
+                      onChange={(e) => setDocStatus(e.target.value as DocumentStatus)}
+                      style={{
+                        width: '100%',
+                        height: '30px',
+                        padding: '0 8px',
+                        fontSize: '11.5px',
+                        backgroundColor: '#FFFFFF',
+                        border: '1px solid #CBD5E1',
+                        borderRadius: '6px',
+                        outline: 'none',
+                      }}
+                    >
+                      <option value="Aktif">Aktif (Masuk RAG)</option>
+                      <option value="Draft">Draft</option>
+                      <option value="Review">Review</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '3px' }}>
+                      Versi
+                    </label>
+                    <input
+                      type="text"
+                      value={version}
+                      onChange={(e) => setVersion(e.target.value)}
+                      placeholder="1.0"
+                      style={{
+                        width: '100%',
+                        height: '30px',
+                        padding: '0 8px',
+                        fontSize: '11.5px',
+                        backgroundColor: '#FFFFFF',
+                        border: '1px solid #CBD5E1',
+                        borderRadius: '6px',
+                        fontFamily: 'monospace',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Review Date */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '3px' }}>
+                    Jadwal Tinjau Berkala
+                  </label>
+                  <input
+                    type="date"
+                    value={reviewDueDate}
+                    onChange={(e) => setReviewDueDate(e.target.value)}
+                    style={{
+                      width: '100%',
+                      height: '30px',
+                      padding: '0 8px',
+                      fontSize: '11.5px',
+                      backgroundColor: '#FFFFFF',
+                      border: '1px solid #CBD5E1',
+                      borderRadius: '6px',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+
+                {/* User Grants */}
+                <div style={{ borderTop: '1px dashed #E2E8F0', paddingTop: '6px', marginTop: '2px' }}>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '3px' }}>
+                    Beri Akses Khusus ke User
+                  </label>
+                  <div style={{ display: 'flex', gap: '5px' }}>
+                    <select
+                      value={selectedUserId}
+                      onChange={(e) => setSelectedUserId(e.target.value)}
+                      style={{
+                        flex: 1,
+                        height: '28px',
+                        padding: '0 6px',
+                        fontSize: '11px',
+                        backgroundColor: '#FFFFFF',
+                        border: '1px solid #CBD5E1',
+                        borderRadius: '6px',
+                        outline: 'none',
+                        minWidth: 0,
+                      }}
+                    >
+                      <option value="">Pilih pengguna...</option>
+                      {availableUsers.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name} ({u.department || 'General'})
+                        </option>
+                      ))}
+                    </select>
+
+                    <select
+                      value={selectedAccessLevel}
+                      onChange={(e) => setSelectedAccessLevel(e.target.value as 'viewer' | 'editor')}
+                      style={{
+                        width: '74px',
+                        height: '28px',
+                        padding: '0 4px',
+                        fontSize: '11px',
+                        backgroundColor: '#FFFFFF',
+                        border: '1px solid #CBD5E1',
+                        borderRadius: '6px',
+                        outline: 'none',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <option value="viewer">Viewer</option>
+                      <option value="editor">Editor</option>
+                    </select>
+
+                    <button
+                      type="button"
+                      onClick={handleAddUserGrant}
+                      disabled={!selectedUserId}
+                      style={{
+                        height: '28px',
+                        padding: '0 8px',
+                        backgroundColor: selectedUserId ? '#F1F5F9' : '#F8FAFC',
+                        border: '1px solid #CBD5E1',
+                        borderRadius: '6px',
+                        cursor: selectedUserId ? 'pointer' : 'not-allowed',
+                        color: selectedUserId ? '#0F172A' : '#94A3B8',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                      title="Tambah Akses User"
+                    >
+                      <Plus size={12} />
+                    </button>
+                  </div>
+
+                  {userGrants.length > 0 && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '4px',
+                        marginTop: '6px',
+                        maxHeight: '52px',
+                        overflowY: 'auto',
+                      }}
+                    >
+                      {userGrants.map((grant) => (
+                        <div
+                          key={grant.userId}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            padding: '2px 7px',
+                            backgroundColor: '#FFFFFF',
+                            border: '1px solid #E2E8F0',
+                            borderRadius: '9999px',
+                            fontSize: '10.5px',
+                          }}
+                        >
+                          <span style={{ fontWeight: 600, color: '#0F172A' }}>{grant.userName}</span>
+                          <span style={{ fontSize: '9.5px', padding: '0 4px', borderRadius: '4px', backgroundColor: '#F1F5F9', color: '#64748B' }}>
+                            {grant.accessLevel}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveUserGrant(grant.userId)}
+                            style={{ background: 'none', border: 'none', color: '#DC2626', cursor: 'pointer', padding: 0, display: 'flex' }}
+                            title="Hapus"
+                          >
+                            <Trash2 size={10} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </>
+            </div>
           )}
         </div>
 
@@ -1012,26 +1018,28 @@ export default function DocumentUploadModal({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'flex-end',
-              gap: '10px',
-              padding: '14px 24px 20px',
+              gap: '8px',
+              padding: '12px 20px',
+              borderTop: '1px solid #F1F5F9',
+              backgroundColor: '#FAFAFA',
             }}
           >
             <button
               type="button"
               onClick={handleModalClose}
               style={{
-                height: '38px',
-                padding: '0 16px',
-                borderRadius: '8px',
-                border: '1px solid #E2E8F0',
+                height: '28px',
+                padding: '0 14px',
+                borderRadius: '9999px',
+                border: '1px solid #CBD5E1',
                 backgroundColor: '#FFFFFF',
                 color: '#475569',
-                fontSize: '13px',
-                fontWeight: 600,
+                fontSize: '11.5px',
+                fontWeight: 500,
                 cursor: 'pointer',
-                transition: 'background 0.15s ease',
+                transition: 'all 0.15s ease',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F1F5F9')}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#FFFFFF')}
             >
               Batal
@@ -1041,23 +1049,35 @@ export default function DocumentUploadModal({
               onClick={handleSubmit}
               disabled={!selectedFile}
               style={{
-                height: '38px',
-                padding: '0 18px',
-                borderRadius: '8px',
-                border: 'none',
+                height: '28px',
+                padding: '0 14px',
+                borderRadius: '9999px',
+                border: '1px solid #1D4ED8',
                 backgroundColor: selectedFile ? '#2563EB' : '#94A3B8',
                 color: '#FFFFFF',
-                fontSize: '13px',
-                fontWeight: 600,
+                fontSize: '11.5px',
+                fontWeight: 550,
                 cursor: selectedFile ? 'pointer' : 'not-allowed',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
-                boxShadow: selectedFile ? '0 1px 2px rgba(0, 0, 0, 0.05)' : 'none',
-                transition: 'background 0.15s ease',
+                gap: '5px',
+                boxShadow: selectedFile ? '0 1px 2px rgba(37, 99, 235, 0.15)' : 'none',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                if (selectedFile) {
+                  e.currentTarget.style.backgroundColor = '#1D4ED8';
+                  e.currentTarget.style.transform = 'translateY(-0.5px)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (selectedFile) {
+                  e.currentTarget.style.backgroundColor = '#2563EB';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }
               }}
             >
-              <UploadCloud size={15} />
+              <UploadCloud size={12} strokeWidth={2.2} />
               <span>Unggah Dokumen</span>
             </button>
           </div>

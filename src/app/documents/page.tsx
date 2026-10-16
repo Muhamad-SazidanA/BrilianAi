@@ -202,10 +202,36 @@ function DocumentsContent() {
               <button
                 type="button"
                 onClick={() => setIsUploadOpen(true)}
-                className="btn btn-primary btn-sm"
-                style={{ fontWeight: 600, gap: '6px' }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  height: '28px',
+                  padding: '0 12px',
+                  fontSize: '11.5px',
+                  fontWeight: 500,
+                  letterSpacing: '-0.01em',
+                  color: '#FFFFFF',
+                  backgroundColor: '#2563EB',
+                  border: '1px solid #1D4ED8',
+                  borderRadius: '9999px',
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 2px rgba(37, 99, 235, 0.15)',
+                  transition: 'all 0.15s ease',
+                  whiteSpace: 'nowrap',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#1D4ED8';
+                  e.currentTarget.style.transform = 'translateY(-0.5px)';
+                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(37, 99, 235, 0.25)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#2563EB';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(37, 99, 235, 0.15)';
+                }}
               >
-                <UploadCloud size={13} />
+                <UploadCloud size={12} strokeWidth={2.2} />
                 <span>{language === 'en' ? 'Upload Document' : 'Unggah Dokumen'}</span>
               </button>
             ) : null
