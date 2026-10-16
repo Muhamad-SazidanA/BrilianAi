@@ -26,6 +26,8 @@ export interface EnterpriseSelectProps {
   style?: React.CSSProperties;
   menuWidth?: string | number;
   menuMaxHeight?: number;
+  buttonHeight?: string;
+  buttonStyle?: React.CSSProperties;
   ariaLabel?: string;
 }
 
@@ -37,6 +39,8 @@ export default function EnterpriseSelect({
   disabled = false,
   size = 'sm',
   variant = 'rounded',
+  buttonHeight,
+  buttonStyle,
   direction = 'auto',
   searchable = false,
   searchPlaceholder = 'Cari opsi...',
@@ -118,7 +122,7 @@ export default function EnterpriseSelect({
     : options;
 
   // Sizing definitions
-  const height = size === 'xs' ? '24px' : size === 'sm' ? '30px' : '36px';
+  const height = buttonHeight || (size === 'xs' ? '24px' : size === 'sm' ? '30px' : '36px');
   const fontSize = size === 'xs' ? '11px' : size === 'sm' ? '11.5px' : '12.5px';
   const paddingX = size === 'xs' ? '7px' : size === 'sm' ? '8px' : '10px';
   const borderRadius = variant === 'pill' ? '9999px' : '6px';
@@ -164,6 +168,7 @@ export default function EnterpriseSelect({
           outline: 'none',
           textAlign: 'left',
           boxSizing: 'border-box',
+          ...buttonStyle,
         }}
       >
         <span
