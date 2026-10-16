@@ -1,63 +1,152 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Plus, Search, Eye, Pencil, RotateCcw, X, Loader2, ChevronLeft, ChevronRight, ChevronDown, Save, CheckCircle2, Clock, ShieldCheck, UserCheck } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import {
+  Plus, Search, Eye, Pencil, RotateCcw, X, Loader2,
+  CheckCircle2, Clock, ShieldCheck, UserCheck, Trash2, KeyRound, Check,
+} from 'lucide-react';
 import { User, Role } from '@/types/user';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserSession } from '@/context/UserSessionContext';
 import { toast } from 'sonner';
 import UserAvatar from '@/components/ui/UserAvatar';
+import EnterprisePageHeader from '@/components/layout/EnterprisePageHeader';
+import DashboardMetricCard from '@/components/dashboard/DashboardMetricCard';
+import EnterprisePagination from '@/components/ui/EnterprisePagination';
+import EnterpriseSelect, { EnterpriseSelectOption } from '@/components/ui/EnterpriseSelect';
 
 function fmtDate(iso?: string | null) {
   if (!iso) return '-';
-  return new Date(iso).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return new Date(iso).toLocaleString('id-ID', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 const ROLE_COLORS: Record<string, string> = {
-  admin: '#2563eb', member: '#16a34a', viewer: '#9333ea',
-  finance: '#d97706', direktur: '#0891b2', sales: '#db2777',
+  admin: '#2563eb',
+  member: '#16a34a',
+  viewer: '#9333ea',
+  finance: '#d97706',
+  direktur: '#0891b2',
+  sales: '#db2777',
 };
-function roleDot(rid: string) { return ROLE_COLORS[rid.toLowerCase()] ?? '#6b7280'; }
+function roleDot(rid: string) {
+  return ROLE_COLORS[rid.toLowerCase()] ?? '#64748b';
+}
 
-const cardS: React.CSSProperties = { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', overflow: 'hidden' };
-const OL: React.CSSProperties = { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1.5rem' };
-function BOX(w = 520): React.CSSProperties { return { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: `${w}px`, padding: '1.5rem', boxShadow: '0 20px 60px rgba(0,0,0,0.18)' }; }
-const LBL: React.CSSProperties = { display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '6px' };
-const INP: React.CSSProperties = { width: '100%', height: '38px', padding: '0 12px', borderRadius: '8px', border: '1px solid var(--border-default)', fontSize: '13.5px', color: 'var(--text-primary)', backgroundColor: 'var(--bg-card)', outline: 'none', boxSizing: 'border-box' };
+const OL: React.CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  backgroundColor: 'rgba(15, 23, 42, 0.45)',
+  backdropFilter: 'blur(4px)',
+  WebkitBackdropFilter: 'blur(4px)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  zIndex: 9999,
+  padding: '1.25rem',
+};
+
+function BOX(w = 520): React.CSSProperties {
+  return {
+    backgroundColor: 'var(--bg-card, #ffffff)',
+    border: '1px solid var(--border-default, #e2e8f0)',
+    borderRadius: '14px',
+    width: '100%',
+    maxWidth: `${w}px`,
+    padding: '1.5rem',
+    boxShadow: '0 20px 40px rgba(15, 23, 42, 0.16)',
+  };
+}
+
+const LBL: React.CSSProperties = {
+  display: 'block',
+  fontSize: '12px',
+  fontWeight: 600,
+  color: 'var(--text-primary)',
+  marginBottom: '5px',
+};
+
+const INP: React.CSSProperties = {
+  width: '100%',
+  height: '34px',
+  padding: '0 12px',
+  borderRadius: '8px',
+  border: '1px solid var(--border-default, #e2e8f0)',
+  fontSize: '12.5px',
+  color: 'var(--text-primary)',
+  backgroundColor: 'var(--bg-card, #ffffff)',
+  outline: 'none',
+  boxSizing: 'border-box',
+};
 
 function StatusBadge({ status }: { status: 'active' | 'inactive' | 'pending_approval' }) {
   if (status === 'pending_approval') {
     return (
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 9px', borderRadius: '9999px', fontSize: '11.5px', fontWeight: 600, backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }}>
+      <span className="status-pill-warning">
         <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: '#f59e0b' }} />
-        menunggu approval
+        Menunggu Approval
       </span>
     );
   }
   const ok = status === 'active';
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 9px', borderRadius: '9999px', fontSize: '11.5px', fontWeight: 600, backgroundColor: ok ? '#f0fdf4' : 'var(--bg-subtle)', color: ok ? '#16a34a' : 'var(--text-muted)', border: `1px solid ${ok ? '#bbf7d0' : 'var(--border-default)'}` }}>
-      <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: ok ? '#16a34a' : 'var(--text-muted)' }} />
-      {ok ? 'aktif' : 'nonaktif'}
+    <span className={ok ? 'status-pill-success' : 'status-pill-neutral'}>
+      <span
+        style={{
+          width: '5px',
+          height: '5px',
+          borderRadius: '50%',
+          backgroundColor: ok ? 'var(--color-success, #10b981)' : 'var(--text-muted)',
+        }}
+      />
+      {ok ? 'Aktif' : 'Nonaktif'}
     </span>
   );
 }
 
-function IBtn({ children, onClick, title }: { children: React.ReactNode; onClick: () => void; title?: string }) {
+function IBtn({
+  children,
+  onClick,
+  title,
+  danger,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  title?: string;
+  danger?: boolean;
+}) {
   return (
-    <button type="button" title={title} onClick={onClick}
-      style={{ width: '28px', height: '28px', borderRadius: '6px', border: '1px solid var(--border-default)', background: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)' }}
-      onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--bg-subtle)')}
-      onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
-      {children}
-    </button>
-  );
-}
-
-function PBtn({ children, onClick, disabled, active }: { children: React.ReactNode; onClick: () => void; disabled?: boolean; active?: boolean }) {
-  return (
-    <button type="button" onClick={onClick} disabled={disabled}
-      style={{ height: '28px', minWidth: '28px', padding: '0 8px', borderRadius: '6px', border: '1px solid var(--border-default)', backgroundColor: active ? 'var(--bg-subtle)' : 'transparent', color: disabled ? 'var(--text-muted)' : 'var(--text-primary)', fontSize: '12.5px', fontWeight: active ? 600 : 400, cursor: disabled ? 'default' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px', opacity: disabled ? 0.5 : 1 }}>
+    <button
+      type="button"
+      title={title}
+      onClick={onClick}
+      style={{
+        width: '28px',
+        height: '28px',
+        borderRadius: '6px',
+        border: '1px solid var(--border-default, #e2e8f0)',
+        backgroundColor: 'var(--bg-card, #ffffff)',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        color: danger ? '#dc2626' : 'var(--text-secondary)',
+        transition: 'all 0.12s ease',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = danger ? '#fef2f2' : 'var(--bg-subtle, #f8fafc)';
+        e.currentTarget.style.borderColor = danger ? '#fecaca' : 'var(--border-hover, #cbd5e1)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = 'var(--bg-card, #ffffff)';
+        e.currentTarget.style.borderColor = 'var(--border-default, #e2e8f0)';
+      }}
+    >
       {children}
     </button>
   );
@@ -65,9 +154,36 @@ function PBtn({ children, onClick, disabled, active }: { children: React.ReactNo
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)}
-      style={{ width: '44px', height: '24px', borderRadius: '9999px', border: 'none', cursor: 'pointer', backgroundColor: checked ? 'var(--color-primary)' : '#d1d5db', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
-      <span style={{ position: 'absolute', top: '3px', left: checked ? '23px' : '3px', width: '18px', height: '18px', borderRadius: '50%', backgroundColor: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      style={{
+        width: '40px',
+        height: '22px',
+        borderRadius: '9999px',
+        border: 'none',
+        cursor: 'pointer',
+        backgroundColor: checked ? 'var(--color-primary, #2563eb)' : '#cbd5e1',
+        position: 'relative',
+        transition: 'background 0.2s',
+        flexShrink: 0,
+      }}
+    >
+      <span
+        style={{
+          position: 'absolute',
+          top: '2px',
+          left: checked ? '20px' : '2px',
+          width: '18px',
+          height: '18px',
+          borderRadius: '50%',
+          backgroundColor: '#fff',
+          transition: 'left 0.2s',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+        }}
+      />
     </button>
   );
 }
@@ -79,10 +195,49 @@ export default function UsersManagementView() {
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [syncTime, setSyncTime] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending_approval' | 'active' | 'inactive'>('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const statsRef = useRef<HTMLDivElement>(null);
+  const [statsHeight, setStatsHeight] = useState(110);
+
+  // Dynamic sticky measurement for 4 stats cards
+  useEffect(() => {
+    if (!statsRef.current) return;
+    const updateHeight = () => {
+      if (statsRef.current) {
+        const h = Math.round(statsRef.current.getBoundingClientRect().height);
+        if (h > 0) setStatsHeight(h);
+      }
+    };
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(statsRef.current);
+    window.addEventListener('resize', updateHeight);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateHeight);
+    };
+  }, [users]);
+
+  // Keyboard shortcut Ctrl+K and /
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      } else if (e.key === '/' && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Modals
   const [showCreate, setShowCreate] = useState(false);
@@ -120,6 +275,8 @@ export default function UsersManagementView() {
       const [uRes, rRes] = await Promise.all([fetch('/api/users'), fetch('/api/roles')]);
       if (uRes.ok) setUsers((await uRes.json()).users || []);
       if (rRes.ok) setRoles((await rRes.json()).roles || []);
+      const d = new Date();
+      setSyncTime(d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     } catch (err: any) {
       toast.error('Gagal memuat data: ' + err.message);
     } finally {
@@ -127,25 +284,82 @@ export default function UsersManagementView() {
     }
   }, []);
 
-  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  // Derived user lists for stats & filters
+  const pendingUsers = useMemo(() => users.filter((u) => u.status === 'pending_approval'), [users]);
+  const activeUsers = useMemo(() => users.filter((u) => u.status === 'active'), [users]);
+  const inactiveUsers = useMemo(() => users.filter((u) => u.status === 'inactive'), [users]);
 
   const filtered = useMemo(() => {
-    const q = searchQuery.toLowerCase();
-    return users.filter(u => {
-      const ms = !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.department ?? '').toLowerCase().includes(q);
+    const q = searchQuery.toLowerCase().trim();
+    return users.filter((u) => {
+      const ms =
+        !q ||
+        u.name.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        (u.department ?? '').toLowerCase().includes(q);
       const mst = statusFilter === 'all' || u.status === statusFilter;
       return ms && mst;
     });
   }, [users, searchQuery, statusFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const paginated = useMemo(() => { const s = (page - 1) * pageSize; return filtered.slice(s, s + pageSize); }, [filtered, page, pageSize]);
+  const safeCurrentPage = Math.min(Math.max(1, page), totalPages);
+  const paginated = useMemo(() => {
+    const s = (safeCurrentPage - 1) * pageSize;
+    return filtered.slice(s, s + pageSize);
+  }, [filtered, safeCurrentPage, pageSize]);
 
-  const pendingUsers = useMemo(() => users.filter(u => u.status === 'pending_approval'), [users]);
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, statusFilter]);
 
-  const openCreate = () => { setCName(''); setCEmail(''); setCDept(''); setCPassword(''); setCRoleId(roles[0]?.id || 'member'); setCActive(true); setShowCreate(true); };
-  const openEdit = (u: User) => { setEName(u.name); setEEmail(u.email); setEDept(u.department || ''); setERoleId(u.role_id); setEStatus(u.status); setDetailUser(null); setEditingUser(u); };
-  const openApprove = (u: User) => { setApprovingUser(u); setARoleId(u.role_id || 'member'); setADept(u.department || 'Google Account'); };
+  // Role options for EnterpriseSelect
+  const roleSelectOptions: EnterpriseSelectOption[] = useMemo(
+    () =>
+      roles.map((r) => ({
+        value: r.id,
+        label: r.name,
+        sublabel: r.description ? (r.description.length > 45 ? `${r.description.slice(0, 45)}...` : r.description) : undefined,
+      })),
+    [roles]
+  );
+
+  const statusSelectOptions: EnterpriseSelectOption[] = [
+    { value: 'active', label: 'Aktif' },
+    { value: 'pending_approval', label: 'Menunggu Approval' },
+    { value: 'inactive', label: 'Nonaktif' },
+  ];
+
+  const openCreate = () => {
+    setCName('');
+    setCEmail('');
+    setCDept('');
+    setCPassword('');
+    setCRoleId(roles[0]?.id || 'member');
+    setCActive(true);
+    setShowCreate(true);
+  };
+
+  const openEdit = (u: User) => {
+    setEName(u.name);
+    setEEmail(u.email);
+    setEDept(u.department || '');
+    setERoleId(u.role_id);
+    setEStatus(u.status);
+    setDetailUser(null);
+    setEditingUser(u);
+  };
+
+  const openApprove = (u: User) => {
+    setApprovingUser(u);
+    setARoleId(u.role_id || 'member');
+    setADept(u.department || 'Google Account');
+  };
 
   const handleApprove = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,7 +377,7 @@ export default function UsersManagementView() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Gagal menyetujui akun');
-      const roleObj = roles.find(r => r.id === aRoleId);
+      const roleObj = roles.find((r) => r.id === aRoleId);
       toast.success(`Akun ${approvingUser.name} berhasil disetujui dengan peran ${roleObj?.name || aRoleId}`);
       setApprovingUser(null);
       await fetchUsers();
@@ -177,291 +391,836 @@ export default function UsersManagementView() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cName.trim() || !cEmail.trim()) { toast.warning('Nama dan Email wajib diisi'); return; }
+    if (!cName.trim() || !cEmail.trim()) {
+      toast.warning('Nama dan Email wajib diisi');
+      return;
+    }
     setIsSubmitting(true);
     try {
-      const res = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: cName, email: cEmail, role_id: cRoleId, department: cDept, status: cActive ? 'active' : 'inactive' }) });
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: cName.trim(),
+          email: cEmail.trim(),
+          role_id: cRoleId,
+          department: cDept.trim(),
+          status: cActive ? 'active' : 'inactive',
+          password: cPassword || undefined,
+        }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Gagal membuat pengguna');
-      toast.success('Pengguna berhasil dibuat'); setShowCreate(false);
-      await fetchUsers(); await refreshSessionUsers();
-    } catch (err: any) { toast.error(err.message); }
-    finally { setIsSubmitting(false); }
+      toast.success('Pengguna baru berhasil dibuat');
+      setShowCreate(false);
+      await fetchUsers();
+      await refreshSessionUsers();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleUpdate = async (e: React.FormEvent) => {
-    e.preventDefault(); if (!editingUser) return;
+    e.preventDefault();
+    if (!editingUser) return;
     setIsSubmitting(true);
     try {
-      const res = await fetch(`/api/users/${editingUser.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: eName, email: eEmail, role_id: eRoleId, department: eDept, status: eStatus }) });
+      const res = await fetch(`/api/users/${editingUser.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: eName.trim(),
+          email: eEmail.trim(),
+          role_id: eRoleId,
+          department: eDept.trim(),
+          status: eStatus,
+        }),
+      });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Gagal memperbarui');
-      toast.success('Data pengguna berhasil diperbarui'); setEditingUser(null);
-      await fetchUsers(); await refreshSessionUsers();
-    } catch (err: any) { toast.error(err.message); }
-    finally { setIsSubmitting(false); }
+      if (!res.ok) throw new Error(data.error || 'Gagal memperbarui pengguna');
+      toast.success('Data pengguna berhasil diperbarui');
+      setEditingUser(null);
+      await fetchUsers();
+      await refreshSessionUsers();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const toggleStatus = async (u: User) => {
-    if (!canManage) { toast.error('Tidak memiliki hak akses'); return; }
+    if (!canManage) {
+      toast.error('Tidak memiliki hak akses');
+      return;
+    }
     const next = u.status === 'active' ? 'inactive' : 'active';
     try {
-      const res = await fetch(`/api/users/${u.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: next }) });
-      if (!res.ok) throw new Error('Gagal memperbarui status');
-      toast.success(next === 'active' ? `Akun ${u.name} diaktifkan` : `Akun ${u.name} dinonaktifkan`);
-      setUsers(prev => prev.map(x => x.id === u.id ? { ...x, status: next } : x));
-      if (detailUser?.id === u.id) setDetailUser(d => d ? { ...d, status: next } : d);
+      const res = await fetch(`/api/users/${u.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: next }),
+      });
+      if (!res.ok) throw new Error('Gagal memperbarui status akun');
+      toast.success(next === 'active' ? `Akun ${u.name} berhasil diaktifkan` : `Akun ${u.name} berhasil dinonaktifkan`);
+      setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, status: next } : x)));
+      if (detailUser?.id === u.id) setDetailUser((d) => (d ? { ...d, status: next } : d));
       await refreshSessionUsers();
-    } catch (err: any) { toast.error(err.message); }
+    } catch (err: any) {
+      toast.error(err.message);
+    }
   };
 
   const handleDelete = async () => {
-    if (!deletingUser) return; setIsSubmitting(true);
+    if (!deletingUser) return;
+    setIsSubmitting(true);
     try {
       const res = await fetch(`/api/users/${deletingUser.id}`, { method: 'DELETE' });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Gagal menghapus');
-      toast.success('Pengguna berhasil dihapus'); setDeletingUser(null);
-      await fetchUsers(); await refreshSessionUsers();
-    } catch (err: any) { toast.error(err.message); }
-    finally { setIsSubmitting(false); }
+      if (!res.ok) throw new Error(data.error || 'Gagal menghapus pengguna');
+      toast.success('Pengguna berhasil dihapus');
+      setDeletingUser(null);
+      await fetchUsers();
+      await refreshSessionUsers();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-      {/* Page Header */}
-      <div style={{ marginBottom: '1.25rem' }}>
-        <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Kelola User</h1>
-        <p style={{ fontSize: '13px', color: 'var(--color-primary)', margin: '3px 0 0' }}>Kelola akun user, detail profil, sesi, dan status akun.</p>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '1.25rem',
+        padding: '0 0.25rem 3.5rem',
+      }}
+    >
+      {/* ── Enterprise Page Header ── */}
+      <EnterprisePageHeader
+        title={language === 'en' ? 'User Management' : 'Kelola Pengguna'}
+        subtitle={
+          language === 'en'
+            ? 'Manage accounts, access privileges, departmental roles, and operational activity.'
+            : 'Kelola akun pengguna, peran akses (RBAC), departemen, dan pantau keaktifan tanya-jawab AI.'
+        }
+        syncTime={syncTime}
+        onRefresh={fetchUsers}
+        isLoading={isLoading}
+        actions={
+          canManage ? (
+            <button
+              type="button"
+              onClick={openCreate}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                height: '28px',
+                padding: '0 12px',
+                fontSize: '11.5px',
+                fontWeight: 500,
+                letterSpacing: '-0.01em',
+                color: '#FFFFFF',
+                backgroundColor: '#2563EB',
+                border: '1px solid #1D4ED8',
+                borderRadius: '9999px',
+                cursor: 'pointer',
+                boxShadow: '0 1px 2px rgba(37, 99, 235, 0.15)',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <Plus size={12} strokeWidth={2.4} />
+              <span>{language === 'en' ? 'New User' : 'User Baru'}</span>
+            </button>
+          ) : null
+        }
+      />
+
+      {/* ── 4 Pure Enterprise Metric Cards (Sticky Freeze below Header) ── */}
+      <div
+        ref={statsRef}
+        style={{
+          position: 'sticky',
+          top: 'var(--header-height, 48px)',
+          zIndex: 30,
+          backgroundColor: 'var(--bg-app)',
+          paddingTop: '6px',
+          paddingBottom: '8px',
+          borderBottom: '1px solid var(--border-default)',
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
+          boxShadow: '0 2px 4px rgba(15, 23, 42, 0.03)',
+          boxSizing: 'border-box',
+        }}
+      >
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
+            gap: '0.85rem',
+          }}
+        >
+          <DashboardMetricCard
+            title={language === 'en' ? 'Total Users' : 'Total Pengguna'}
+            value={`${users.length} User`}
+            badge="RBAC"
+            badgeType="neutral"
+            footerText={language === 'en' ? 'Registered accounts' : 'Akun terdaftar dalam KMS'}
+            isLoading={isLoading}
+            onClick={() => setStatusFilter('all')}
+          />
+
+          <DashboardMetricCard
+            title={language === 'en' ? 'Active Users' : 'Pengguna Aktif'}
+            value={`${activeUsers.length} Aktif`}
+            badge="Active"
+            badgeType="neutral"
+            statusDot="live"
+            footerText={language === 'en' ? 'Full access enabled' : 'Akses operasional normal'}
+            isLoading={isLoading}
+            onClick={() => setStatusFilter('active')}
+          />
+
+          <DashboardMetricCard
+            title={language === 'en' ? 'Pending Approval' : 'Menunggu Approval'}
+            value={`${pendingUsers.length} Antrean`}
+            badge={pendingUsers.length > 0 ? 'Pending' : 'Clear'}
+            badgeType={pendingUsers.length > 0 ? 'warning' : 'neutral'}
+            statusDot={pendingUsers.length > 0 ? 'blue' : 'none'}
+            footerText={
+              pendingUsers.length > 0
+                ? language === 'en'
+                  ? 'Awaiting role assignment'
+                  : 'Menunggu penugasan peran'
+                : language === 'en'
+                ? 'All accounts processed'
+                : 'Semua akun telah diproses'
+            }
+            isLoading={isLoading}
+            onClick={() => setStatusFilter('pending_approval')}
+          />
+
+          <DashboardMetricCard
+            title={language === 'en' ? 'System Roles' : 'Peran Akses'}
+            value={`${roles.length} Role`}
+            badge="Security"
+            badgeType="neutral"
+            footerText={language === 'en' ? 'Defined RBAC matrix' : 'Hierarki hak akses terdefinisi'}
+            isLoading={isLoading}
+          />
+        </div>
       </div>
 
-      {/* Main Card */}
-      <div style={cardS}>
-        {/* Card Header */}
-        <div style={{ padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>Daftar user</h2>
-            <p style={{ margin: '2px 0 0', fontSize: '12.5px', color: 'var(--text-secondary)' }}>Cari user dan kelola status akun dari satu tempat.</p>
-          </div>
-          {canManage && (
-            <button type="button" onClick={openCreate} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', height: '36px', padding: '0 14px', backgroundColor: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
-              <Plus size={15} /><span>User baru</span>
-            </button>
-          )}
-        </div>
+      {/* ── Main Stream Card (Linear / Vercel Enterprise Style) ── */}
+      <div
+        className="enterprise-card"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: '400px',
+          overflow: 'visible',
+        }}
+      >
+        {/* Sticky Freeze Header below 4 Stats Cards */}
+        <div
+          className="enterprise-card-header"
+          style={{
+            flexWrap: 'wrap',
+            gap: '8px',
+            position: 'sticky',
+            top: `${48 + statsHeight - 1}px`,
+            zIndex: 20,
+            backgroundColor: 'var(--bg-card, #ffffff)',
+            boxShadow: '0 2px 4px rgba(15, 23, 42, 0.04)',
+            borderBottom: '1px solid var(--border-default, #e2e8f0)',
+          }}
+        >
+          {/* Left: Title + Inline Segmented Switcher */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                {language === 'en' ? 'User Directory' : 'Daftar Pengguna'}
+              </span>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                · {filtered.length} user
+              </span>
+            </div>
 
-        {/* Filter Bar */}
-        <div style={{ padding: '0.75rem 1.5rem', borderTop: '1px solid var(--border-default)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative', minWidth: '280px', flex: 1, maxWidth: '380px' }}>
-            <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
-            <input type="text" placeholder="Cari berdasarkan nama, email, atau username" value={searchQuery}
-              onChange={e => { setSearchQuery(e.target.value); setPage(1); }}
-              style={{ ...INP, paddingLeft: '32px', height: '34px', fontSize: '12.5px' }} />
-          </div>
-          <div style={{ display: 'inline-flex', borderRadius: '8px', border: '1px solid var(--border-default)', overflow: 'hidden' }}>
-            {(['all', 'pending_approval', 'active', 'inactive'] as const).map(s => {
-              const isA = statusFilter === s;
-              const txt = s === 'all' ? 'Semua' : s === 'pending_approval' ? 'Menunggu Approval' : s === 'active' ? 'Aktif' : 'Nonaktif';
-              const count = s === 'pending_approval' ? pendingUsers.length : undefined;
-              return (
-                <button key={s} type="button" onClick={() => { setStatusFilter(s); setPage(1); }}
-                  style={{ padding: '5px 14px', fontSize: '13px', fontWeight: isA ? 600 : 400, border: 'none', borderLeft: s !== 'all' ? '1px solid var(--border-default)' : 'none', backgroundColor: isA ? 'var(--bg-subtle)' : 'transparent', color: isA ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                  <span>{txt}</span>
-                  {count !== undefined && count > 0 && (
-                    <span style={{ fontSize: '11px', fontWeight: 700, backgroundColor: '#f59e0b', color: '#ffffff', borderRadius: '9999px', padding: '1px 6px', minWidth: '16px', textAlign: 'center' }}>
-                      {count}
+            {/* Segmented Status Switcher (Smooth Pill Style) */}
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                backgroundColor: 'var(--bg-subtle, #f1f5f9)',
+                border: '1px solid var(--border-default, #e2e8f0)',
+                borderRadius: '9999px',
+                padding: '2px',
+                gap: '2px',
+                height: '26px',
+              }}
+            >
+              {(
+                [
+                  { key: 'all', label: language === 'en' ? 'All' : 'Semua', count: users.length },
+                  { key: 'pending_approval', label: language === 'en' ? 'Pending' : 'Menunggu Approval', count: pendingUsers.length, highlight: pendingUsers.length > 0 },
+                  { key: 'active', label: language === 'en' ? 'Active' : 'Aktif', count: activeUsers.length },
+                  { key: 'inactive', label: language === 'en' ? 'Inactive' : 'Nonaktif', count: inactiveUsers.length },
+                ] as { key: 'all' | 'pending_approval' | 'active' | 'inactive'; label: string; count: number; highlight?: boolean }[]
+              ).map((tab) => {
+                const isSelected = statusFilter === tab.key;
+                const isHighlighted = Boolean(tab.highlight);
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => {
+                      setStatusFilter(tab.key);
+                      setPage(1);
+                    }}
+                    style={{
+                      borderRadius: '9999px',
+                      padding: '2px 10px',
+                      fontSize: '11px',
+                      height: '22px',
+                      fontWeight: isSelected ? 600 : 500,
+                      border: 'none',
+                      backgroundColor: isSelected ? 'var(--bg-card, #ffffff)' : 'transparent',
+                      color: isSelected
+                        ? isHighlighted
+                          ? '#b45309'
+                          : 'var(--text-primary)'
+                        : 'var(--text-secondary)',
+                      boxShadow: isSelected ? '0 1px 2px rgba(15, 23, 42, 0.06)' : 'none',
+                      cursor: 'pointer',
+                      transition: 'all 0.12s ease',
+                      whiteSpace: 'nowrap',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                    }}
+                  >
+                    <span>{tab.label}</span>
+                    <span
+                      style={{
+                        fontSize: '10px',
+                        fontWeight: 600,
+                        padding: '0 5px',
+                        borderRadius: '9999px',
+                        backgroundColor: isSelected
+                          ? isHighlighted
+                            ? '#fef3c7'
+                            : 'var(--bg-subtle, #f1f5f9)'
+                          : 'rgba(0,0,0,0.05)',
+                        color: isHighlighted ? '#b45309' : 'var(--text-muted)',
+                      }}
+                    >
+                      {tab.count}
                     </span>
-                  )}
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Right: Search Box with Smooth Pill & Ctrl+K */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                backgroundColor: 'var(--bg-subtle, #f8fafc)',
+                border: '1px solid var(--border-default, #e2e8f0)',
+                borderRadius: '9999px',
+                padding: '0 8px 0 10px',
+                height: '26px',
+                width: '230px',
+                gap: '6px',
+              }}
+            >
+              <Search size={12} color="var(--text-muted)" style={{ flexShrink: 0 }} />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder={language === 'en' ? 'Search user, email, dept...' : 'Cari nama, email, divisi...'}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  flex: 1,
+                  border: 'none',
+                  background: 'transparent',
+                  outline: 'none',
+                  fontSize: '11.5px',
+                  color: 'var(--text-primary)',
+                  padding: 0,
+                  minWidth: 0,
+                }}
+              />
+              <kbd className="kbd-shortcut" style={{ fontSize: '9px', padding: '1px 4px' }}>
+                Ctrl K
+              </kbd>
+            </div>
           </div>
         </div>
 
-        {/* Pending Users Notification Banner */}
+        {/* ── Pending Users Action Callout Banner (if pending users exist) ── */}
         {pendingUsers.length > 0 && statusFilter !== 'pending_approval' && (
-          <div style={{ margin: '0 1.5rem 1rem', padding: '12px 16px', borderRadius: '10px', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+          <div
+            style={{
+              margin: '12px 14px 4px',
+              padding: '10px 14px',
+              borderRadius: '8px',
+              backgroundColor: '#fffbeb',
+              border: '1px solid #fde68a',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              flexWrap: 'wrap',
+            }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Clock size={20} color="#D97706" style={{ flexShrink: 0 }} />
+              <Clock size={16} color="#d97706" style={{ flexShrink: 0 }} />
               <div>
-                <div style={{ fontWeight: 600, fontSize: '13px', color: '#92400E' }}>
-                  Terdapat {pendingUsers.length} akun Google baru yang menunggu persetujuan
+                <div style={{ fontWeight: 600, fontSize: '12px', color: '#92400e' }}>
+                  Terdapat {pendingUsers.length} akun Google baru menunggu persetujuan
                 </div>
-                <div style={{ fontSize: '12px', color: '#B45309' }}>
-                  Tinjau akun dan tetapkan hak akses (Role) sebelum pengguna dapat masuk ke sistem.
+                <div style={{ fontSize: '11.5px', color: '#b45309' }}>
+                  Tinjau akun dan tetapkan hak akses (Role) sebelum pengguna dapat mengakses sistem KMS.
                 </div>
               </div>
             </div>
             <button
               type="button"
-              onClick={() => { setStatusFilter('pending_approval'); setPage(1); }}
-              style={{ padding: '5px 12px', borderRadius: '6px', backgroundColor: '#D97706', color: '#fff', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+              onClick={() => setStatusFilter('pending_approval')}
+              style={{
+                padding: '4px 12px',
+                borderRadius: '9999px',
+                backgroundColor: '#d97706',
+                color: '#ffffff',
+                border: 'none',
+                fontSize: '11.5px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                boxShadow: '0 1px 2px rgba(217, 119, 6, 0.2)',
+              }}
             >
-              <UserCheck size={14} />
+              <UserCheck size={13} />
               Tinjau Sekarang ({pendingUsers.length})
             </button>
           </div>
         )}
 
-        {/* Table */}
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+        {/* ── Table Content ── */}
+        <div style={{ overflowX: 'auto', flex: 1 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px' }}>
             <thead>
-              <tr style={{ borderTop: '1px solid var(--border-default)', backgroundColor: 'var(--bg-subtle)' }}>
-                {['User', 'Username', 'Roles', 'Departemen', 'Pertanyaan AI', 'Login terakhir', 'Status', 'Aksi'].map(h => (
-                  <th key={h} style={{ padding: '9px 1rem', fontWeight: 600, fontSize: '12px', color: 'var(--text-secondary)', textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
+              <tr style={{ backgroundColor: 'var(--bg-subtle, #f8fafc)', borderBottom: '1px solid var(--border-default, #e2e8f0)' }}>
+                {['Pengguna', 'Username', 'Role Akses', 'Departemen', 'Pertanyaan AI', 'Login Terakhir', 'Status', 'Aksi'].map((h, idx) => (
+                  <th
+                    key={h}
+                    style={{
+                      padding: '8px 14px',
+                      fontWeight: 600,
+                      fontSize: '11px',
+                      letterSpacing: '0.02em',
+                      color: 'var(--text-secondary)',
+                      textAlign: idx === 7 ? 'right' : idx === 4 ? 'center' : 'left',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {h}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={8} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}><Loader2 size={16} className="animate-spin" color="var(--color-primary)" /><span>Memuat data pengguna...</span></div>
-                </td></tr>
+                <tr>
+                  <td colSpan={8} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
+                      <Loader2 size={16} className="animate-spin" color="var(--color-primary, #2563eb)" />
+                      <span>Memuat data pengguna...</span>
+                    </div>
+                  </td>
+                </tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={8} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  <p style={{ margin: 0, fontWeight: 600, color: 'var(--text-primary)' }}>{searchQuery ? 'Tidak ada pengguna yang cocok' : 'Belum ada pengguna'}</p>
-                  <p style={{ margin: '4px 0 0', fontSize: '12px' }}>Coba sesuaikan kata kunci pencarian atau filter.</p>
-                </td></tr>
-              ) : paginated.map(u => {
-                const isSA = u.id === 'a0000000-0000-0000-0000-000000000001';
-                return (
-                  <tr key={u.id} style={{ borderTop: '1px solid var(--border-subtle)', transition: 'background 0.12s' }}
-                    onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--bg-subtle)')}
-                    onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
-                    <td style={{ padding: '10px 1rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <UserAvatar name={u.name} size={32} />
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)' }}>{u.name}</div>
-                          <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>{u.email}</div>
+                <tr>
+                  <td colSpan={8} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <p style={{ margin: 0, fontWeight: 600, color: 'var(--text-primary)', fontSize: '13px' }}>
+                      {searchQuery ? 'Tidak ada pengguna yang cocok' : 'Belum ada pengguna'}
+                    </p>
+                    <p style={{ margin: '4px 0 0', fontSize: '11.5px' }}>
+                      Coba sesuaikan kata kunci pencarian atau filter status di atas.
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                paginated.map((u) => {
+                  const isSA = u.id === 'a0000000-0000-0000-0000-000000000001';
+                  const isPending = u.status === 'pending_approval';
+
+                  return (
+                    <tr
+                      key={u.id}
+                      style={{
+                        borderBottom: '1px solid var(--border-subtle, #f1f5f9)',
+                        transition: 'background 0.12s ease',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-subtle, #f8fafc)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      {/* Name & Email */}
+                      <td style={{ padding: '9px 14px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <UserAvatar name={u.name} size={30} />
+                          <div style={{ minWidth: 0 }}>
+                            <div
+                              style={{
+                                fontWeight: 600,
+                                fontSize: '12.5px',
+                                color: 'var(--text-primary)',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                              }}
+                            >
+                              {u.name}
+                            </div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{u.email}</div>
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td style={{ padding: '10px 1rem', fontSize: '12.5px', color: 'var(--text-secondary)' }}>{u.email.split('@')[0]}</td>
-                    <td style={{ padding: '10px 1rem' }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '2px 8px', borderRadius: '6px', border: '1px solid var(--border-default)', backgroundColor: 'var(--bg-subtle)', fontSize: '12px', color: 'var(--text-primary)' }}>
-                        <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: roleDot(u.role_id), flexShrink: 0 }} />
-                        {u.role?.name || u.role_id}
-                      </span>
-                    </td>
-                    <td style={{ padding: '10px 1rem', fontSize: '12.5px', color: 'var(--text-secondary)' }}>{u.department || '-'}</td>
-                    <td style={{ padding: '10px 1rem', fontSize: '12.5px', color: 'var(--text-secondary)', textAlign: 'center' }}>{u.question_count ?? 0}</td>
-                    <td style={{ padding: '10px 1rem', fontSize: '12px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-                      {u.last_login_at ? new Date(u.last_login_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-'}
-                    </td>
-                    <td style={{ padding: '10px 1rem' }}><StatusBadge status={u.status} /></td>
-                    <td style={{ padding: '10px 1rem' }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                        {u.status === 'pending_approval' && canManage ? (
-                          <button
-                            type="button"
-                            onClick={() => openApprove(u)}
+                      </td>
+
+                      {/* Username */}
+                      <td style={{ padding: '9px 14px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                        {u.email.split('@')[0]}
+                      </td>
+
+                      {/* Role */}
+                      <td style={{ padding: '9px 14px' }}>
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            padding: '2px 8px',
+                            borderRadius: '9999px',
+                            border: '1px solid var(--border-default, #e2e8f0)',
+                            backgroundColor: 'var(--bg-subtle, #f8fafc)',
+                            fontSize: '11.5px',
+                            color: 'var(--text-primary)',
+                            fontWeight: 500,
+                          }}
+                        >
+                          <span
                             style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '5px',
-                              padding: '4px 10px',
-                              borderRadius: '6px',
-                              backgroundColor: '#2563EB',
-                              color: '#FFFFFF',
-                              border: 'none',
-                              cursor: 'pointer',
-                              fontSize: '12px',
-                              fontWeight: 600,
-                              boxShadow: '0 1px 2px rgba(37,99,235,0.2)',
+                              width: '6px',
+                              height: '6px',
+                              borderRadius: '50%',
+                              backgroundColor: roleDot(u.role_id),
+                              flexShrink: 0,
                             }}
-                          >
-                            <CheckCircle2 size={13} />
-                            Setujui Akun
-                          </button>
-                        ) : null}
-                        <IBtn title="Lihat detail" onClick={() => setDetailUser(u)}><Eye size={13} /></IBtn>
-                        {canManage && <IBtn title="Edit user" onClick={() => openEdit(u)}><Pencil size={13} /></IBtn>}
-                        {canManage && !isSA && <IBtn title="Revoke sesi" onClick={() => toast.info('Fitur revoke sesi belum tersedia')}><RotateCcw size={13} /></IBtn>}
-                        {canManage && !isSA && u.status !== 'pending_approval' && (
-                          <button type="button" onClick={() => toggleStatus(u)}
-                            style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid var(--border-default)', backgroundColor: 'transparent', cursor: 'pointer', fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                            {u.status === 'active' ? 'Nonaktifkan' : 'Aktifkan'}
-                          </button>
-                        )}
-                        {canManage && !isSA && u.status === 'pending_approval' && (
-                          <button
-                            type="button"
-                            onClick={() => setDeletingUser(u)}
-                            style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #fecaca', backgroundColor: '#fef2f2', cursor: 'pointer', fontSize: '12px', color: '#dc2626', fontWeight: 500 }}
-                          >
-                            Tolak
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                          />
+                          {u.role?.name || u.role_id}
+                        </span>
+                      </td>
+
+                      {/* Department */}
+                      <td style={{ padding: '9px 14px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                        {u.department || '—'}
+                      </td>
+
+                      {/* AI Question Count */}
+                      <td
+                        style={{
+                          padding: '9px 14px',
+                          fontSize: '12px',
+                          color: 'var(--text-secondary)',
+                          textAlign: 'center',
+                          fontFamily: 'var(--font-mono, monospace)',
+                        }}
+                      >
+                        {u.question_count ?? 0}
+                      </td>
+
+                      {/* Last Login */}
+                      <td style={{ padding: '9px 14px', fontSize: '11.5px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                        {u.last_login_at
+                          ? new Date(u.last_login_at).toLocaleString('id-ID', {
+                              day: 'numeric',
+                              month: 'short',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })
+                          : '—'}
+                      </td>
+
+                      {/* Status */}
+                      <td style={{ padding: '9px 14px' }}>
+                        <StatusBadge status={u.status} />
+                      </td>
+
+                      {/* Actions */}
+                      <td style={{ padding: '9px 14px', textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', justifyContent: 'flex-end' }}>
+                          {isPending && canManage ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => openApprove(u)}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  height: '24px',
+                                  padding: '0 9px',
+                                  borderRadius: '9999px',
+                                  backgroundColor: '#2563eb',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  fontSize: '11px',
+                                  fontWeight: 600,
+                                  boxShadow: '0 1px 2px rgba(37,99,235,0.2)',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                <CheckCircle2 size={12} />
+                                Setujui
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDeletingUser(u)}
+                                style={{
+                                  height: '24px',
+                                  padding: '0 8px',
+                                  borderRadius: '9999px',
+                                  border: '1px solid #fecaca',
+                                  backgroundColor: '#fef2f2',
+                                  cursor: 'pointer',
+                                  fontSize: '11px',
+                                  color: '#dc2626',
+                                  fontWeight: 600,
+                                }}
+                              >
+                                Tolak
+                              </button>
+                            </>
+                          ) : null}
+
+                          <IBtn title="Lihat detail" onClick={() => setDetailUser(u)}>
+                            <Eye size={12} />
+                          </IBtn>
+
+                          {canManage && (
+                            <IBtn title="Edit pengguna" onClick={() => openEdit(u)}>
+                              <Pencil size={12} />
+                            </IBtn>
+                          )}
+
+                          {canManage && !isSA && (
+                            <IBtn title="Revoke sesi aktif" onClick={() => toast.info('Fitur revoke sesi belum tersedia')}>
+                              <RotateCcw size={12} />
+                            </IBtn>
+                          )}
+
+                          {canManage && !isSA && !isPending && (
+                            <button
+                              type="button"
+                              onClick={() => toggleStatus(u)}
+                              style={{
+                                height: '24px',
+                                padding: '0 8px',
+                                borderRadius: '9999px',
+                                border: '1px solid var(--border-default, #e2e8f0)',
+                                backgroundColor: 'var(--bg-card, #ffffff)',
+                                cursor: 'pointer',
+                                fontSize: '11px',
+                                color: 'var(--text-secondary)',
+                                fontWeight: 500,
+                                transition: 'all 0.12s ease',
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-subtle, #f8fafc)')}
+                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-card, #ffffff)')}
+                            >
+                              {u.status === 'active' ? 'Nonaktifkan' : 'Aktifkan'}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
 
-        {/* Pagination Footer */}
-        <div style={{ padding: '0.75rem 1.5rem', borderTop: '1px solid var(--border-default)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12.5px', color: 'var(--text-secondary)', flexWrap: 'wrap', gap: '8px' }}>
-          <span>Halaman {page} / {totalPages}</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span>Baris per halaman</span>
-              <div style={{ position: 'relative' }}>
-                <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
-                  style={{ height: '28px', padding: '0 24px 0 8px', borderRadius: '6px', border: '1px solid var(--border-default)', fontSize: '12.5px', appearance: 'none', backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)', cursor: 'pointer' }}>
-                  {[5, 10, 25, 50].map(n => <option key={n} value={n}>{n}</option>)}
-                </select>
-                <ChevronDown size={11} style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-muted)' }} />
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <PBtn onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}><ChevronLeft size={13} />Prev Page</PBtn>
-              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map(pg => (
-                <PBtn key={pg} onClick={() => setPage(pg)} active={page === pg}>{pg}</PBtn>
-              ))}
-              <PBtn onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>Next Page<ChevronRight size={13} /></PBtn>
-            </div>
-          </div>
-        </div>
+        {/* ── Enterprise Pagination Bar (Always pinned at bottom) ── */}
+        <EnterprisePagination
+          currentPage={safeCurrentPage}
+          totalItems={filtered.length}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setPage(1);
+          }}
+          language={language}
+        />
       </div>
 
-      {/* MODAL: Buat User */}
+      {/* ════ MODAL: Buat User ════ */}
       {showCreate && (
         <div style={OL} onClick={() => setShowCreate(false)}>
-          <div style={BOX(500)} onClick={e => e.stopPropagation()}>
+          <div style={BOX(480)} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: 'var(--text-primary)' }}>Buat user</h3>
-                <p style={{ margin: '3px 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>Buat akun user lokal dengan password awal.</p>
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  Buat Pengguna Baru
+                </h3>
+                <p style={{ margin: '3px 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  Tambahkan akun pengguna lokal dengan kredensial awal.
+                </p>
               </div>
-              <button type="button" onClick={() => setShowCreate(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={18} /></button>
+              <button
+                type="button"
+                onClick={() => setShowCreate(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+              >
+                <X size={16} />
+              </button>
             </div>
+
             <form onSubmit={handleCreate}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                <div><span style={LBL}>Nama</span><input type="text" required value={cName} onChange={e => setCName(e.target.value)} style={INP} autoFocus /></div>
-                <div><span style={LBL}>Email</span><input type="email" value={cEmail} onChange={e => setCEmail(e.target.value)} style={INP} /></div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '4px' }}>
-                <div><span style={LBL}>Departemen</span><input type="text" placeholder="johndoe" value={cDept} onChange={e => setCDept(e.target.value)} style={INP} /></div>
-                <div><span style={LBL}>Role</span><select value={cRoleId} onChange={e => setCRoleId(e.target.value)} style={INP}>{roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</select></div>
-              </div>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 12px' }}>Atur departemen agar user lebih mudah dikelola.</p>
-              <div style={{ marginBottom: '4px' }}><span style={LBL}>Password</span><input type="password" value={cPassword} onChange={e => setCPassword(e.target.value)} style={INP} /></div>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 14px' }}>Bagikan password awal ini melalui kanal yang aman.</p>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: '10px', border: '1px solid var(--border-default)', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--text-primary)' }}>Akun aktif</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>User aktif dapat langsung login.</div>
+                  <label style={LBL}>Nama Lengkap *</label>
+                  <input
+                    type="text"
+                    required
+                    value={cName}
+                    onChange={(e) => setCName(e.target.value)}
+                    style={INP}
+                    placeholder="Contoh: Budi Santoso"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label style={LBL}>Email Kantor *</label>
+                  <input
+                    type="email"
+                    required
+                    value={cEmail}
+                    onChange={(e) => setCEmail(e.target.value)}
+                    style={INP}
+                    placeholder="budi@perusahaan.com"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                <div>
+                  <label style={LBL}>Departemen / Divisi</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: Operasional"
+                    value={cDept}
+                    onChange={(e) => setCDept(e.target.value)}
+                    style={INP}
+                  />
+                </div>
+                <div>
+                  <label style={LBL}>Role Akses (RBAC)</label>
+                  <EnterpriseSelect
+                    value={cRoleId}
+                    onChange={(val) => setCRoleId(String(val))}
+                    options={roleSelectOptions}
+                    size="sm"
+                    width="100%"
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '10px' }}>
+                <label style={LBL}>Password Awal</label>
+                <input
+                  type="password"
+                  placeholder="Minimal 6 karakter"
+                  value={cPassword}
+                  onChange={(e) => setCPassword(e.target.value)}
+                  style={INP}
+                />
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border-default, #e2e8f0)',
+                  backgroundColor: 'var(--bg-subtle, #f8fafc)',
+                  marginBottom: '1.25rem',
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: '12.5px', color: 'var(--text-primary)' }}>Akun Aktif Langsung</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '1px' }}>
+                    User aktif dapat langsung login ke portal KMS.
+                  </div>
                 </div>
                 <Toggle checked={cActive} onChange={setCActive} />
               </div>
+
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                <button type="button" onClick={() => setShowCreate(false)} style={{ height: '36px', padding: '0 16px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'none', fontSize: '13px', cursor: 'pointer', color: 'var(--text-primary)' }}>Batal</button>
-                <button type="submit" disabled={isSubmitting} style={{ height: '36px', padding: '0 16px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--color-primary)', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px', opacity: isSubmitting ? 0.7 : 1 }}>
-                  {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}Buat user
+                <button
+                  type="button"
+                  onClick={() => setShowCreate(false)}
+                  style={{
+                    height: '28px',
+                    padding: '0 14px',
+                    borderRadius: '9999px',
+                    border: '1px solid var(--border-default, #e2e8f0)',
+                    backgroundColor: 'var(--bg-card, #ffffff)',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    height: '28px',
+                    padding: '0 14px',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    color: '#FFFFFF',
+                    backgroundColor: '#2563EB',
+                    border: '1px solid #1D4ED8',
+                    borderRadius: '9999px',
+                    cursor: 'pointer',
+                    opacity: isSubmitting ? 0.7 : 1,
+                  }}
+                >
+                  {isSubmitting ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+                  Buat Pengguna
                 </button>
               </div>
             </form>
@@ -469,120 +1228,303 @@ export default function UsersManagementView() {
         </div>
       )}
 
-      {/* MODAL: Detail User */}
+      {/* ════ MODAL: Detail User ════ */}
       {detailUser && (
         <div style={OL} onClick={() => setDetailUser(null)}>
-          <div style={{ ...BOX(520), maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+          <div style={{ ...BOX(520), maxHeight: '90vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: 'var(--text-primary)' }}>Detail user</h3>
-                <p style={{ margin: '3px 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>Lihat detail akun, keanggotaan tim, dan aktivitas sesi.</p>
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  Detail Profil Pengguna
+                </h3>
+                <p style={{ margin: '3px 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  Informasi akun, unit kerja, dan riwayat aktivitas KMS.
+                </p>
               </div>
-              <button type="button" onClick={() => setDetailUser(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={18} /></button>
+              <button
+                type="button"
+                onClick={() => setDetailUser(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+              >
+                <X size={16} />
+              </button>
             </div>
-            {/* User header */}
-            <div style={{ border: '1px solid var(--border-default)', borderRadius: '10px', padding: '14px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+
+            {/* User Profile Card */}
+            <div
+              style={{
+                border: '1px solid var(--border-default, #e2e8f0)',
+                borderRadius: '10px',
+                padding: '12px 14px',
+                marginBottom: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px',
+                flexWrap: 'wrap',
+                backgroundColor: 'var(--bg-subtle, #f8fafc)',
+              }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <UserAvatar name={detailUser.name} size={40} />
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary)' }}>{detailUser.name}</span>
+                    <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text-primary)' }}>
+                      {detailUser.name}
+                    </span>
                     <StatusBadge status={detailUser.status} />
                   </div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{detailUser.email}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{detailUser.email.split('@')[0]}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    {detailUser.email}
+                  </div>
                 </div>
               </div>
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                 {canManage && (
-                  <button type="button" onClick={() => openEdit(detailUser)} style={{ height: '32px', padding: '0 12px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'none', fontSize: '12.5px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px', color: 'var(--text-primary)' }}>
-                    <Pencil size={12} />Edit user
+                  <button
+                    type="button"
+                    onClick={() => openEdit(detailUser)}
+                    style={{
+                      height: '26px',
+                      padding: '0 10px',
+                      borderRadius: '9999px',
+                      border: '1px solid var(--border-default, #e2e8f0)',
+                      backgroundColor: 'var(--bg-card, #ffffff)',
+                      fontSize: '11.5px',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      color: 'var(--text-primary)',
+                      fontWeight: 500,
+                    }}
+                  >
+                    <Pencil size={11} />
+                    Edit
                   </button>
                 )}
-                <button type="button" onClick={() => toast.info('Fitur revoke sesi belum tersedia')} style={{ height: '32px', padding: '0 12px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'none', fontSize: '12.5px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px', color: 'var(--text-primary)' }}>
-                  <RotateCcw size={12} />Revoke sesi
-                </button>
                 {canManage && detailUser.id !== 'a0000000-0000-0000-0000-000000000001' && (
-                  <button type="button" onClick={() => toggleStatus(detailUser)} style={{ height: '32px', padding: '0 12px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'none', fontSize: '12.5px', cursor: 'pointer', color: 'var(--text-primary)' }}>
+                  <button
+                    type="button"
+                    onClick={() => toggleStatus(detailUser)}
+                    style={{
+                      height: '26px',
+                      padding: '0 10px',
+                      borderRadius: '9999px',
+                      border: '1px solid var(--border-default, #e2e8f0)',
+                      backgroundColor: 'var(--bg-card, #ffffff)',
+                      fontSize: '11.5px',
+                      cursor: 'pointer',
+                      color: 'var(--text-primary)',
+                      fontWeight: 500,
+                    }}
+                  >
                     {detailUser.status === 'active' ? 'Nonaktifkan' : 'Aktifkan'}
                   </button>
                 )}
               </div>
             </div>
-            {/* Info grid row 1 */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '8px', marginBottom: '8px' }}>
-              {[{ l: 'DEPARTEMEN', v: detailUser.department || '-' }, { l: 'PERTANYAAN AI', v: String(detailUser.question_count ?? 0) }, { l: 'SESI AKTIF', v: '—' }, { l: 'STATUS', v: detailUser.status === 'active' ? 'Aktif' : 'Nonaktif' }].map(({ l, v }) => (
-                <div key={l} style={{ border: '1px solid var(--border-default)', borderRadius: '8px', padding: '10px 12px' }}>
-                  <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '4px' }}>{l}</div>
-                  <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)' }}>{v}</div>
+
+            {/* Metrics grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '8px' }}>
+              {[
+                { l: 'DEPARTEMEN', v: detailUser.department || '—' },
+                { l: 'PERTANYAAN AI', v: String(detailUser.question_count ?? 0) },
+                { l: 'ROLE', v: detailUser.role?.name || detailUser.role_id },
+                { l: 'STATUS', v: detailUser.status === 'active' ? 'Aktif' : 'Nonaktif' },
+              ].map(({ l, v }) => (
+                <div
+                  key={l}
+                  style={{
+                    border: '1px solid var(--border-default, #e2e8f0)',
+                    borderRadius: '8px',
+                    padding: '8px 10px',
+                    backgroundColor: 'var(--bg-card, #ffffff)',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: '9.5px',
+                      fontWeight: 700,
+                      color: 'var(--text-muted)',
+                      letterSpacing: '0.05em',
+                      textTransform: 'uppercase',
+                      marginBottom: '3px',
+                    }}
+                  >
+                    {l}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '12.5px',
+                      fontWeight: 600,
+                      color: 'var(--text-primary)',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {v}
+                  </div>
                 </div>
               ))}
             </div>
-            {/* Info grid row 2 */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px', marginBottom: '12px' }}>
-              {[{ l: 'LOGIN TERAKHIR', v: fmtDate(detailUser.last_login_at) }, { l: 'DIBUAT', v: fmtDate(detailUser.created_at) }, { l: 'DIPERBARUI', v: fmtDate(detailUser.updated_at) }].map(({ l, v }) => (
-                <div key={l} style={{ border: '1px solid var(--border-default)', borderRadius: '8px', padding: '10px 12px' }}>
-                  <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '4px' }}>{l}</div>
-                  <div style={{ fontSize: '12.5px', color: 'var(--text-primary)' }}>{v}</div>
+
+            {/* Timestamps */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '12px' }}>
+              {[
+                { l: 'LOGIN TERAKHIR', v: fmtDate(detailUser.last_login_at) },
+                { l: 'TANGGAL DIBUAT', v: fmtDate(detailUser.created_at) },
+                { l: 'TERAKHIR UPDATE', v: fmtDate(detailUser.updated_at) },
+              ].map(({ l, v }) => (
+                <div
+                  key={l}
+                  style={{
+                    border: '1px solid var(--border-default, #e2e8f0)',
+                    borderRadius: '8px',
+                    padding: '8px 10px',
+                    backgroundColor: 'var(--bg-card, #ffffff)',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: '9.5px',
+                      fontWeight: 700,
+                      color: 'var(--text-muted)',
+                      letterSpacing: '0.05em',
+                      textTransform: 'uppercase',
+                      marginBottom: '3px',
+                    }}
+                  >
+                    {l}
+                  </div>
+                  <div style={{ fontSize: '11.5px', color: 'var(--text-primary)' }}>{v}</div>
                 </div>
               ))}
-            </div>
-            {/* Roles */}
-            <div style={{ border: '1px solid var(--border-default)', borderRadius: '10px', padding: '14px', marginBottom: '10px' }}>
-              <div style={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--text-primary)', marginBottom: '3px' }}>Roles</div>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 10px' }}>Access roles assigned to this user.</p>
-              <div style={{ border: '1px solid var(--border-default)', borderRadius: '8px', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
-                  <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: roleDot(detailUser.role_id) }} />
-                  {detailUser.role?.name || detailUser.role_id}
-                </span>
-                <ChevronDown size={14} color="var(--text-muted)" />
-              </div>
-            </div>
-            {/* Keanggotaan tim */}
-            <div style={{ border: '1px solid var(--border-default)', borderRadius: '10px', padding: '14px' }}>
-              <div style={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--text-primary)', marginBottom: '3px' }}>Keanggotaan tim</div>
-              <div style={{ border: '1px solid var(--border-default)', borderRadius: '8px', padding: '12px', marginTop: '8px', fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center' }}>
-                {detailUser.department ? `Anggota tim: ${detailUser.department}` : 'User ini belum masuk ke tim mana pun.'}
-              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL: Edit User */}
+      {/* ════ MODAL: Edit User ════ */}
       {editingUser && (
         <div style={OL} onClick={() => setEditingUser(null)}>
-          <div style={BOX(480)} onClick={e => e.stopPropagation()}>
+          <div style={BOX(480)} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: 'var(--text-primary)' }}>Edit user</h3>
-                <p style={{ margin: '3px 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>Perbarui identitas akun dan informasi kontak.</p>
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  Edit Pengguna
+                </h3>
+                <p style={{ margin: '3px 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  Perbarui profil akun, departemen, dan hak akses.
+                </p>
               </div>
-              <button type="button" onClick={() => setEditingUser(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={18} /></button>
+              <button
+                type="button"
+                onClick={() => setEditingUser(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+              >
+                <X size={16} />
+              </button>
             </div>
+
             <form onSubmit={handleUpdate}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                <div><span style={LBL}>Nama</span><input type="text" required value={eName} onChange={e => setEName(e.target.value)} style={INP} /></div>
-                <div><span style={LBL}>Email</span><input type="email" value={eEmail} onChange={e => setEEmail(e.target.value)} style={INP} /></div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                <div>
+                  <label style={LBL}>Nama Lengkap *</label>
+                  <input
+                    type="text"
+                    required
+                    value={eName}
+                    onChange={(e) => setEName(e.target.value)}
+                    style={INP}
+                  />
+                </div>
+                <div>
+                  <label style={LBL}>Email Kantor *</label>
+                  <input
+                    type="email"
+                    required
+                    value={eEmail}
+                    onChange={(e) => setEEmail(e.target.value)}
+                    style={INP}
+                  />
+                </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '4px' }}>
-                <div><span style={LBL}>Departemen</span><input type="text" value={eDept} onChange={e => setEDept(e.target.value)} style={INP} /></div>
-                <div><span style={LBL}>Role</span><select value={eRoleId} onChange={e => setERoleId(e.target.value)} style={INP}>{roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</select></div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                <div>
+                  <label style={LBL}>Departemen / Unit</label>
+                  <input
+                    type="text"
+                    value={eDept}
+                    onChange={(e) => setEDept(e.target.value)}
+                    style={INP}
+                  />
+                </div>
+                <div>
+                  <label style={LBL}>Role Akses</label>
+                  <EnterpriseSelect
+                    value={eRoleId}
+                    onChange={(val) => setERoleId(String(val))}
+                    options={roleSelectOptions}
+                    size="sm"
+                    width="100%"
+                  />
+                </div>
               </div>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 14px' }}>Atur departemen agar user lebih mudah dikelola.</p>
+
               <div style={{ marginBottom: '1.25rem' }}>
-                <span style={LBL}>Status akun</span>
-                <select value={eStatus} onChange={e => setEStatus(e.target.value as any)} style={INP}>
-                  <option value="active">Aktif</option>
-                  <option value="pending_approval">Menunggu Approval</option>
-                  <option value="inactive">Nonaktif</option>
-                </select>
+                <label style={LBL}>Status Akun</label>
+                <EnterpriseSelect
+                  value={eStatus}
+                  onChange={(val) => setEStatus(val)}
+                  options={statusSelectOptions}
+                  size="sm"
+                  width="100%"
+                />
               </div>
+
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                <button type="button" onClick={() => setEditingUser(null)} style={{ height: '36px', padding: '0 16px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'none', fontSize: '13px', cursor: 'pointer', color: 'var(--text-primary)' }}>Batal</button>
-                <button type="submit" disabled={isSubmitting} style={{ height: '36px', padding: '0 16px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--color-primary)', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px', opacity: isSubmitting ? 0.7 : 1 }}>
-                  {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}Simpan perubahan
+                <button
+                  type="button"
+                  onClick={() => setEditingUser(null)}
+                  style={{
+                    height: '28px',
+                    padding: '0 14px',
+                    borderRadius: '9999px',
+                    border: '1px solid var(--border-default, #e2e8f0)',
+                    backgroundColor: 'var(--bg-card, #ffffff)',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    height: '28px',
+                    padding: '0 14px',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    color: '#FFFFFF',
+                    backgroundColor: '#2563EB',
+                    border: '1px solid #1D4ED8',
+                    borderRadius: '9999px',
+                    cursor: 'pointer',
+                    opacity: isSubmitting ? 0.7 : 1,
+                  }}
+                >
+                  {isSubmitting ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                  Simpan Perubahan
                 </button>
               </div>
             </form>
@@ -590,56 +1532,83 @@ export default function UsersManagementView() {
         </div>
       )}
 
-      {/* MODAL: Persetujuan Akun Google */}
+      {/* ════ MODAL: Persetujuan Akun Google ════ */}
       {approvingUser && (
         <div style={OL} onClick={() => setApprovingUser(null)}>
-          <div style={BOX(500)} onClick={e => e.stopPropagation()}>
+          <div style={BOX(500)} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '38px', height: '38px', borderRadius: '50%', backgroundColor: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <UserCheck size={20} />
+                <div
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%',
+                    backgroundColor: '#eff6ff',
+                    color: '#2563eb',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <UserCheck size={18} />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: 'var(--text-primary)' }}>Persetujuan Akun Google</h3>
-                  <p style={{ margin: '2px 0 0', fontSize: '12.5px', color: 'var(--text-secondary)' }}>Verifikasi dan tentukan hak akses (Role) pengguna.</p>
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    Persetujuan Akun Google
+                  </h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    Verifikasi identitas dan tentukan hak akses (Role) pengguna.
+                  </p>
                 </div>
               </div>
-              <button type="button" onClick={() => setApprovingUser(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={18} /></button>
+              <button
+                type="button"
+                onClick={() => setApprovingUser(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+              >
+                <X size={16} />
+              </button>
             </div>
 
-            {/* User Profile Summary */}
-            <div style={{ backgroundColor: 'var(--bg-subtle)', border: '1px solid var(--border-default)', borderRadius: '10px', padding: '12px 14px', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <UserAvatar name={approvingUser.name} size={42} />
+            {/* Profile Summary */}
+            <div
+              style={{
+                backgroundColor: 'var(--bg-subtle, #f8fafc)',
+                border: '1px solid var(--border-default, #e2e8f0)',
+                borderRadius: '10px',
+                padding: '12px 14px',
+                marginBottom: '1.25rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+              }}
+            >
+              <UserAvatar name={approvingUser.name} size={38} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>{approvingUser.name}</div>
-                <div style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>{approvingUser.email}</div>
+                <div style={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--text-primary)' }}>
+                  {approvingUser.name}
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{approvingUser.email}</div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                  Mendaftar via Google • {fmtDate(approvingUser.created_at)}
+                  Mendaftar via Google SSO • {fmtDate(approvingUser.created_at)}
                 </div>
               </div>
-              <span style={{ fontSize: '11.5px', fontWeight: 600, color: '#B45309', backgroundColor: '#FEF3C7', padding: '3px 8px', borderRadius: '9999px', border: '1px solid #FDE68A' }}>
-                Pending
-              </span>
+              <span className="status-pill-warning">Pending</span>
             </div>
 
             <form onSubmit={handleApprove}>
               <div style={{ marginBottom: '1rem' }}>
                 <label style={LBL}>
-                  Pilih Role Akses (Hak Akses Pengguna) <span style={{ color: '#dc2626' }}>*</span>
+                  Pilih Role Akses (RBAC) <span style={{ color: '#dc2626' }}>*</span>
                 </label>
-                <select
+                <EnterpriseSelect
                   value={aRoleId}
-                  onChange={e => setARoleId(e.target.value)}
-                  style={{ ...INP, fontWeight: 500 }}
-                  required
-                >
-                  {roles.map(r => (
-                    <option key={r.id} value={r.id}>
-                      {r.name} ({r.id}) — {r.description?.slice(0, 50)}...
-                    </option>
-                  ))}
-                </select>
-                <p style={{ margin: '4px 0 0', fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                  onChange={(val) => setARoleId(String(val))}
+                  options={roleSelectOptions}
+                  size="sm"
+                  width="100%"
+                />
+                <p style={{ margin: '4px 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>
                   Hak akses menu dokumen, kurasi AI, chatbot, dan administrasi akan mengikuti role ini.
                 </p>
               </div>
@@ -649,7 +1618,7 @@ export default function UsersManagementView() {
                 <input
                   type="text"
                   value={aDept}
-                  onChange={e => setADept(e.target.value)}
+                  onChange={(e) => setADept(e.target.value)}
                   placeholder="Contoh: Operasional, IT, Medis, dll."
                   style={INP}
                 />
@@ -663,7 +1632,17 @@ export default function UsersManagementView() {
                     setApprovingUser(null);
                     setDeletingUser(target);
                   }}
-                  style={{ height: '36px', padding: '0 12px', borderRadius: '8px', border: '1px solid #FECACA', backgroundColor: '#FEF2F2', color: '#DC2626', fontSize: '12.5px', fontWeight: 500, cursor: 'pointer' }}
+                  style={{
+                    height: '28px',
+                    padding: '0 12px',
+                    borderRadius: '9999px',
+                    border: '1px solid #fecaca',
+                    backgroundColor: '#fef2f2',
+                    color: '#dc2626',
+                    fontSize: '11.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
                 >
                   Tolak Akun
                 </button>
@@ -672,7 +1651,17 @@ export default function UsersManagementView() {
                   <button
                     type="button"
                     onClick={() => setApprovingUser(null)}
-                    style={{ height: '36px', padding: '0 14px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'none', fontSize: '13px', cursor: 'pointer', color: 'var(--text-primary)' }}
+                    style={{
+                      height: '28px',
+                      padding: '0 14px',
+                      borderRadius: '9999px',
+                      border: '1px solid var(--border-default, #e2e8f0)',
+                      backgroundColor: 'var(--bg-card, #ffffff)',
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      color: 'var(--text-primary)',
+                    }}
                   >
                     Batal
                   </button>
@@ -680,23 +1669,23 @@ export default function UsersManagementView() {
                     type="submit"
                     disabled={isApproving}
                     style={{
-                      height: '36px',
-                      padding: '0 18px',
-                      borderRadius: '8px',
-                      border: 'none',
-                      backgroundColor: '#2563EB',
-                      color: '#fff',
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '6px',
+                      height: '28px',
+                      padding: '0 16px',
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      color: '#FFFFFF',
+                      backgroundColor: '#2563EB',
+                      border: '1px solid #1D4ED8',
+                      borderRadius: '9999px',
+                      cursor: 'pointer',
+                      boxShadow: '0 1px 2px rgba(37,99,235,0.2)',
                       opacity: isApproving ? 0.7 : 1,
-                      boxShadow: '0 1px 3px rgba(37,99,235,0.25)',
                     }}
                   >
-                    {isApproving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                    {isApproving ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
                     Setujui & Berikan Akses
                   </button>
                 </div>
@@ -706,18 +1695,53 @@ export default function UsersManagementView() {
         </div>
       )}
 
-      {/* MODAL: Hapus */}
+      {/* ════ MODAL: Hapus Pengguna ════ */}
       {deletingUser && (
         <div style={OL} onClick={() => setDeletingUser(null)}>
-          <div style={BOX(420)} onClick={e => e.stopPropagation()}>
-            <h3 style={{ margin: '0 0 8px', fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>Hapus akun pengguna?</h3>
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 1.25rem', lineHeight: 1.5 }}>
-              Apakah Anda yakin ingin menghapus akun &quot;{deletingUser.name}&quot; ({deletingUser.email})? Tindakan ini tidak dapat dibatalkan.
+          <div style={BOX(420)} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 8px', fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>
+              Hapus Akun Pengguna?
+            </h3>
+            <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: '0 0 1.25rem', lineHeight: 1.5 }}>
+              Apakah Anda yakin ingin menghapus akun <strong>&quot;{deletingUser.name}&quot;</strong> ({deletingUser.email})?
+              Tindakan ini tidak dapat dibatalkan.
             </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-              <button type="button" onClick={() => setDeletingUser(null)} style={{ height: '36px', padding: '0 16px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'none', fontSize: '13px', cursor: 'pointer', color: 'var(--text-primary)' }}>Batal</button>
-              <button type="button" onClick={handleDelete} disabled={isSubmitting} style={{ height: '36px', padding: '0 16px', borderRadius: '8px', border: 'none', backgroundColor: '#dc2626', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: isSubmitting ? 0.7 : 1 }}>
-                {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : 'Hapus'}
+              <button
+                type="button"
+                onClick={() => setDeletingUser(null)}
+                style={{
+                  height: '28px',
+                  padding: '0 14px',
+                  borderRadius: '9999px',
+                  border: '1px solid var(--border-default, #e2e8f0)',
+                  backgroundColor: 'var(--bg-card, #ffffff)',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isSubmitting}
+                style={{
+                  height: '28px',
+                  padding: '0 14px',
+                  borderRadius: '9999px',
+                  border: 'none',
+                  backgroundColor: '#dc2626',
+                  color: '#ffffff',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  opacity: isSubmitting ? 0.7 : 1,
+                }}
+              >
+                {isSubmitting ? <Loader2 size={13} className="animate-spin" /> : 'Hapus Pengguna'}
               </button>
             </div>
           </div>
