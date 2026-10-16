@@ -15,6 +15,7 @@ import {
 import AppShell from '@/components/layout/AppShell';
 import EnterprisePageHeader from '@/components/layout/EnterprisePageHeader';
 import DashboardMetricCard from '@/components/dashboard/DashboardMetricCard';
+import EnterprisePagination from '@/components/ui/EnterprisePagination';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserSession } from '@/context/UserSessionContext';
 import { toast } from 'sonner';
@@ -50,6 +51,15 @@ export default function KnowledgeGapsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'open' | 'in_progress' | 'resolved' | 'all'>('open');
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Reset to page 1 on search or filter change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter]);
 
   // Modal resolution state
   const [resolvingGap, setResolvingGap] = useState<KnowledgeGapItem | null>(null);
@@ -139,6 +149,13 @@ export default function KnowledgeGapsPage() {
     });
   }, [gaps, searchQuery]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredGaps.length / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const paginatedGaps = filteredGaps.slice(
+    (safeCurrentPage - 1) * pageSize,
+    safeCurrentPage * pageSize
+  );
+
   return (
     <AppShell requiredPermission="documents:read">
       <div
@@ -214,7 +231,7 @@ export default function KnowledgeGapsPage() {
         </div>
 
         {/* ── Unified Knowledge Gaps Stream Card (Linear / Vercel style) ── */}
-        <div className="enterprise-card">
+        <div className="enterprise-card" style={{ display: 'flex', flexDirection: 'column', minHeight: '380px' }}>
           {/* Unified Header Controls */}
           <div className="enterprise-card-header" style={{ flexWrap: 'wrap', gap: '8px' }}>
             {/* Left: Title + Inline Segmented Switcher */}
@@ -384,47 +401,48 @@ export default function KnowledgeGapsPage() {
           </div>
 
           {/* Stream Body */}
-          {isLoading ? (
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {[1, 2, 3, 4, 5].map((n) => (
-                <div
-                  key={n}
-                  className="enterprise-list-item"
-                  style={{
-                    borderBottom: n === 5 ? 'none' : '1px solid var(--border-default)',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '9px', flex: 1 }}>
-                    <span className="skeleton-shimmer" style={{ width: '24px', height: '24px', borderRadius: '5px', flexShrink: 0 }} />
-                    <span className="skeleton-shimmer" style={{ width: `${160 + n * 30}px`, height: '13px', borderRadius: '3px' }} />
-                    <span className="skeleton-shimmer" style={{ width: '120px', height: '11px', borderRadius: '3px' }} />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            {isLoading ? (
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <div
+                    key={n}
+                    className="enterprise-list-item"
+                    style={{
+                      borderBottom: n === 5 ? 'none' : '1px solid var(--border-default)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '9px', flex: 1 }}>
+                      <span className="skeleton-shimmer" style={{ width: '24px', height: '24px', borderRadius: '5px', flexShrink: 0 }} />
+                      <span className="skeleton-shimmer" style={{ width: `${160 + n * 30}px`, height: '13px', borderRadius: '3px' }} />
+                      <span className="skeleton-shimmer" style={{ width: '120px', height: '11px', borderRadius: '3px' }} />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span className="skeleton-shimmer" style={{ width: '45px', height: '13px', borderRadius: '3px' }} />
+                      <span className="skeleton-shimmer" style={{ width: '55px', height: '20px', borderRadius: '4px' }} />
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span className="skeleton-shimmer" style={{ width: '45px', height: '13px', borderRadius: '3px' }} />
-                    <span className="skeleton-shimmer" style={{ width: '55px', height: '20px', borderRadius: '4px' }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : filteredGaps.length === 0 ? (
-            <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
-              <CheckCircle2 size={20} style={{ margin: '0 auto 6px', color: 'var(--text-muted)', opacity: 0.6 }} />
-              <p style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)', margin: 0 }}>
-                {statusFilter === 'open'
-                  ? (language === 'en' ? 'No Open Knowledge Gaps' : 'Tidak Ada Kesenjangan Pengetahuan Terbuka')
-                  : (language === 'en' ? 'No Gaps Recorded' : 'Tidak Ada Data Kesenjangan')}
-              </p>
-              <p style={{ fontSize: '11.5px', marginTop: '3px', color: 'var(--text-secondary)' }}>
-                {statusFilter === 'open'
-                  ? (language === 'en'
-                      ? 'All user questions are addressed or indexed in active knowledge bases.'
-                      : 'Seluruh pertanyaan pengguna saat ini berhasil dijawab atau telah dilengkapi oleh dokumen SOP aktif.')
-                  : (language === 'en' ? 'Try adjusting your search query or filter.' : 'Cobalah gunakan kata kunci pencarian yang berbeda.')}
-              </p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {filteredGaps.map((gap, idx) => (
+                ))}
+              </div>
+            ) : filteredGaps.length === 0 ? (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+                <CheckCircle2 size={20} style={{ margin: '0 auto 6px', color: 'var(--text-muted)', opacity: 0.6 }} />
+                <p style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)', margin: 0 }}>
+                  {statusFilter === 'open'
+                    ? (language === 'en' ? 'No Open Knowledge Gaps' : 'Tidak Ada Kesenjangan Pengetahuan Terbuka')
+                    : (language === 'en' ? 'No Gaps Recorded' : 'Tidak Ada Data Kesenjangan')}
+                </p>
+                <p style={{ fontSize: '11.5px', marginTop: '3px', color: 'var(--text-secondary)' }}>
+                  {statusFilter === 'open'
+                    ? (language === 'en'
+                        ? 'All user questions are addressed or indexed in active knowledge bases.'
+                        : 'Seluruh pertanyaan pengguna saat ini berhasil dijawab atau telah dilengkapi oleh dokumen SOP aktif.')
+                    : (language === 'en' ? 'Try adjusting your search query or filter.' : 'Cobalah gunakan kata kunci pencarian yang berbeda.')}
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {paginatedGaps.map((gap, idx) => (
                 <div
                   key={gap.id}
                   className="enterprise-list-item"
@@ -577,6 +595,20 @@ export default function KnowledgeGapsPage() {
               ))}
             </div>
           )}
+          </div>
+
+          {/* ── Enterprise Pagination Bar (Always pinned at bottom) ── */}
+          <EnterprisePagination
+            currentPage={safeCurrentPage}
+            totalItems={filteredGaps.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setCurrentPage(1);
+            }}
+            language={language}
+          />
         </div>
       </div>
 

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { UploadBatch } from '@/types/document';
 import RenameModal from './RenameModal';
+import EnterprisePagination from '@/components/ui/EnterprisePagination';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserSession } from '@/context/UserSessionContext';
 import { formatDateTime } from '@lib/utils/formatters';
@@ -62,6 +63,15 @@ export default function DocumentTable({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Reset to page 1 on search or filter change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterActive]);
+
   const inactiveCount = batches.filter((b) => !b.is_active_knowledge).length;
   const activeCount = batches.filter((b) => b.is_active_knowledge).length;
 
@@ -74,9 +84,16 @@ export default function DocumentTable({
     return true;
   });
 
+  const totalPages = Math.max(1, Math.ceil(filteredBatches.length / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const paginatedBatches = filteredBatches.slice(
+    (safeCurrentPage - 1) * pageSize,
+    safeCurrentPage * pageSize
+  );
+
   return (
     <>
-      <div className="enterprise-card">
+      <div className="enterprise-card" style={{ display: 'flex', flexDirection: 'column', minHeight: '380px' }}>
         {/* ── Unified Header Controls (Linear / Vercel style) ── */}
         <div className="enterprise-card-header" style={{ flexWrap: 'wrap', gap: '8px' }}>
         {/* Left: Title + Inline Segmented Switcher */}
@@ -246,42 +263,43 @@ export default function DocumentTable({
           </button>
         </div>
       </div>
-        {isLoading ? (
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {[1, 2, 3, 4, 5].map((n) => (
-              <div
-                key={n}
-                className="enterprise-list-item"
-                style={{
-                  borderBottom: n === 5 ? 'none' : '1px solid var(--border-default)',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '9px', flex: 1 }}>
-                  <span className="skeleton-shimmer" style={{ width: '24px', height: '24px', borderRadius: '5px', flexShrink: 0 }} />
-                  <span className="skeleton-shimmer" style={{ width: `${140 + n * 25}px`, height: '13px', borderRadius: '3px' }} />
-                  <span className="skeleton-shimmer" style={{ width: '180px', height: '11px', borderRadius: '3px' }} />
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          {isLoading ? (
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <div
+                  key={n}
+                  className="enterprise-list-item"
+                  style={{
+                    borderBottom: n === 5 ? 'none' : '1px solid var(--border-default)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '9px', flex: 1 }}>
+                    <span className="skeleton-shimmer" style={{ width: '24px', height: '24px', borderRadius: '5px', flexShrink: 0 }} />
+                    <span className="skeleton-shimmer" style={{ width: `${140 + n * 25}px`, height: '13px', borderRadius: '3px' }} />
+                    <span className="skeleton-shimmer" style={{ width: '180px', height: '11px', borderRadius: '3px' }} />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span className="skeleton-shimmer" style={{ width: '45px', height: '13px', borderRadius: '3px' }} />
+                    <span className="skeleton-shimmer" style={{ width: '60px', height: '20px', borderRadius: '4px' }} />
+                  </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span className="skeleton-shimmer" style={{ width: '45px', height: '13px', borderRadius: '3px' }} />
-                  <span className="skeleton-shimmer" style={{ width: '60px', height: '20px', borderRadius: '4px' }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : filteredBatches.length === 0 ? (
-          <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
-            <FileText size={20} style={{ margin: '0 auto 6px', color: 'var(--text-muted)', opacity: 0.6 }} />
-            <p style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)', margin: 0 }}>
-              {searchQuery ? t('table.empty_search_title') : t('table.empty_title')}
-            </p>
-            <p style={{ fontSize: '11.5px', marginTop: '3px', color: 'var(--text-secondary)' }}>
-              {searchQuery ? t('table.empty_search_desc') : t('table.empty_desc')}
-            </p>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {filteredBatches.map((batch, idx) => {
-              const formattedDate = formatDateTime(batch.uploaded_at, language);
+              ))}
+            </div>
+          ) : filteredBatches.length === 0 ? (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+              <FileText size={20} style={{ margin: '0 auto 6px', color: 'var(--text-muted)', opacity: 0.6 }} />
+              <p style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)', margin: 0 }}>
+                {searchQuery ? t('table.empty_search_title') : t('table.empty_title')}
+              </p>
+              <p style={{ fontSize: '11.5px', marginTop: '3px', color: 'var(--text-secondary)' }}>
+                {searchQuery ? t('table.empty_search_desc') : t('table.empty_desc')}
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {paginatedBatches.map((batch, idx) => {
+                const formattedDate = formatDateTime(batch.uploaded_at, language);
 
               return (
                 <div
@@ -454,6 +472,20 @@ export default function DocumentTable({
             })}
           </div>
         )}
+        </div>
+
+        {/* ── Enterprise Pagination Bar (Always pinned at bottom) ── */}
+        <EnterprisePagination
+          currentPage={safeCurrentPage}
+          totalItems={filteredBatches.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setCurrentPage(1);
+          }}
+          language={language}
+        />
       </div>
 
       {/* Rename Modal */}
