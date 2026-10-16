@@ -247,8 +247,18 @@ export default function KnowledgeGapsPage() {
 
         {/* ── Unified Knowledge Gaps Stream Card (Linear / Vercel style) ── */}
         <div className="enterprise-card" style={{ display: 'flex', flexDirection: 'column', minHeight: '380px' }}>
-          {/* Unified Header Controls */}
-          <div className="enterprise-card-header" style={{ flexWrap: 'wrap', gap: '8px' }}>
+          {/* Unified Header Controls (Sticky Freeze Header) */}
+          <div
+            className="enterprise-card-header"
+            style={{
+              flexWrap: 'wrap',
+              gap: '8px',
+              position: 'sticky',
+              top: 0,
+              zIndex: 10,
+              backgroundColor: 'var(--bg-card, #ffffff)',
+            }}
+          >
             {/* Left: Title + Inline Segmented Switcher */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -416,7 +426,16 @@ export default function KnowledgeGapsPage() {
           </div>
 
           {/* Stream Body */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              overflowY: 'auto',
+              maxHeight: 'min(500px, calc(100vh - 300px))',
+              minHeight: '260px',
+            }}
+          >
             {isLoading ? (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {[1, 2, 3, 4, 5].map((n) => (
