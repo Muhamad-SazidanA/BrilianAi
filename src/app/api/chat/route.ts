@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { askDocumentChat } from '@lib/chat/chatService';
+import { askDocumentChat, askDocumentChatStream } from '@lib/chat/chatService';
 import { saveAuditLog } from '@lib/db/auditLogStore';
 import { getAuthenticatedUser, hasServerPermission, getAllowedClassificationsForRole, canUserAccessDocument } from '@lib/auth/serverAuth';
 import { getBatchById } from '@lib/db/vectorStore';
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden: AI Assistant access required.' }, { status: 403 });
     }
     const body = await request.json();
-    const { query, documentId, allowPublicKnowledge, topK, minSimilarity, bypassCache, sessionId } = body;
+    const { query, documentId, allowPublicKnowledge, topK, minSimilarity, bypassCache, sessionId, stream } = body;
 
     if (!query || typeof query !== 'string' || query.trim().length === 0) {
       return NextResponse.json(
@@ -38,19 +38,33 @@ export async function POST(request: NextRequest) {
     if (documentId) {
       const targetBatch = await getBatchById(documentId);
       if (targetBatch && !canUserAccessDocument(authenticatedUser, targetBatch, grantedBatchIds)) {
-        return NextResponse.json(
-          {
-            answer: 'Data tidak ditemukan di dalam dokumen yang dapat Anda akses.',
-            sources: [],
-            allowPublicKnowledge: Boolean(allowPublicKnowledge),
-            retrievedCount: 0,
-          },
-          { status: 200 }
-        );
+        const notFoundPayload = {
+          answer: 'Data tidak ditemukan di dalam dokumen yang dapat Anda akses.',
+          sources: [],
+          allowPublicKnowledge: Boolean(allowPublicKnowledge),
+          retrievedCount: 0,
+        };
+        if (stream) {
+          const encoder = new TextEncoder();
+          const readable = new ReadableStream({
+            start(controller) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done', ...notFoundPayload })}\n\n`));
+              controller.close();
+            },
+          });
+          return new Response(readable, {
+            headers: {
+              'Content-Type': 'text/event-stream; charset=utf-8',
+              'Cache-Control': 'no-cache, no-transform',
+              'Connection': 'keep-alive',
+            },
+          });
+        }
+        return NextResponse.json(notFoundPayload, { status: 200 });
       }
     }
 
-    const result = await askDocumentChat(query, {
+    const chatOptions = {
       documentId: documentId || undefined,
       allowPublicKnowledge: Boolean(allowPublicKnowledge),
       topK: typeof topK === 'number' ? topK : undefined,
@@ -60,22 +74,115 @@ export async function POST(request: NextRequest) {
       divisionId: userDivision,
       allowedClassifications: allowedClassifications as any,
       grantedBatchIds,
-    });
+    };
 
-    // Record audit log asynchronously for enterprise monitoring & compliance
-    saveAuditLog({
-      sessionId: sessionId || `sess-${Date.now()}`,
-      userId: authenticatedUser.id,
-      userName: authenticatedUser.name,
-      userEmail: authenticatedUser.email,
-      userDepartment: authenticatedUser.department,
-      queryText: query.trim(),
-      answerText: result.answer,
-      sources: result.sources,
-      retrievedCount: result.retrievedCount,
-    }).catch((err) => {
+    const isStreamingRequested = Boolean(stream) || request.headers.get('accept')?.includes('text/event-stream');
+
+    if (isStreamingRequested) {
+      const encoder = new TextEncoder();
+      const readable = new ReadableStream({
+        async start(controller) {
+          let isClosed = false;
+          const sendEvent = (data: any) => {
+            if (isClosed) return;
+            try {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+            } catch {
+              isClosed = true;
+            }
+          };
+
+          try {
+            await askDocumentChatStream(query, chatOptions, {
+              onSources(sources) {
+                sendEvent({ type: 'sources', sources });
+              },
+              onToken(token) {
+                sendEvent({ type: 'token', token });
+              },
+              async onDone(result) {
+                sendEvent({
+                  type: 'done',
+                  answer: result.answer,
+                  sources: result.sources,
+                  retrievedCount: result.retrievedCount,
+                });
+
+                // Record audit log with guaranteed delivery before stream shutdown
+                try {
+                  await saveAuditLog({
+                    sessionId: sessionId || `sess-${Date.now()}`,
+                    userId: authenticatedUser.id,
+                    userName: authenticatedUser.name,
+                    userEmail: authenticatedUser.email,
+                    userDepartment: authenticatedUser.department,
+                    queryText: query.trim(),
+                    answerText: result.answer,
+                    sources: result.sources,
+                    retrievedCount: result.retrievedCount,
+                  });
+                } catch (err) {
+                  console.warn('[API /api/chat] Failed to record audit log:', err);
+                }
+
+                if (!isClosed) {
+                  isClosed = true;
+                  try {
+                    controller.close();
+                  } catch {}
+                }
+              },
+              onError(err) {
+                sendEvent({ type: 'error', error: err.message });
+                if (!isClosed) {
+                  isClosed = true;
+                  try {
+                    controller.close();
+                  } catch {}
+                }
+              },
+            });
+          } catch (streamErr: any) {
+            sendEvent({ type: 'error', error: streamErr?.message || 'Gagal memproses streaming' });
+            if (!isClosed) {
+              isClosed = true;
+              try {
+                controller.close();
+              } catch {}
+            }
+          }
+        },
+      });
+
+      return new Response(readable, {
+        headers: {
+          'Content-Type': 'text/event-stream; charset=utf-8',
+          'Cache-Control': 'no-cache, no-transform',
+          'Connection': 'keep-alive',
+          'X-Accel-Buffering': 'no',
+        },
+      });
+    }
+
+    // Default Non-Streaming Fallback
+    const result = await askDocumentChat(query, chatOptions);
+
+    // Record audit log with guaranteed delivery before response return
+    try {
+      await saveAuditLog({
+        sessionId: sessionId || `sess-${Date.now()}`,
+        userId: authenticatedUser.id,
+        userName: authenticatedUser.name,
+        userEmail: authenticatedUser.email,
+        userDepartment: authenticatedUser.department,
+        queryText: query.trim(),
+        answerText: result.answer,
+        sources: result.sources,
+        retrievedCount: result.retrievedCount,
+      });
+    } catch (err) {
       console.warn('[API /api/chat] Failed to record audit log:', err);
-    });
+    }
 
     return NextResponse.json(result, { status: 200 });
   } catch (error) {

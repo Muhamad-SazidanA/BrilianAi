@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listAuditLogs } from '@/../lib/db/auditLogStore';
+import { getAuthenticatedUser, hasServerPermission } from '@lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized: Session required.' }, { status: 401 });
+    }
+
+    const canReadAudit = await hasServerPermission(req, 'audit:read');
+    if (!canReadAudit) {
+      return NextResponse.json({ error: 'Forbidden: Hak akses audit:read diperlukan.' }, { status: 403 });
+    }
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get('userId') || undefined;
     const search = searchParams.get('search') || undefined;

@@ -1,4 +1,7 @@
 export type PermissionKey =
+  | 'dashboard:admin'
+  | 'dashboard:documents'
+  | 'dashboard:personal'
   | 'documents:read'
   | 'documents:upload'
   | 'documents:toggle_active'
@@ -12,7 +15,7 @@ export type PermissionKey =
   | 'roles:manage'
   | 'audit:read';
 
-export type PermissionCategory = 'documents' | 'curation' | 'chat' | 'administration';
+export type PermissionCategory = 'dashboard' | 'documents' | 'curation' | 'chat' | 'administration';
 
 export interface PermissionDefinition {
   key: PermissionKey;
@@ -24,6 +27,32 @@ export interface PermissionDefinition {
 }
 
 export const PERMISSIONS_CATALOG: PermissionDefinition[] = [
+  // Dashboard
+  {
+    key: 'dashboard:admin',
+    category: 'dashboard',
+    labelId: 'Akses Dasbor Admin & Sistem',
+    labelEn: 'Admin & System Dashboard Access',
+    descId: 'Melihat status infrastruktur AI, audit login, dan error/gaps',
+    descEn: 'View AI infrastructure health, login audit, and error/gap reports',
+  },
+  {
+    key: 'dashboard:documents',
+    category: 'dashboard',
+    labelId: 'Akses Dasbor Dokumen & OCR',
+    labelEn: 'Document & OCR Dashboard Access',
+    descId: 'Melihat metrik volume upload, halaman OCR, dan status kurasi batch',
+    descEn: 'View upload volume, OCR page counts, and batch curation status',
+  },
+  {
+    key: 'dashboard:personal',
+    category: 'dashboard',
+    labelId: 'Akses Dasbor Pribadi',
+    labelEn: 'Personal Dashboard Access',
+    descId: 'Melihat riwayat percakapan saya, pintasan pencarian AI, dan dokumen tim',
+    descEn: 'View personal chat history, AI search shortcuts, and team documents',
+  },
+
   // Documents
   {
     key: 'documents:read',

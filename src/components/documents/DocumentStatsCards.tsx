@@ -83,9 +83,9 @@ export default function DocumentStatsCards({
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-        gap: '14px',
-        marginBottom: '1.5rem',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+        gap: '10px',
+        marginBottom: '1rem',
       }}
     >
       {cards.map((card) => {
@@ -101,20 +101,20 @@ export default function DocumentStatsCards({
               border: isSelected
                 ? `1.5px solid ${card.activeBorder}`
                 : '1px solid var(--border-default)',
-              borderRadius: '12px',
-              padding: '1.1rem 1.25rem',
+              borderRadius: '8px',
+              padding: '0.65rem 0.85rem',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
-              minHeight: '112px',
+              minHeight: '78px',
               boxShadow: isSelected
-                ? `0 0 0 3px ${card.activeBorder}25, 0 1px 3px rgba(0,0,0,0.1)`
-                : '0 1px 2px rgba(0,0,0,0.05)',
+                ? `0 0 0 2px ${card.activeBorder}25, 0 1px 2px rgba(0,0,0,0.08)`
+                : '0 1px 2px rgba(0,0,0,0.04)',
               cursor: onSelectFilter ? 'pointer' : 'default',
-              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+              transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
               position: 'relative',
             }}
-            className="hover:shadow-md transition-all"
+            className="hover:shadow-sm transition-all"
             title={`${language === 'en' ? 'Click to filter' : 'Klik untuk memfilter'}: ${card.title}`}
           >
             {/* Top Row: Title Label & Icon */}
@@ -124,26 +124,26 @@ export default function DocumentStatsCards({
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 gap: '8px',
-                marginBottom: '10px',
+                marginBottom: '6px',
               }}
             >
               <span
                 style={{
-                  fontSize: '11px',
+                  fontSize: '10px',
                   fontWeight: 700,
                   color: 'var(--text-secondary, #64748B)',
                   letterSpacing: '0.05em',
                   textTransform: 'uppercase',
-                  lineHeight: '14px',
+                  lineHeight: '13px',
                 }}
               >
                 {card.title}
               </span>
               <div
                 style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '8px',
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '6px',
                   backgroundColor: card.bgTint,
                   display: 'flex',
                   alignItems: 'center',
@@ -152,7 +152,7 @@ export default function DocumentStatsCards({
                   flexShrink: 0,
                 }}
               >
-                <Icon size={16} strokeWidth={2.2} />
+                <Icon size={13} strokeWidth={2.2} />
               </div>
             </div>
 
@@ -161,16 +161,16 @@ export default function DocumentStatsCards({
               style={{
                 display: 'flex',
                 alignItems: 'baseline',
-                gap: '8px',
-                marginBottom: '6px',
+                gap: '6px',
+                marginBottom: '4px',
               }}
             >
               <span
                 style={{
-                  fontSize: '28px',
+                  fontSize: '18px',
                   fontWeight: 800,
                   color: card.color,
-                  lineHeight: '32px',
+                  lineHeight: '22px',
                   letterSpacing: '-0.02em',
                 }}
               >
@@ -178,9 +178,9 @@ export default function DocumentStatsCards({
               </span>
               <span
                 style={{
-                  fontSize: '10.5px',
+                  fontSize: '9.5px',
                   fontWeight: 600,
-                  padding: '1px 7px',
+                  padding: '1px 5px',
                   borderRadius: '9999px',
                   backgroundColor: card.bgTint,
                   color: card.color,
@@ -194,9 +194,9 @@ export default function DocumentStatsCards({
             {/* Bottom Subtitle / Description */}
             <div
               style={{
-                fontSize: '11.5px',
+                fontSize: '11px',
                 color: 'var(--text-secondary, #64748B)',
-                lineHeight: '15px',
+                lineHeight: '14px',
                 fontWeight: 500,
               }}
             >

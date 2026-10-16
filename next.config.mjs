@@ -24,6 +24,33 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
 
+  // Enterprise HTTP Security Headers (OWASP Clickjacking & MIME-sniffing protection)
+  headers: async () => {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'SAMEORIGIN',
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=()',
+          },
+        ],
+      },
+    ];
+  },
+
   // Allow build to proceed even with static mupdf import (externalized at runtime)
   typescript: {
     ignoreBuildErrors: true,

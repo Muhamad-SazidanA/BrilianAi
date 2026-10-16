@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { User, Role, PermissionKey } from '@/types/user';
 import { toast } from 'sonner';
 
@@ -49,31 +49,86 @@ export const DEFAULT_ADMIN_USER: User = {
   },
 };
 
+function getStoredUserProfile(): User | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem('brilian_user_profile');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.id && parsed.role) return parsed;
+    }
+    const activeId = localStorage.getItem('brilian_active_user_id');
+    if (activeId === DEFAULT_ADMIN_USER.id) {
+      return DEFAULT_ADMIN_USER;
+    }
+  } catch {}
+  return null;
+}
+
 export function UserSessionProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  const currentUserRef = useRef<User | null>(null);
+  currentUserRef.current = currentUser;
+
+  // Hydration sync to ensure cached user from localStorage is populated immediately after mount
+  useEffect(() => {
+    const cached = getStoredUserProfile();
+    if (cached) {
+      setCurrentUser(cached);
+      currentUserRef.current = cached;
+    }
+    setIsLoading(false);
+  }, []);
 
   const fetchUsersAndRoles = useCallback(async () => {
     try {
-      // 1. Verify active session via /api/auth/me
-      const meRes = await fetch('/api/auth/me');
+      const activeId =
+        typeof window !== 'undefined'
+          ? localStorage.getItem('brilian_active_user_id') ||
+            (document.cookie.match(/(^|;\s*)brilian_active_user_id=([^;]*)/)?.[2]
+              ? decodeURIComponent(document.cookie.match(/(^|;\s*)brilian_active_user_id=([^;]*)/)![2])
+              : null)
+          : null;
+
+      const headers: Record<string, string> = {};
+      if (activeId) {
+        headers['x-user-id'] = activeId;
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+      // 1. Verify active session via /api/auth/me with timeout and user fallback header
+      const meRes = await fetch('/api/auth/me', {
+        headers,
+        signal: controller.signal,
+      }).catch((e) => {
+        console.warn('[UserSessionContext] /api/auth/me fetch error:', e);
+        return null;
+      });
+      clearTimeout(timeoutId);
+
       let activeUser: User | null = null;
 
-      if (meRes.ok) {
+      if (meRes && meRes.ok) {
         const meData = await meRes.json();
         if (meData.authenticated && meData.user) {
           const userRecord = meData.user as User;
           activeUser = userRecord;
           setCurrentUser(userRecord);
           try {
+            localStorage.setItem('brilian_user_profile', JSON.stringify(userRecord));
             localStorage.setItem('brilian_active_user_id', userRecord.id);
             localStorage.setItem('brilian_user_status', userRecord.status || 'active');
           } catch {}
         } else {
           setCurrentUser(null);
           try {
+            localStorage.removeItem('brilian_user_profile');
             localStorage.removeItem('brilian_active_user_id');
             localStorage.removeItem('brilian_user_status');
             document.cookie = 'brilian_active_user_id=; path=/; max-age=0; SameSite=Lax';
@@ -81,16 +136,21 @@ export function UserSessionProvider({ children }: { children: React.ReactNode })
             document.cookie = 'brilian_chat_access=; path=/; max-age=0; SameSite=Lax';
           } catch {}
         }
-      } else {
-        // Not authenticated or session invalid: clean stale cookies & storage
+      } else if (meRes && meRes.status === 401) {
+        // Only clear session when server explicitly rejects authorization
         setCurrentUser(null);
         try {
+          localStorage.removeItem('brilian_user_profile');
           localStorage.removeItem('brilian_active_user_id');
           localStorage.removeItem('brilian_user_status');
           document.cookie = 'brilian_active_user_id=; path=/; max-age=0; SameSite=Lax';
           document.cookie = 'brilian_user_status=; path=/; max-age=0; SameSite=Lax';
           document.cookie = 'brilian_chat_access=; path=/; max-age=0; SameSite=Lax';
         } catch {}
+      } else {
+        // Server error or network lag (5xx/timeout): preserve existing user from cache
+        console.warn('[UserSessionContext] Session verification unreachable, retaining local session.');
+        activeUser = currentUserRef.current || getStoredUserProfile();
       }
 
       // 2. Fetch users and roles if session is active
@@ -110,7 +170,13 @@ export function UserSessionProvider({ children }: { children: React.ReactNode })
           const loadedUsers = usersData.users || [];
           setAllUsers(loadedUsers);
           const matched = loadedUsers.find((u: User) => u.id === activeUser?.id);
-          if (matched) setCurrentUser(matched);
+          if (matched) {
+            setCurrentUser(matched);
+            currentUserRef.current = matched;
+            try {
+              localStorage.setItem('brilian_user_profile', JSON.stringify(matched));
+            } catch {}
+          }
         } else {
           setAllUsers([activeUser]);
         }
@@ -133,6 +199,7 @@ export function UserSessionProvider({ children }: { children: React.ReactNode })
       return [user, ...filtered];
     });
     try {
+      localStorage.setItem('brilian_user_profile', JSON.stringify(user));
       localStorage.setItem('brilian_active_user_id', user.id);
       localStorage.setItem('brilian_user_status', user.status || 'active');
       document.cookie = `brilian_active_user_id=${encodeURIComponent(user.id)}; path=/; max-age=2592000; SameSite=Lax`;
@@ -158,6 +225,7 @@ export function UserSessionProvider({ children }: { children: React.ReactNode })
 
       setCurrentUser(target);
       try {
+        localStorage.setItem('brilian_user_profile', JSON.stringify(target));
         localStorage.setItem('brilian_active_user_id', target.id);
         localStorage.setItem('brilian_user_status', target.status);
         document.cookie = `brilian_active_user_id=${encodeURIComponent(target.id)}; path=/; max-age=2592000; SameSite=Lax`;
@@ -174,6 +242,7 @@ export function UserSessionProvider({ children }: { children: React.ReactNode })
     setCurrentUser(null);
     setAllUsers([]);
     try {
+      localStorage.removeItem('brilian_user_profile');
       localStorage.removeItem('brilian_active_user_id');
       localStorage.removeItem('brilian_user_status');
       document.cookie = 'brilian_active_user_id=; path=/; max-age=0; SameSite=Lax';
@@ -204,21 +273,24 @@ export function UserSessionProvider({ children }: { children: React.ReactNode })
     [currentUser, roles]
   );
 
+  const contextValue = useMemo(
+    () => ({
+      currentUser,
+      setCurrentUser,
+      allUsers,
+      roles,
+      isLoading,
+      hasPermission,
+      loginUser,
+      switchUser,
+      refreshUsers: fetchUsersAndRoles,
+      logout,
+    }),
+    [currentUser, allUsers, roles, isLoading, hasPermission, loginUser, switchUser, fetchUsersAndRoles, logout]
+  );
+
   return (
-    <UserSessionContext.Provider
-      value={{
-        currentUser,
-        setCurrentUser,
-        allUsers,
-        roles,
-        isLoading,
-        hasPermission,
-        loginUser,
-        switchUser,
-        refreshUsers: fetchUsersAndRoles,
-        logout,
-      }}
-    >
+    <UserSessionContext.Provider value={contextValue}>
       {children}
     </UserSessionContext.Provider>
   );

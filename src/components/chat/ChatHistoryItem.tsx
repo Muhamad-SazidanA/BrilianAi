@@ -110,37 +110,7 @@ export default function ChatHistoryItem({
   };
 
   if (isCollapsed) {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        title={session.title}
-        style={{
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '8px 0',
-          borderRadius: '8px',
-          border: 'none',
-          cursor: 'pointer',
-          backgroundColor: isActive ? 'var(--chat-active-bg)' : 'transparent',
-          color: isActive ? 'var(--chat-active-text)' : 'var(--text-muted)',
-          transition: 'background-color 0.15s ease',
-        }}
-        className="hover:bg-subtle"
-      >
-        <span
-          style={{
-            width: '6px',
-            height: '6px',
-            borderRadius: '50%',
-            backgroundColor: isActive ? 'var(--color-primary)' : 'var(--text-muted)',
-            flexShrink: 0,
-          }}
-        />
-      </button>
-    );
+    return null;
   }
 
   return (
@@ -154,17 +124,17 @@ export default function ChatHistoryItem({
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
-          padding: '8px 10px',
+          gap: '7px',
+          padding: '3px 6px',
           cursor: renaming ? 'default' : 'pointer',
-          borderRadius: '8px',
+          borderRadius: '5px',
           minWidth: 0,
         }}
         onClick={renaming ? undefined : onClick}
       >
         <MessageCircle
-          size={14}
-          strokeWidth={isActive ? 2.2 : 1.8}
+          size={12}
+          strokeWidth={isActive ? 2 : 1.7}
           style={{ flexShrink: 0, color: isActive ? 'var(--chat-active-icon)' : 'var(--text-muted)' }}
         />
 
@@ -183,7 +153,7 @@ export default function ChatHistoryItem({
                 border: 'none',
                 outline: '1px solid var(--color-primary)',
                 borderRadius: '4px',
-                fontSize: '12px',
+                fontSize: '11px',
                 color: 'var(--text-primary)',
                 padding: '1px 4px',
                 fontFamily: 'inherit',
@@ -193,13 +163,13 @@ export default function ChatHistoryItem({
             <span
               style={{
                 display: 'block',
-                fontSize: '12.5px',
+                fontSize: '11.5px',
                 fontWeight: isActive ? 600 : 400,
                 color: isActive ? 'var(--chat-active-text)' : 'var(--text-secondary)',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
-                lineHeight: '1.4',
+                lineHeight: '1.3',
               }}
             >
               {session.title}

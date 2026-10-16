@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 
 /* ─── Category labels ─────────────────────────────── */
 const CAT_LABELS: Record<PermissionCategory, string> = {
+  dashboard: 'Akses Dasbor',
   documents: 'Dokumen & Ingestion',
   curation: 'Kurasi AI',
   chat: 'Asisten AI & Chat',

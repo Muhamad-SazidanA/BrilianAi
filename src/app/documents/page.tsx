@@ -1,24 +1,33 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
-import Link from 'next/link';
-import { UploadCloud, MessageSquare } from 'lucide-react';
+import React, { useEffect, useState, useMemo, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import AppShell from '@/components/layout/AppShell';
 import DocumentTable from '@/components/documents/DocumentTable';
 import DocumentStatsCards from '@/components/documents/DocumentStatsCards';
+import DocumentUploadModal from '@/components/documents/DocumentUploadModal';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import { UploadBatch } from '@/types/document';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserSession } from '@/context/UserSessionContext';
 import { toast } from 'sonner';
 
-export default function DocumentsPage() {
+function DocumentsContent() {
   const { language, t } = useLanguage();
   const { hasPermission } = useUserSession();
+  const searchParams = useSearchParams();
+
   const [batches, setBatches] = useState<UploadBatch[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [deletingDoc, setDeletingDoc] = useState<{ id: string; filename: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get('action') === 'upload') {
+      setIsUploadOpen(true);
+    }
+  }, [searchParams]);
 
   const fetchBatches = async () => {
     setIsLoading(true);
@@ -87,31 +96,32 @@ export default function DocumentsPage() {
       },
       {
         loading: language === 'en' ? 'Saving new name...' : 'Menyimpan nama dokumen...',
-        success: language === 'en' ? 'Document renamed successfully' : 'Nama dokumen berhasil diperbarui',
+        success: language === 'en' ? 'Document renamed successfully.' : 'Nama dokumen berhasil diperbarui.',
         error: (err) => err.message,
       }
     );
   };
 
-  const handleToggleActive = async (batchId: string, active: boolean) => {
+  const handleToggleActive = async (batchId: string, currentActive: boolean) => {
+    const nextActive = !currentActive;
     toast.promise(
       async () => {
         const res = await fetch(`/api/documents/${batchId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ isActiveKnowledge: active }),
+          body: JSON.stringify({ is_active_knowledge: nextActive }),
         });
         if (!res.ok) {
           const data = await res.json();
-          throw new Error(data.error || (language === 'en' ? 'Failed to change status' : 'Gagal mengubah status basis pengetahuan'));
+          throw new Error(data.error || 'Gagal mengubah status aktif dokumen');
         }
         await fetchBatches();
       },
       {
         loading: language === 'en' ? 'Updating status...' : 'Memperbarui status...',
-        success: active
-          ? (language === 'en' ? 'Document activated for AI knowledge base' : 'Dokumen diaktifkan ke basis pengetahuan AI')
-          : (language === 'en' ? 'Document set to standby' : 'Dokumen diset ke standby'),
+        success: nextActive
+          ? (language === 'en' ? 'Document activated for AI Chatbot.' : 'Dokumen diaktifkan untuk AI Chatbot.')
+          : (language === 'en' ? 'Document deactivated from AI Chatbot.' : 'Dokumen dinonaktifkan dari AI Chatbot.'),
         error: (err) => err.message,
       }
     );
@@ -158,24 +168,7 @@ export default function DocumentsPage() {
   return (
     <AppShell
       requiredPermission="documents:read"
-      title={t('docs.title')}
       subtitle={t('docs.subtitle')}
-      actions={
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {hasPermission('documents:upload') && (
-            <Link href="/upload" className="btn btn-primary btn-sm">
-              <UploadCloud size={15} />
-              <span>{t('dash.upload_new')}</span>
-            </Link>
-          )}
-          {hasPermission('chat:query') && (
-            <Link href="/chat" className="btn btn-outline btn-sm">
-              <MessageSquare size={15} />
-              <span>Tanya Dokumen</span>
-            </Link>
-          )}
-        </div>
-      }
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         {/* Document Stats Cards */}
@@ -194,8 +187,21 @@ export default function DocumentsPage() {
           onRename={handleRename}
           onToggleActive={handleToggleActive}
           onActivateAll={handleActivateAll}
+          onUpload={() => setIsUploadOpen(true)}
         />
       </div>
+
+      {/* Clean & Slim Upload Modal */}
+      <DocumentUploadModal
+        isOpen={isUploadOpen}
+        onClose={() => {
+          setIsUploadOpen(false);
+          if (typeof window !== 'undefined' && window.location.search.includes('action=upload')) {
+            window.history.replaceState({}, '', '/documents');
+          }
+        }}
+        onSuccess={fetchBatches}
+      />
 
       {/* Confirmation Modal for Document Deletion */}
       <ConfirmationModal
@@ -224,5 +230,13 @@ export default function DocumentsPage() {
         variant="danger"
       />
     </AppShell>
+  );
+}
+
+export default function DocumentsPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center' }}>Memuat Dokumen...</div>}>
+      <DocumentsContent />
+    </Suspense>
   );
 }

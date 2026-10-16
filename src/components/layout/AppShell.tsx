@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ShieldAlert, MessageSquare, FolderTree, LayoutDashboard } from 'lucide-react';
 import { useUserSession } from '@/context/UserSessionContext';
+import { useSidebar } from '@/context/SidebarContext';
 import { PermissionKey } from '@/types/user';
 import Sidebar from './Sidebar';
 import Header from './Header';
@@ -34,7 +35,7 @@ export default function AppShell({
 }: AppShellProps) {
   const router = useRouter();
   const { currentUser, isLoading, hasPermission } = useUserSession();
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const { isCollapsed, toggleSidebar } = useSidebar();
 
   // Client-side auth guard: redirect if not logged in or pending approval
   useEffect(() => {
@@ -47,32 +48,36 @@ export default function AppShell({
     }
   }, [isLoading, currentUser, router, allowGuest]);
 
-  // Load saved sidebar collapse preference
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('sidebar_collapsed');
-      if (saved !== null) {
-        setIsCollapsed(saved === 'true');
-      }
-    } catch {
-      // quiet fallback
+  // Guard against unauthenticated render flash on protected routes
+  if (!allowGuest && !currentUser) {
+    if (isLoading) {
+      return (
+        <div
+          className="app-shell"
+          style={{
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'var(--bg-app)',
+          }}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+            <div
+              style={{
+                width: '28px',
+                height: '28px',
+                borderRadius: '50%',
+                border: '2.5px solid var(--border-default)',
+                borderTopColor: 'var(--color-primary)',
+                animation: 'spin 0.8s linear infinite',
+              }}
+            />
+            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Memuat sesi Brilian.Ai...</span>
+          </div>
+        </div>
+      );
     }
-  }, []);
-
-  const handleToggleCollapse = () => {
-    setIsCollapsed((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem('sidebar_collapsed', String(next));
-      } catch {
-        // quiet fallback
-      }
-      return next;
-    });
-  };
-
-  // Guard against unauthenticated render flash
-  if (!isLoading && !currentUser && !allowGuest) {
     return null;
   }
 
@@ -87,7 +92,7 @@ export default function AppShell({
       {!hideSidebar && (
         <Sidebar
           isCollapsed={isCollapsed}
-          onToggleCollapse={handleToggleCollapse}
+          onToggleCollapse={toggleSidebar}
         />
       )}
 

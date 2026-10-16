@@ -38,21 +38,21 @@ export async function ensureUsersAndRolesTables(): Promise<void> {
               'Super Administrator',
               'Akses penuh ke seluruh modul sistem, dokumen, kurasi AI, manajemen pengguna, dan audit log.',
               true,
-              '["documents:read", "documents:upload", "documents:toggle_active", "documents:delete", "curation:trigger", "curation:edit", "curation:delete", "chat:query", "chat:export", "users:manage", "roles:manage", "audit:read"]'::jsonb
+              '["dashboard:admin", "dashboard:documents", "dashboard:personal", "documents:read", "documents:upload", "documents:toggle_active", "documents:delete", "curation:trigger", "curation:edit", "curation:delete", "chat:query", "chat:export", "users:manage", "roles:manage", "audit:read"]'::jsonb
           ),
           (
               'editor',
               'Knowledge Manager & Editor',
               'Dapat mengunggah dokumen PDF, mengelola basis pengetahuan, menjalankan dan menyunting kurasi AI, serta bertanya ke Chatbot.',
               true,
-              '["documents:read", "documents:upload", "documents:toggle_active", "curation:trigger", "curation:edit", "curation:delete", "chat:query", "chat:export"]'::jsonb
+              '["dashboard:documents", "dashboard:personal", "documents:read", "documents:upload", "documents:toggle_active", "curation:trigger", "curation:edit", "curation:delete", "chat:query", "chat:export"]'::jsonb
           ),
           (
               'member',
               'Member / Viewer',
               'Hak akses standar untuk membaca dokumen aktif dan bertanya pada AI Chatbot RAG.',
               true,
-              '["documents:read", "chat:query", "chat:export"]'::jsonb
+              '["dashboard:personal", "documents:read", "chat:query", "chat:export"]'::jsonb
           ),
           (
               'chat_only',

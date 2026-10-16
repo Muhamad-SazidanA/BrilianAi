@@ -5,14 +5,56 @@ import { GET as handleListChunks } from '../src/app/api/documents/[id]/chunks/ro
 import { NextRequest } from 'next/server';
 import * as queueModule from '../lib/queue/ingestQueue';
 import * as vectorStoreModule from '../lib/db/vectorStore';
+import * as serverAuthModule from '../lib/auth/serverAuth';
 import { setIngestProgress } from '../lib/ingest/ingestProgress';
 
 describe('Next.js API Route Handlers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(serverAuthModule, 'getAuthenticatedUser').mockResolvedValue({
+      id: 'user-admin',
+      name: 'Admin Test',
+      email: 'admin@test.com',
+      role_id: 'admin',
+      status: 'active',
+      department: 'IT',
+      role: {
+        id: 'admin',
+        name: 'Admin',
+        description: '',
+        is_system: true,
+        permissions: ['documents:upload', 'documents:toggle_active', 'documents:read'],
+      },
+    } as any);
+    vi.spyOn(serverAuthModule, 'hasServerPermission').mockResolvedValue(true);
   });
 
   describe('POST /api/documents/upload', () => {
+    it('should return 401 when request is unauthenticated', async () => {
+      vi.spyOn(serverAuthModule, 'getAuthenticatedUser').mockResolvedValueOnce(null);
+
+      const formData = new FormData();
+      const request = new NextRequest('http://localhost:3000/api/documents/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const response = await handleUpload(request);
+      expect(response.status).toBe(401);
+    });
+
+    it('should return 403 when user lacks documents:upload permission', async () => {
+      vi.spyOn(serverAuthModule, 'hasServerPermission').mockResolvedValueOnce(false);
+
+      const formData = new FormData();
+      const request = new NextRequest('http://localhost:3000/api/documents/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const response = await handleUpload(request);
+      expect(response.status).toBe(403);
+    });
     it('1. should return 400 when non-PDF file is uploaded (invalid magic bytes)', async () => {
       const formData = new FormData();
       const fakeTextBlob = new Blob(['Ini bukan file PDF melainkan teks biasa'], {
@@ -119,11 +161,17 @@ describe('Next.js API Route Handlers', () => {
 
       vi.spyOn(vectorStoreModule, 'listBatches').mockResolvedValueOnce(mockBatches);
 
-      const response = await handleListBatches();
+      const req = new NextRequest('http://localhost:3000/api/documents');
+      const response = await handleListBatches(req);
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data).toEqual(mockBatches);
+      expect(data).toEqual([
+        {
+          ...mockBatches[0],
+          has_user_grant: false,
+        },
+      ]);
     });
   });
 

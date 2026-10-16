@@ -133,22 +133,6 @@ export default function KnowledgeGapsPage() {
           ? 'Track unanswered queries and user feedback to continuously enrich organizational knowledge.'
           : 'Lacak pertanyaan yang belum terjawab atau tidak akurat agar tim ahli (SME) dapat segera melengkapi dokumen SOP terkait.'
       }
-      actions={
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {hasPermission('documents:upload') && (
-            <Link href="/upload" className="btn btn-primary btn-sm" style={{ gap: '6px' }}>
-              <UploadCloud size={14} />
-              <span>Unggah SOP Baru</span>
-            </Link>
-          )}
-          {hasPermission('chat:query') && (
-            <Link href="/chat" className="btn btn-outline btn-sm" style={{ gap: '6px' }}>
-              <MessageSquare size={14} />
-              <span>Uji Tanya AI</span>
-            </Link>
-          )}
-        </div>
-      }
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '1200px' }}>
         {/* Metric Cards Banner */}

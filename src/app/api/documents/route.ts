@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listBatches, activateAllBatches } from '@lib/db/vectorStore';
-import { getAuthenticatedUser, canUserAccessDocument } from '@lib/auth/serverAuth';
+import { getAuthenticatedUser, canUserAccessDocument, hasServerPermission } from '@lib/auth/serverAuth';
 import { listUserGrantedBatchIds } from '@lib/db/documentGrantStore';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request?: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     const allBatches = await listBatches();
-    if (!request) {
-      return NextResponse.json(allBatches, { status: 200 });
-    }
 
     const user = await getAuthenticatedUser(request);
     const grantedBatchList = user?.id ? await listUserGrantedBatchIds(user.id) : [];
@@ -37,6 +34,19 @@ export async function GET(request?: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const authUser = await getAuthenticatedUser(request);
+    if (!authUser) {
+      return NextResponse.json({ error: 'Unauthorized: Session required.' }, { status: 401 });
+    }
+
+    const canToggle = await hasServerPermission(request, 'documents:toggle_active');
+    if (!canToggle) {
+      return NextResponse.json(
+        { error: 'Forbidden: Hak akses documents:toggle_active diperlukan.' },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const { activateAll } = body;
     if (typeof activateAll === 'boolean') {

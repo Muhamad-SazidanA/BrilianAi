@@ -44,15 +44,13 @@ export async function POST(request: NextRequest) {
 
     if (authenticatedUser) {
       await saveAuditLog({
-        user_id: authenticatedUser.id,
-        action: 'SUBMIT_CHAT_FEEDBACK',
-        resource_type: 'chat_feedback',
-        resource_id: sessionId || 'adhoc',
-        details: {
-          rating,
-          feedbackText,
-          querySnippet: queryText.substring(0, 80),
-        },
+        sessionId: sessionId || 'adhoc',
+        userId: authenticatedUser.id,
+        userName: authenticatedUser.name,
+        userEmail: authenticatedUser.email,
+        userDepartment: authenticatedUser.department,
+        queryText: `[Feedback: ${rating}] ${queryText}`,
+        answerText: feedbackText || answerText,
       }).catch(() => {});
     }
 

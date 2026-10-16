@@ -121,12 +121,14 @@ export default function NavUser({
           setShowSwitchUserSubmenu(false);
         }}
         style={{
-          width: '100%',
+          width: isCollapsed ? '36px' : '100%',
+          height: isCollapsed ? '36px' : undefined,
+          margin: isCollapsed ? '0 auto' : undefined,
           display: 'flex',
           alignItems: 'center',
           justifyContent: isCollapsed ? 'center' : 'flex-start',
-          gap: isCollapsed ? 0 : '10px',
-          padding: isCollapsed ? '6px 0' : '8px 10px',
+          gap: isCollapsed ? 0 : '7px',
+          padding: isCollapsed ? 0 : '3px 6px',
           borderRadius: '8px',
           backgroundColor: isOpen ? 'var(--bg-subtle, #F1F5F9)' : 'transparent',
           border: 'none',
@@ -139,8 +141,8 @@ export default function NavUser({
         aria-expanded={isOpen}
         title={isCollapsed ? `${activeName} (${activeEmail})` : undefined}
       >
-        {/* Avatar Circle (Standard Neutral Spensify Avatar) */}
-        <UserAvatar name={activeName} size={34} />
+        {/* Avatar Circle (Enlarged to 32px when collapsed) */}
+        <UserAvatar name={activeName} size={isCollapsed ? 32 : 20} />
 
         {/* User name & email (hidden when collapsed) */}
         {!isCollapsed && (
@@ -148,10 +150,10 @@ export default function NavUser({
             <div style={{ flex: 1, minWidth: 0 }}>
               <div
                 style={{
-                  fontSize: '14px',
+                  fontSize: '11px',
                   fontWeight: 600,
                   color: 'var(--text-primary, #0F172A)',
-                  lineHeight: '18px',
+                  lineHeight: '14px',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
@@ -161,9 +163,9 @@ export default function NavUser({
               </div>
               <div
                 style={{
-                  fontSize: '12px',
+                  fontSize: '9.5px',
                   color: 'var(--text-muted, #64748B)',
-                  lineHeight: '16px',
+                  lineHeight: '12px',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
@@ -174,7 +176,7 @@ export default function NavUser({
             </div>
 
             {/* ChevronsUpDown icon */}
-            <ChevronsUpDown size={16} color="var(--text-secondary, #64748B)" style={{ flexShrink: 0 }} />
+            <ChevronsUpDown size={11} color="var(--text-secondary, #64748B)" style={{ flexShrink: 0 }} />
           </>
         )}
       </button>
@@ -184,7 +186,7 @@ export default function NavUser({
         <div
           style={{
             position: 'fixed',
-            left: isCollapsed ? '80px' : 'calc(var(--sidebar-width) + 6px)',
+            left: isCollapsed ? '58px' : 'calc(var(--sidebar-width) + 6px)',
             bottom: '12px',
             width: 'fit-content',
             minWidth: '170px',

@@ -1,10 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listUsers, createUser } from '@/../lib/db/userStore';
+import { getAuthenticatedUser, hasServerPermission } from '@lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
+    const authUser = await getAuthenticatedUser(req);
+    if (!authUser) {
+      return NextResponse.json({ error: 'Unauthorized: Session required.' }, { status: 401 });
+    }
+
+    const canManage = await hasServerPermission(req, 'users:manage');
+    if (!canManage) {
+      return NextResponse.json({ error: 'Forbidden: Hak akses users:manage diperlukan.' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(req.url);
     const search = searchParams.get('search') || undefined;
     const roleId = searchParams.get('roleId') || undefined;
@@ -26,6 +37,16 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const authUser = await getAuthenticatedUser(req);
+    if (!authUser) {
+      return NextResponse.json({ error: 'Unauthorized: Session required.' }, { status: 401 });
+    }
+
+    const canManage = await hasServerPermission(req, 'users:manage');
+    if (!canManage) {
+      return NextResponse.json({ error: 'Forbidden: Hak akses users:manage diperlukan.' }, { status: 403 });
+    }
+
     const body = await req.json();
     const { name, email, role_id, department, status, avatar_color } = body;
 

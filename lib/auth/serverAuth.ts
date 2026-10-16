@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getUserById } from '@lib/db/userStore';
+import { validateSession } from '@lib/db/sessionStore';
 import type { PermissionKey, User } from '@/types/user';
 import type { DocumentClassification } from '@/types/document';
 
@@ -14,6 +15,16 @@ function readUserId(request: NextRequest): string | null {
 }
 
 export async function getAuthenticatedUser(request: NextRequest): Promise<User | null> {
+  // 1. Enterprise Database Session Validation (Primary Secure Path)
+  const sessionToken = request.cookies.get('brilian_session_token')?.value;
+  if (sessionToken) {
+    const sessionUser = await validateSession(sessionToken);
+    if (sessionUser && sessionUser.status === 'active') {
+      return sessionUser;
+    }
+  }
+
+  // 2. Fallback to active user cookie (with status check) for dev / test compatibility
   const userId = readUserId(request);
   if (!userId) return null;
   const user = await getUserById(userId);
@@ -106,7 +117,7 @@ export function canUserAccessDocument(
 export async function canUserAccessDocumentAsync(
   user: { id?: string; role_id?: string; department?: string } | null | undefined,
   doc: { id?: string; classification?: DocumentClassification | string; division_id?: string; owner_id?: string | null }
-): Promise<{ canAccess: boolean; canEdit: boolean; accessLevel?: 'viewer' | 'editor' | 'owner' | 'admin' }> {
+): Promise<{ canAccess: boolean; canEdit: boolean; accessLevel?: 'viewer' | 'editor' | 'owner' | 'admin' | null }> {
   if (!user) {
     const isPublic = doc.classification === 'Publik';
     return { canAccess: isPublic, canEdit: false };

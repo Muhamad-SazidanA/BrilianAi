@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listCuratedInsights, deduplicateCuratedInsights } from '@lib/db/vectorStore';
 import { curateBatch, curateAllChunks, isBatchCurating, getCurationProgress } from '@lib/curation/curationService';
+import { getAuthenticatedUser, hasServerPermission } from '@lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +28,19 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
+    const authUser = await getAuthenticatedUser(request);
+    if (!authUser) {
+      return NextResponse.json({ error: 'Unauthorized: Session required.' }, { status: 401 });
+    }
+
+    const canCurate = await hasServerPermission(request, 'curation:trigger');
+    if (!canCurate) {
+      return NextResponse.json(
+        { error: 'Forbidden: Hak akses curation:trigger diperlukan.' },
+        { status: 403 }
+      );
+    }
+
     const { id } = params;
     const { searchParams } = new URL(request.url);
     const syncParam = searchParams.get('sync');

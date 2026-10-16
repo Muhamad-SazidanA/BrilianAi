@@ -48,24 +48,24 @@ export default function StatCards({ stats, isLoading }: StatCardsProps) {
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '1rem',
-        marginBottom: '1.25rem',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+        gap: '0.75rem',
+        marginBottom: '1rem',
       }}
     >
       {cards.map((card) => {
         const Icon = card.icon;
         return (
-          <div key={card.title} className="ui-card ui-card-interactive" style={{ padding: '0.85rem 1rem' }}>
+          <div key={card.title} className="ui-card ui-card-interactive" style={{ padding: '0.65rem 0.85rem' }}>
             {/* Header: Title & Icon */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <span style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-secondary)' }}>
                 {card.title}
               </span>
               <div
                 style={{
-                  width: '30px',
-                  height: '30px',
+                  width: '24px',
+                  height: '24px',
                   borderRadius: 'var(--radius-xs)',
                   backgroundColor: 'var(--bg-subtle)',
                   color: 'var(--text-secondary)',
@@ -75,30 +75,30 @@ export default function StatCards({ stats, isLoading }: StatCardsProps) {
                   justifyContent: 'center',
                 }}
               >
-                <Icon size={16} strokeWidth={2} />
+                <Icon size={13} strokeWidth={2} />
               </div>
             </div>
 
             {/* Metric Value */}
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
               <span
                 style={{
-                  fontSize: '22px',
+                  fontSize: '18px',
                   fontWeight: 700,
                   color: 'var(--text-primary)',
                   letterSpacing: '-0.02em',
-                  lineHeight: '28px',
+                  lineHeight: '22px',
                 }}
               >
                 {isLoading ? '...' : card.value.toLocaleString(language === 'en' ? 'en-US' : 'id-ID')}
               </span>
-              <span className="badge badge-neutral" style={{ fontSize: '10.5px', padding: '1px 7px' }}>
+              <span className="badge badge-neutral" style={{ fontSize: '9.5px', padding: '1px 5px' }}>
                 {card.badge}
               </span>
             </div>
 
             {/* Description */}
-            <p style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px', fontWeight: 400 }}>
+            <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', fontWeight: 400 }}>
               {card.description}
             </p>
           </div>

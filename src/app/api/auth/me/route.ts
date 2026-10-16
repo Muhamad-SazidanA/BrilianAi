@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserById, ensureUsersAndRolesTables } from '@lib/db/userStore';
+import { validateSession } from '@lib/db/sessionStore';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,33 +12,36 @@ export async function GET(req: NextRequest) {
   try {
     await ensureUsersAndRolesTables();
 
-    // Read user ID from cookies or header
-    let userId = req.cookies.get('brilian_active_user_id')?.value;
-    if (!userId) {
-      userId = req.headers.get('x-user-id') || undefined;
+    let user = null;
+
+    // 1. Enterprise Session Validation
+    const sessionToken = req.cookies.get('brilian_session_token')?.value;
+    if (sessionToken) {
+      user = await validateSession(sessionToken);
     }
 
-    const isUuid = Boolean(
-      userId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)
-    );
+    // 2. Dev / Legacy fallback
+    if (!user) {
+      let userId = req.cookies.get('brilian_active_user_id')?.value;
+      if (!userId && process.env.NODE_ENV !== 'production') {
+        userId = req.headers.get('x-user-id') || undefined;
+      }
 
-    if (!userId || !isUuid) {
+      const isUuid = Boolean(
+        userId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)
+      );
+
+      if (userId && isUuid) {
+        user = await getUserById(userId);
+      }
+    }
+
+    if (!user) {
       const response = NextResponse.json(
         { authenticated: false, error: 'No active session found.' },
         { status: 401 }
       );
-      response.cookies.delete('brilian_active_user_id');
-      response.cookies.delete('brilian_user_status');
-      response.cookies.delete('brilian_chat_access');
-      return response;
-    }
-
-    const user = await getUserById(userId);
-    if (!user) {
-      const response = NextResponse.json(
-        { authenticated: false, error: 'User record not found.' },
-        { status: 401 }
-      );
+      response.cookies.delete('brilian_session_token');
       response.cookies.delete('brilian_active_user_id');
       response.cookies.delete('brilian_user_status');
       response.cookies.delete('brilian_chat_access');
@@ -71,13 +75,9 @@ export async function GET(req: NextRequest) {
     return response;
   } catch (err: any) {
     console.error('[/api/auth/me GET Error]:', err);
-    const response = NextResponse.json(
+    return NextResponse.json(
       { authenticated: false, error: err.message || 'Internal server error' },
-      { status: 401 }
+      { status: 500 }
     );
-    response.cookies.delete('brilian_active_user_id');
-    response.cookies.delete('brilian_user_status');
-    response.cookies.delete('brilian_chat_access');
-    return response;
   }
 }

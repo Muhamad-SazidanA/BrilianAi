@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queuePdfIngestion } from '@lib/queue/ingestQueue';
 import { getIngestProgress, clearIngestProgress, setIngestProgress } from '@lib/ingest/ingestProgress';
+import { getAuthenticatedUser, hasServerPermission } from '@lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
 // Standard PDF 4-byte magic signature: %PDF (0x25, 0x50, 0x44, 0x46)
 const PDF_MAGIC_BYTES = Buffer.from([0x25, 0x50, 0x44, 0x46]);
+// Maximum allowed file size for ingestion: 50 MB
+const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -31,6 +34,19 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const authUser = await getAuthenticatedUser(req);
+    if (!authUser) {
+      return NextResponse.json({ error: 'Unauthorized: Session required.' }, { status: 401 });
+    }
+
+    const canUpload = await hasServerPermission(req, 'documents:upload');
+    if (!canUpload) {
+      return NextResponse.json(
+        { error: 'Forbidden: Hak akses documents:upload diperlukan.' },
+        { status: 403 }
+      );
+    }
+
     const formData = await req.formData();
     const file = formData.get('file');
 
@@ -38,6 +54,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: 'No PDF file uploaded. Please attach a file under the "file" field.' },
         { status: 400 }
+      );
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: 'Ukuran file terlalu besar. Batas maksimum dokumen adalah 50 MB.' },
+        { status: 413 }
       );
     }
 
@@ -63,7 +86,7 @@ export async function POST(req: NextRequest) {
       progressPercent: 5,
     });
 
-    const ownerId = (formData.get('ownerId') as string) || null;
+    const ownerId = (formData.get('ownerId') as string) || authUser.id;
     const divisionId = (formData.get('divisionId') as string) || 'General';
     const classification = (formData.get('classification') as any) || 'Internal';
     const status = (formData.get('status') as any) || 'Aktif';

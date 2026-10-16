@@ -27,15 +27,25 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const sessionToken = request.cookies.get('brilian_session_token')?.value;
+  const hasValidSessionToken = Boolean(
+    sessionToken && typeof sessionToken === 'string' && sessionToken.length >= 32
+  );
+
   const rawUserId = request.cookies.get('brilian_active_user_id')?.value;
   const isValidUuid = Boolean(
     rawUserId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawUserId)
   );
-  const activeUserId = isValidUuid ? rawUserId : undefined;
+
+  // Authenticated state: has enterprise session token (primary) or valid user id
+  const isAuthenticated = hasValidSessionToken || isValidUuid;
+  const activeUserId = isAuthenticated ? rawUserId : undefined;
   const userStatus = request.cookies.get('brilian_user_status')?.value;
 
   // 2. Unauthenticated handling (Guest)
-  if (!activeUserId) {
+  if (!isAuthenticated) {
+    const hasStaleCookies = Boolean(rawUserId || sessionToken);
+
     // Unauthenticated guest accessing root URL (/) goes directly to /chat
     if (pathname === '/') {
       const chatUrl = new URL('/chat', request.url);
@@ -43,7 +53,8 @@ export function middleware(request: NextRequest) {
         chatUrl.searchParams.set(key, val);
       });
       const response = NextResponse.redirect(chatUrl);
-      if (rawUserId && !isValidUuid) {
+      if (hasStaleCookies) {
+        response.cookies.delete('brilian_session_token');
         response.cookies.delete('brilian_active_user_id');
         response.cookies.delete('brilian_user_status');
         response.cookies.delete('brilian_chat_access');
@@ -54,7 +65,8 @@ export function middleware(request: NextRequest) {
     // Only /login and /chat (and /chat/...) are accessible to unauthenticated guests
     if (pathname === '/login' || pathname === '/chat' || pathname.startsWith('/chat/')) {
       const response = NextResponse.next();
-      if (rawUserId && !isValidUuid) {
+      if (hasStaleCookies) {
+        response.cookies.delete('brilian_session_token');
         response.cookies.delete('brilian_active_user_id');
         response.cookies.delete('brilian_user_status');
         response.cookies.delete('brilian_chat_access');
@@ -64,7 +76,8 @@ export function middleware(request: NextRequest) {
 
     if (pathname.startsWith('/api/')) {
       const response = NextResponse.json({ error: 'Unauthorized: Session required.' }, { status: 401 });
-      if (rawUserId && !isValidUuid) {
+      if (hasStaleCookies) {
+        response.cookies.delete('brilian_session_token');
         response.cookies.delete('brilian_active_user_id');
         response.cookies.delete('brilian_user_status');
         response.cookies.delete('brilian_chat_access');
@@ -78,7 +91,8 @@ export function middleware(request: NextRequest) {
       loginUrl.searchParams.set('redirect', pathname);
     }
     const response = NextResponse.redirect(loginUrl);
-    if (rawUserId && !isValidUuid) {
+    if (hasStaleCookies) {
+      response.cookies.delete('brilian_session_token');
       response.cookies.delete('brilian_active_user_id');
       response.cookies.delete('brilian_user_status');
       response.cookies.delete('brilian_chat_access');

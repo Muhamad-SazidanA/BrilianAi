@@ -51,7 +51,7 @@ export async function PATCH(request: NextRequest) {
     const success = await resolveKnowledgeGap({
       id,
       status,
-      resolvedBy: authenticatedUser.name || authenticatedUser.username || authenticatedUser.id,
+      resolvedBy: authenticatedUser.name || authenticatedUser.id,
       resolutionNote,
     });
 
@@ -63,14 +63,12 @@ export async function PATCH(request: NextRequest) {
     }
 
     await saveAuditLog({
-      user_id: authenticatedUser.id,
-      action: 'UPDATE_KNOWLEDGE_GAP',
-      resource_type: 'knowledge_gap',
-      resource_id: String(id),
-      details: {
-        status,
-        resolutionNote,
-      },
+      sessionId: `gap-${id}`,
+      userId: authenticatedUser.id,
+      userName: authenticatedUser.name,
+      userEmail: authenticatedUser.email,
+      userDepartment: authenticatedUser.department,
+      queryText: `[Knowledge Gap Status: ${status}] Note: ${resolutionNote || 'None'}`,
     }).catch(() => {});
 
     return NextResponse.json({ success: true, id, status });

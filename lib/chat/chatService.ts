@@ -11,9 +11,10 @@ import {
 import {
   runGuardrailAndRouter,
   runRagSynthesizer,
+  runRagSynthesizerStream,
   runSafetyEvaluator,
 } from '../ai/multiAgentClient';
-import { generateChatResponse } from '../ai/chatClient';
+import { generateChatResponse, generateChatResponseStream } from '../ai/chatClient';
 import { isDataNotFoundAnswer } from './chatUtils';
 import {
   getCachedChatResponse,
@@ -317,6 +318,299 @@ export async function askDocumentChat(
   }
 
   return result;
+}
+
+export interface ChatStreamCallbacks {
+  onSources?: (sources: ChatSource[]) => void;
+  onToken?: (token: string) => void;
+  onDone?: (result: ChatResponseResult) => void;
+  onError?: (err: Error) => void;
+}
+
+/**
+ * Orchestrates Multi-Agent RAG with real-time streaming:
+ * - Emits onSources immediately after vector similarity search completes.
+ * - Streams tokens to onToken in real-time as LLM generates answer.
+ * - Emits onDone with final canonical answer and attribution metadata.
+ */
+export async function askDocumentChatStream(
+  query: string,
+  options?: ChatRequestOptions & { signal?: AbortSignal },
+  callbacks?: ChatStreamCallbacks
+): Promise<ChatResponseResult> {
+  const trimmedQuery = query?.trim();
+  if (!trimmedQuery) {
+    const err = new Error('Pertanyaan tidak boleh kosong.');
+    callbacks?.onError?.(err);
+    throw err;
+  }
+
+  const allowPublicKnowledge = Boolean(options?.allowPublicKnowledge);
+  const topK = options?.topK ?? 6;
+  const minSimilarity = options?.minSimilarity ?? (allowPublicKnowledge ? 0.2 : 0.28);
+
+  // Helper to emit fast non-streaming result (cached, guardrail blocked, golden)
+  const emitStaticResult = (result: ChatResponseResult): ChatResponseResult => {
+    callbacks?.onSources?.(result.sources);
+    callbacks?.onToken?.(result.answer);
+    callbacks?.onDone?.(result);
+    return result;
+  };
+
+  // 0a. Check non-active document
+  if (options?.documentId) {
+    try {
+      const batch = await getBatchById(options.documentId);
+      if (batch && !batch.is_active_knowledge) {
+        return emitStaticResult({
+          answer: `Dokumen "${batch.original_filename}" saat ini berstatus non-aktif (standby) untuk AI Chatbot. Anda dapat mengaktifkannya melalui menu Knowledge Base atau Document Studio.`,
+          sources: [],
+          allowPublicKnowledge,
+          retrievedCount: 0,
+        });
+      }
+    } catch (err) {
+      console.warn('[ChatServiceStream] getBatchById check warning:', err);
+    }
+  }
+
+  // 0b. Golden Fisioterapi answer
+  if (isStandardFisioterapiQuery(trimmedQuery)) {
+    try {
+      const batches: UploadBatch[] = await listBatches();
+      const hasRealActiveDoc = batches.some((b: UploadBatch) => (b.chunk_count || 0) > 0 && b.is_active_knowledge);
+      if (!hasRealActiveDoc) {
+        return emitStaticResult({
+          answer: GOLDEN_FISIOTERAPI_ANSWER,
+          sources: [
+            {
+              chunkId: 'golden-fisioterapi',
+              uploadBatchId: options?.documentId || 'b0000000-0000-0000-0000-000000000000',
+              filename: 'TM 1. Sejarah FT.pdf',
+              pageStart: 1,
+              pageEnd: 2,
+              content: 'Filosofi Profesi Fisioterapi: Holistik, Gerak, Fungsi, Patient-Centered Care, Evidence-Based Practice...',
+              similarity: 0.98,
+            },
+          ],
+          allowPublicKnowledge,
+          retrievedCount: 1,
+        });
+      }
+    } catch {
+      return emitStaticResult({
+        answer: GOLDEN_FISIOTERAPI_ANSWER,
+        sources: [
+          {
+            chunkId: 'golden-fisioterapi',
+            uploadBatchId: options?.documentId || 'b0000000-0000-0000-0000-000000000000',
+            filename: 'TM 1. Sejarah FT.pdf',
+            pageStart: 1,
+            pageEnd: 2,
+            content: 'Filosofi Profesi Fisioterapi: Holistik, Gerak, Fungsi, Patient-Centered Care, Evidence-Based Practice...',
+            similarity: 0.98,
+          },
+        ],
+        allowPublicKnowledge,
+        retrievedCount: 1,
+      });
+    }
+  }
+
+  // 0c. Deterministic Response Cache
+  const cacheKey = generateChatCacheKey(trimmedQuery, options?.documentId);
+  if (!options?.bypassCache) {
+    const cached = await getCachedChatResponse(cacheKey);
+    if (cached) {
+      return emitStaticResult(cached);
+    }
+  }
+
+  // 1. Agent 3: Guardrail & Router
+  const guardrailDecision = await runGuardrailAndRouter(trimmedQuery);
+  if (guardrailDecision.isBlocked) {
+    return emitStaticResult({
+      answer: guardrailDecision.blockReason || 'Permintaan Anda tidak dapat diproses karena tidak memenuhi kebijakan keamanan sistem.',
+      sources: [],
+      allowPublicKnowledge,
+      retrievedCount: 0,
+    });
+  }
+
+  if (guardrailDecision.isDirectGreeting && guardrailDecision.directGreetingResponse) {
+    return emitStaticResult({
+      answer: guardrailDecision.directGreetingResponse,
+      sources: [],
+      allowPublicKnowledge,
+      retrievedCount: 0,
+    });
+  }
+
+  const effectiveQuery = guardrailDecision.optimizedQuery || trimmedQuery;
+
+  // 2. Agent 2: Embedding
+  let queryEmbedding: number[] = [];
+  try {
+    const embeddings = await embedTexts([effectiveQuery]);
+    if (embeddings && embeddings[0] && Array.isArray(embeddings[0])) {
+      queryEmbedding = embeddings[0];
+    }
+  } catch (embErr) {
+    console.warn('[ChatServiceStream] embedTexts notice:', embErr);
+  }
+
+  // 3. Hybrid Search
+  const similarChunks = await searchSimilarChunks(queryEmbedding, {
+    batchId: options?.documentId,
+    limit: topK,
+    minSimilarity,
+    onlyActiveKnowledge: true,
+    textQuery: effectiveQuery,
+    divisionId: options?.divisionId,
+    allowedClassifications: options?.allowedClassifications,
+    onlyActiveStatus: true,
+    grantedBatchIds: options?.grantedBatchIds,
+  });
+
+  let similarCurated: SimilarCuratedResult[] = [];
+  try {
+    similarCurated = await searchSimilarCuratedInsights(queryEmbedding, {
+      batchId: options?.documentId,
+      limit: 4,
+      minSimilarity,
+      onlyActiveKnowledge: true,
+      textQuery: effectiveQuery,
+      divisionId: options?.divisionId,
+      allowedClassifications: options?.allowedClassifications,
+      onlyActiveStatus: true,
+      grantedBatchIds: options?.grantedBatchIds,
+    });
+  } catch {
+    // Graceful fallback
+  }
+
+  if (!allowPublicKnowledge && similarChunks.length === 0 && similarCurated.length === 0) {
+    logKnowledgeGap(trimmedQuery, { userId: options?.userId, divisionId: options?.divisionId }).catch(() => {});
+    return emitStaticResult({
+      answer: 'Data tidak ditemukan di dalam dokumen yang dapat Anda akses.',
+      sources: [],
+      allowPublicKnowledge: false,
+      retrievedCount: 0,
+    });
+  }
+
+  // Immediately emit preliminary sources so client sees document cards while AI generates!
+  const preliminarySources: ChatSource[] = similarChunks.map((c) => ({
+    chunkId: c.id,
+    uploadBatchId: c.uploadBatchId,
+    filename: c.originalFilename,
+    pageStart: c.sourcePageStart,
+    pageEnd: c.sourcePageEnd,
+    content: c.content,
+    similarity: c.similarity,
+    classification: c.classification,
+    version: c.version,
+  }));
+  callbacks?.onSources?.(preliminarySources);
+
+  // 4. Format context sections
+  const contextSections: string[] = [];
+  if (similarCurated.length > 0) {
+    const curatedLines = similarCurated.map(
+      (c) =>
+        `[Insight Kurasi: "${c.title}" | Kategori: ${c.category} | ${c.sourcePages} | Dokumen: ${c.originalFilename}]\n${c.content}`
+    );
+    contextSections.push(`=== INSIGHT KURASI TERSTRUKTUR DOKUMEN ===\n${curatedLines.join('\n\n')}`);
+  }
+  if (similarChunks.length > 0) {
+    const rawLines = similarChunks.map((chunk) => {
+      const pageLabel =
+        chunk.sourcePageStart === chunk.sourcePageEnd
+          ? `Halaman ${chunk.sourcePageStart}`
+          : `Halaman ${chunk.sourcePageStart}-${chunk.sourcePageEnd}`;
+      return `[Dokumen: ${chunk.originalFilename} | ${pageLabel} | Chunk #${chunk.chunkIndex + 1}]\n${chunk.content}`;
+    });
+    contextSections.push(`=== KONTEN LENGKAP HALAMAN DOKUMEN ===\n${rawLines.join('\n\n---\n\n')}`);
+  }
+  const contextText = contextSections.join('\n\n====================\n\n');
+
+  // 5. Agent 4: Stream Synthesizer
+  let rawAnswer = '';
+  try {
+    rawAnswer = await runRagSynthesizerStream(
+      trimmedQuery,
+      contextText,
+      {
+        allowPublicKnowledge,
+        onToken: (tok) => {
+          callbacks?.onToken?.(tok);
+        },
+        signal: options?.signal,
+      }
+    );
+  } catch (synthErr) {
+    console.warn('[ChatServiceStream] Stream synth fallback:', synthErr);
+    rawAnswer = await generateChatResponseStream(
+      trimmedQuery,
+      contextText,
+      allowPublicKnowledge,
+      {
+        onToken: (tok) => {
+          callbacks?.onToken?.(tok);
+        },
+        signal: options?.signal,
+      }
+    );
+  }
+
+  // 6. Agent 5: Safety Evaluator & Attribution
+  let evaluatedAnswer = rawAnswer;
+  try {
+    evaluatedAnswer = await runSafetyEvaluator(trimmedQuery, rawAnswer);
+  } catch {
+    evaluatedAnswer = rawAnswer;
+  }
+
+  const isNotFound = isDataNotFoundAnswer(evaluatedAnswer);
+  let formattedAnswer = evaluatedAnswer.trim();
+  let finalSources: ChatSource[] = [];
+
+  if (isNotFound) {
+    formattedAnswer = formattedAnswer.replace(/\n*Sumber:\s*.*$/i, '').trim();
+    logKnowledgeGap(trimmedQuery, { userId: options?.userId, divisionId: options?.divisionId }).catch(() => {});
+  } else {
+    const { primaryFilename, pageLabel, filteredSources } = determineAccurateSources(
+      evaluatedAnswer,
+      similarChunks,
+      similarCurated
+    );
+
+    if (primaryFilename) {
+      const canonicalSource = `Sumber: ${primaryFilename} | ${pageLabel}`;
+      if (/Sumber:\s*.*$/i.test(formattedAnswer)) {
+        formattedAnswer = formattedAnswer.replace(/Sumber:\s*.*$/i, canonicalSource).trim();
+      } else {
+        formattedAnswer = `${formattedAnswer}\n\n${canonicalSource}`;
+        callbacks?.onToken?.(`\n\n${canonicalSource}`);
+      }
+    }
+    finalSources = filteredSources.length > 0 ? filteredSources : preliminarySources;
+  }
+
+  const finalResult: ChatResponseResult = {
+    answer: formattedAnswer,
+    sources: finalSources,
+    allowPublicKnowledge,
+    retrievedCount: finalSources.length,
+  };
+
+  if (!isNotFound) {
+    await saveCachedChatResponse(cacheKey, trimmedQuery, finalResult);
+  }
+
+  callbacks?.onSources?.(finalSources);
+  callbacks?.onDone?.(finalResult);
+  return finalResult;
 }
 
 interface AttributionResult {

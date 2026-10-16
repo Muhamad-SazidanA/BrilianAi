@@ -14,6 +14,7 @@ import {
   Check,
   ExternalLink,
   X,
+  Square,
 } from 'lucide-react';
 
 import {
@@ -25,6 +26,9 @@ import {
 } from '@/types/chat';
 import ChatMessageItem from './ChatMessageItem';
 import CitationDrawer from './CitationDrawer';
+import AiThinkingIndicator from './AiThinkingIndicator';
+import { ChatShareModal } from './ChatShareModal';
+import { ChatStarterView } from './ChatStarterView';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserSession } from '@/context/UserSessionContext';
 import { toast } from 'sonner';
@@ -39,6 +43,15 @@ interface ChatWorkspaceProps {
   isPublicShare?: boolean;
 }
 
+interface CachedSessionData {
+  messages: ChatMessage[];
+  title: string;
+  lastSharedMessageId: string | null;
+}
+
+// In-memory session cache across route navigation to eliminate loading flicker
+const sessionCache = new Map<string, CachedSessionData>();
+
 export default function ChatWorkspace({
   sessionId,
   shareId,
@@ -50,25 +63,43 @@ export default function ChatWorkspace({
   const { language } = useLanguage();
   const { currentUser, hasPermission, isLoading: isUserLoading } = useUserSession();
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    if (sessionId && sessionCache.has(sessionId)) {
+      return sessionCache.get(sessionId)!.messages;
+    }
+    return [];
+  });
   const [inputQuery, setInputQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [activeQueryText, setActiveQueryText] = useState('');
   const [allowPublicKnowledge, setAllowPublicKnowledge] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [sessionTitle, setSessionTitle] = useState('Chat Baru');
-  const [loadedSessionId, setLoadedSessionId] = useState<string | null>(
-    sessionId ? null : 'idle'
-  );
+  const [sessionTitle, setSessionTitle] = useState(() => {
+    if (sessionId && sessionCache.has(sessionId)) {
+      return sessionCache.get(sessionId)!.title;
+    }
+    return 'Chat Baru';
+  });
+  const [loadedSessionId, setLoadedSessionId] = useState<string | null>(() => {
+    if (sessionId && sessionCache.has(sessionId)) {
+      return sessionId;
+    }
+    return sessionId ? null : 'idle';
+  });
   const [sessionLoadError, setSessionLoadError] = useState<string | null>(null);
-  const [lastSharedMessageId, setLastSharedMessageId] = useState<string | null>(null);
+  const [lastSharedMessageId, setLastSharedMessageId] = useState<string | null>(() => {
+    if (sessionId && sessionCache.has(sessionId)) {
+      return sessionCache.get(sessionId)!.lastSharedMessageId;
+    }
+    return null;
+  });
   const [shareModalUrl, setShareModalUrl] = useState<string | null>(null);
-  const [hasCopiedShareUrl, setHasCopiedShareUrl] = useState(false);
   const [sharedMeta, setSharedMeta] = useState<{
     userId?: string | null;
     sessionId?: string | null;
     title?: string;
   } | null>(null);
+  const [animatingMessageId, setAnimatingMessageId] = useState<string | null>(null);
 
   const isGuestOnShare = Boolean(isPublicShare && !currentUser);
 
@@ -118,6 +149,8 @@ export default function ChatWorkspace({
   // Citation inspection
   const [inspectingSource, setInspectingSource] = useState<ChatSource | null>(null);
 
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const isNearBottomRef = useRef<boolean>(true);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -125,10 +158,28 @@ export default function ChatWorkspace({
   const sessionIdRef = useRef<string | undefined>(sessionId);
   const isCreatingSessionRef = useRef(false);
   const executeAiResponseRef = useRef<((queryText: string, targetMessageId?: string, isRetry?: boolean) => Promise<void>) | null>(null);
+  const aiAbortControllerRef = useRef<AbortController | null>(null);
+
+  const handleContainerScroll = () => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    isNearBottomRef.current = distanceFromBottom <= 120;
+  };
 
   // ── Load sesi dari DB saat sessionId atau shareId berubah ─────────
   useEffect(() => {
     sessionIdRef.current = sessionId;
+
+    // Pastikan loading status AI dan query langsung direset saat ganti sesi/chat
+    if (aiAbortControllerRef.current) {
+      aiAbortControllerRef.current.abort();
+      aiAbortControllerRef.current = null;
+    }
+    setIsLoading(false);
+    setActiveQueryText('');
+    setAnimatingMessageId(null);
+    isNearBottomRef.current = true;
 
     if (!sessionId && !shareId) {
       setMessages([]);
@@ -141,11 +192,25 @@ export default function ChatWorkspace({
     }
 
     let cancelled = false;
-    setLoadedSessionId(null);
-    setSessionLoadError(null);
-    setMessages([]);
-    setSessionTitle('Chat Baru');
-    isFirstMessageRef.current = true;
+
+    // Fast path: If session is already cached in memory, immediately display it without spinner!
+    const cached = sessionId ? sessionCache.get(sessionId) : null;
+    if (cached) {
+      setMessages(cached.messages);
+      setSessionTitle(cached.title || 'Chat Baru');
+      setLastSharedMessageId(cached.lastSharedMessageId);
+      setLoadedSessionId(sessionId!);
+      setSessionLoadError(null);
+      if (cached.messages.length > 0) {
+        isFirstMessageRef.current = false;
+      }
+    } else {
+      setLoadedSessionId(null);
+      setSessionLoadError(null);
+      setMessages([]);
+      setSessionTitle('Chat Baru');
+      isFirstMessageRef.current = true;
+    }
 
     async function loadData() {
       try {
@@ -202,6 +267,14 @@ export default function ChatWorkspace({
             const loadedMessages: ChatMessage[] = Array.isArray(session.messages)
               ? session.messages
               : [];
+
+            // Simpan ke memory cache agar navigasi bolak-balik instan
+            sessionCache.set(sessionId, {
+              messages: loadedMessages,
+              title: session.title || 'Chat Baru',
+              lastSharedMessageId: session.last_shared_message_id || null,
+            });
+
             setMessages(loadedMessages);
             setSessionTitle(session.title || 'Chat Baru');
             setLastSharedMessageId(session.last_shared_message_id || null);
@@ -210,21 +283,16 @@ export default function ChatWorkspace({
               isFirstMessageRef.current = false;
             }
 
-            // Auto-resume unanswered question
-            const lastMsg = loadedMessages[loadedMessages.length - 1];
-            if (lastMsg && lastMsg.sender === 'user') {
-              setTimeout(() => {
-                if (!cancelled) executeAiResponseRef.current?.(lastMsg.text);
-              }, 120);
-            }
             setLoadedSessionId(sessionId);
           }
         }
       } catch (err) {
         if (!cancelled) {
-          setSessionLoadError(
-            err instanceof Error ? err.message : 'Gagal memuat sesi chat.'
-          );
+          if (!cached) {
+            setSessionLoadError(
+              err instanceof Error ? err.message : 'Gagal memuat sesi chat.'
+            );
+          }
           console.warn('[ChatWorkspace] loadData error:', err);
         }
       }
@@ -234,7 +302,7 @@ export default function ChatWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [sessionId, shareId, router, currentUser, language]);
+  }, [sessionId, shareId, router]);
 
   // Otomatis arahkan pemilik asli ke room chat pribadinya jika sesi baru selesai dimuat
   useEffect(() => {
@@ -255,6 +323,15 @@ export default function ChatWorkspace({
     (updatedMessages: ChatMessage[]) => {
       const activeSessionId = sessionIdRef.current;
       if (!activeSessionId) return;
+
+      // Keep in-memory cache synchronized immediately
+      const existing = sessionCache.get(activeSessionId);
+      sessionCache.set(activeSessionId, {
+        messages: updatedMessages,
+        title: existing?.title || 'Chat Baru',
+        lastSharedMessageId: existing?.lastSharedMessageId ?? null,
+      });
+
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(async () => {
         try {
@@ -278,6 +355,10 @@ export default function ChatWorkspace({
       if (!activeSessionId) return;
       const newTitle = generateSessionTitle(firstQuery);
       setSessionTitle(newTitle);
+      const existing = sessionCache.get(activeSessionId);
+      if (existing) {
+        existing.title = newTitle;
+      }
       try {
         await fetch(`/api/chat-sessions/${activeSessionId}`, {
           method: 'PATCH',
@@ -298,14 +379,21 @@ export default function ChatWorkspace({
     isRetry?: boolean
   ) => {
     const trimmed = queryText.trim();
-    if (!trimmed || isLoading) return;
+    if (!trimmed) return;
     const activeSessionId = sessionIdRef.current;
+
+    // Abort ongoing AI query if any exists
+    if (aiAbortControllerRef.current) {
+      aiAbortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    aiAbortControllerRef.current = controller;
 
     setActiveQueryText(trimmed);
     setIsLoading(true);
 
     try {
-      const payload: ChatRequestPayload = {
+      const payload: ChatRequestPayload & { stream?: boolean } = {
         query: trimmed,
         allowPublicKnowledge,
         bypassCache: isRetry,
@@ -318,14 +406,162 @@ export default function ChatWorkspace({
             }
           : undefined,
         sessionId: activeSessionId || `sess-${Date.now()}`,
+        stream: true,
       };
 
       const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream, application/json',
+        },
         body: JSON.stringify(payload),
+        signal: controller.signal,
       });
 
+      if (controller.signal.aborted) return;
+
+      const contentType = res.headers.get('content-type') || '';
+      const isSse = contentType.includes('text/event-stream');
+
+      if (!res.ok && !isSse) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Gagal memproses pertanyaan');
+      }
+
+      // ── Real-Time Token Streaming Mode ────────────────────────────
+      if (isSse && res.body) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let streamedText = '';
+        let streamedSources: ChatSource[] = [];
+        const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const aiMessageId = targetMessageId || `ai-${Date.now()}`;
+        let messageInitialized = false;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmedLine = line.trim();
+            if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
+            try {
+              const eventData = JSON.parse(trimmedLine.slice(6));
+
+              if (eventData.type === 'sources') {
+                streamedSources = eventData.sources || [];
+                if (messageInitialized) {
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === aiMessageId ? { ...m, sources: streamedSources } : m
+                    )
+                  );
+                }
+              } else if (eventData.type === 'token') {
+                streamedText += eventData.token;
+
+                if (!messageInitialized) {
+                  messageInitialized = true;
+                  setAnimatingMessageId(aiMessageId);
+                  setIsLoading(false); // Transisi halus: thinking indicator digantikan oleh streaming teks
+
+                  if (targetMessageId) {
+                    setMessages((prev) =>
+                      prev.map((m) =>
+                        m.id === targetMessageId
+                          ? {
+                              ...m,
+                              text: streamedText,
+                              sources: streamedSources,
+                              variants: m.variants
+                                ? m.variants.map((v, i) =>
+                                    i === (m.currentVariantIndex ?? 0)
+                                      ? { ...v, text: streamedText, sources: streamedSources }
+                                      : v
+                                  )
+                                : [{ text: streamedText, sources: streamedSources, timestamp: m.timestamp }],
+                            }
+                          : m
+                      )
+                    );
+                  } else {
+                    const newAiMsg: ChatMessage = {
+                      id: aiMessageId,
+                      sender: 'ai',
+                      text: streamedText,
+                      sources: streamedSources,
+                      variants: [{ text: streamedText, sources: streamedSources, timestamp }],
+                      currentVariantIndex: 0,
+                      timestamp,
+                    };
+                    setMessages((prev) => [...prev, newAiMsg]);
+                  }
+                } else {
+                  setMessages((prev) =>
+                    prev.map((m) => {
+                      if (m.id !== aiMessageId) return m;
+                      const updatedVariants = m.variants
+                        ? m.variants.map((v, i) =>
+                            i === (m.currentVariantIndex ?? 0)
+                              ? { ...v, text: streamedText, sources: streamedSources }
+                              : v
+                          )
+                        : [{ text: streamedText, sources: streamedSources, timestamp: m.timestamp }];
+
+                      return {
+                        ...m,
+                        text: streamedText,
+                        sources: streamedSources,
+                        variants: updatedVariants,
+                      };
+                    })
+                  );
+                }
+              } else if (eventData.type === 'done') {
+                const finalAnswer = eventData.answer || streamedText;
+                const finalSources = eventData.sources || streamedSources;
+
+                setIsLoading(false);
+                setMessages((prev) => {
+                  const updated = prev.map((m) => {
+                    if (m.id !== aiMessageId) return m;
+                    const finalVariants = m.variants && m.variants.length > 0
+                      ? m.variants.map((v, i) =>
+                          i === (m.currentVariantIndex ?? 0)
+                            ? { ...v, text: finalAnswer, sources: finalSources }
+                            : v
+                        )
+                      : [{ text: finalAnswer, sources: finalSources, timestamp: m.timestamp }];
+
+                    return {
+                      ...m,
+                      text: finalAnswer,
+                      sources: finalSources,
+                      variants: finalVariants,
+                    };
+                  });
+                  scheduleSave(updated);
+                  return updated;
+                });
+              } else if (eventData.type === 'error') {
+                throw new Error(eventData.error || 'Terjadi kesalahan saat memproses streaming');
+              }
+            } catch (parseErr: any) {
+              if (parseErr.name === 'AbortError') return;
+              // Ignore partial JSON parsing chunk
+            }
+          }
+        }
+        return;
+      }
+
+      // ── Non-Streaming Fallback ────────────────────────────────────
       const data: ChatResponsePayload = await res.json();
 
       if (!res.ok) {
@@ -338,6 +574,7 @@ export default function ChatWorkspace({
 
       if (targetMessageId) {
         // Regenerate/retry: append new variant to target message
+        setAnimatingMessageId(targetMessageId);
         setMessages((prev) => {
           const next = prev.map((msg) => {
             if (msg.id !== targetMessageId) return msg;
@@ -371,21 +608,40 @@ export default function ChatWorkspace({
           timestamp,
         };
 
+        setAnimatingMessageId(aiMessage.id);
         setMessages((prev) => {
           const next = [...prev, aiMessage];
+          scheduleSave(next);
           return next;
         });
       }
+    } catch (err: any) {
+      if (err?.name === 'AbortError' || controller.signal.aborted) {
+        return;
+      }
+      toast.error(err instanceof Error ? err.message : 'Gagal memproses pertanyaan');
     } finally {
-      setIsLoading(false);
+      if (aiAbortControllerRef.current === controller) {
+        aiAbortControllerRef.current = null;
+        setIsLoading(false);
+      }
     }
+  };
+
+  const handleStopGeneration = () => {
+    if (aiAbortControllerRef.current) {
+      aiAbortControllerRef.current.abort();
+      aiAbortControllerRef.current = null;
+    }
+    setIsLoading(false);
+    toast.info(language === 'en' ? 'Response generation stopped.' : 'Generasi jawaban dihentikan.');
   };
 
   executeAiResponseRef.current = executeAiResponse;
 
   const handleSwitchVariant = (messageId: string, newIndex: number) => {
-    setMessages((prev) =>
-      prev.map((msg) => {
+    setMessages((prev) => {
+      const next = prev.map((msg) => {
         if (msg.id !== messageId || !msg.variants || !msg.variants[newIndex]) return msg;
         const selected = msg.variants[newIndex];
         return {
@@ -395,14 +651,53 @@ export default function ChatWorkspace({
           sources: selected.sources || [],
           timestamp: selected.timestamp || msg.timestamp,
         };
-      })
-    );
+      });
+      scheduleSave(next);
+      return next;
+    });
+  };
+
+  const handleEditUserPrompt = async (messageIndex: number, newText: string) => {
+    if (isPublicShare) return;
+    const trimmed = newText.trim();
+    if (!trimmed) return;
+
+    // 1. Abort ongoing generation if any
+    if (aiAbortControllerRef.current) {
+      aiAbortControllerRef.current.abort();
+      aiAbortControllerRef.current = null;
+    }
+    setIsLoading(false);
+
+    const targetUserMsg = messages[messageIndex];
+    if (!targetUserMsg || targetUserMsg.sender !== 'user') return;
+
+    const updatedUserMessage: ChatMessage = {
+      ...targetUserMsg,
+      text: trimmed,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    // 2. Truncate & Regenerate: slice off all messages after messageIndex
+    const truncatedMessages = [...messages.slice(0, messageIndex), updatedUserMessage];
+    setMessages(truncatedMessages);
+    scheduleSave(truncatedMessages);
+
+    // If editing the first message, update session title
+    if (messageIndex === 0) {
+      updateSessionTitle(trimmed);
+    }
+
+    // 3. Immediately trigger AI response from this point
+    isNearBottomRef.current = true;
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+    await executeAiResponse(trimmed);
   };
 
   // ── Auto scroll ───────────────────────────────────────────────────
   useEffect(() => {
-    if (messages.length > 0) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messages.length > 0 && isNearBottomRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
     }
   }, [messages, isLoading]);
 
@@ -411,10 +706,13 @@ export default function ChatWorkspace({
     inputRef.current?.focus();
   }, [sessionId, shareId]);
 
-  // Cleanup timer on unmount
+  // Cleanup timer & abort ongoing query on unmount
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      if (aiAbortControllerRef.current) {
+        aiAbortControllerRef.current.abort();
+      }
     };
   }, []);
 
@@ -464,6 +762,8 @@ export default function ChatWorkspace({
       text: textToSend,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
+    setAnimatingMessageId(userMessage.id);
+    isNearBottomRef.current = true;
 
     // ── Kasus 1: Memulai chat dari link share milik orang lain ──
     // "ketika memulai chat di bawah link share maka akan membuat percakapan baru"
@@ -490,7 +790,18 @@ export default function ChatWorkspace({
         }
 
         sessionIdRef.current = data.id;
+        sessionCache.set(data.id, {
+          messages: forkedMessages,
+          title: newTitle,
+          lastSharedMessageId: null,
+        });
+        setLoadedSessionId(data.id);
         window.history.replaceState(null, '', `/chat/w/${data.id}`);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('brilian_chat_session_created', { detail: { id: data.id } })
+          );
+        }
         await executeAiResponse(textToSend);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Gagal membuat sesi chat');
@@ -518,8 +829,19 @@ export default function ChatWorkspace({
         }
 
         sessionIdRef.current = data.id;
+        sessionCache.set(data.id, {
+          messages: [userMessage],
+          title: 'Chat Baru',
+          lastSharedMessageId: null,
+        });
+        setLoadedSessionId(data.id);
         isFirstMessageRef.current = false;
         window.history.replaceState(null, '', `/chat/w/${data.id}`);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('brilian_chat_session_created', { detail: { id: data.id } })
+          );
+        }
         await executeAiResponse(textToSend);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Gagal menyimpan sesi chat');
@@ -599,8 +921,6 @@ export default function ChatWorkspace({
 
       // Buka modal dialog share berisi link & tombol copy
       setShareModalUrl(publicShareUrl);
-      setHasCopiedShareUrl(true);
-      setTimeout(() => setHasCopiedShareUrl(false), 2500);
 
       toast.success(
         language === 'en'
@@ -623,9 +943,52 @@ export default function ChatWorkspace({
     }
   };
 
-  const handleNewChat = async () => {
-    router.push('/chat');
-  };
+  const resetToNewChat = useCallback(() => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    setIsLoading(false);
+    setActiveQueryText('');
+    setMessages([]);
+    setInputQuery('');
+    setLoadedSessionId('idle');
+    setSessionLoadError(null);
+    setSessionTitle('Chat Baru');
+    setLastSharedMessageId(null);
+    sessionIdRef.current = undefined;
+    isFirstMessageRef.current = true;
+
+    if (typeof window !== 'undefined') {
+      window.history.pushState(null, '', '/chat');
+    }
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 50);
+  }, []);
+
+  const handleNewChat = useCallback(() => {
+    if (sessionId) {
+      router.push('/chat');
+    } else {
+      resetToNewChat();
+    }
+  }, [sessionId, router, resetToNewChat]);
+
+  useEffect(() => {
+    const handleGlobalNewChat = () => {
+      if (sessionId) {
+        router.push('/chat');
+      } else {
+        resetToNewChat();
+      }
+    };
+
+    window.addEventListener('brilian_new_chat', handleGlobalNewChat);
+    return () => {
+      window.removeEventListener('brilian_new_chat', handleGlobalNewChat);
+    };
+  }, [sessionId, router, resetToNewChat]);
 
   const handleVoiceInput = () => {
     if (isPublicShare) {
@@ -671,11 +1034,10 @@ export default function ChatWorkspace({
   const hasMessages = messages.length > 0;
 
   // Keep the initial assistant screen hidden until the requested session has
-  // been loaded successfully. This prevents a blank-chat flash during route
-  // transitions from the Recent list.
+  // been loaded successfully. On /chat (new chat), it is always ready immediately.
   const isWorkspaceReady = (sessionId || shareId)
-    ? loadedSessionId === (sessionId || shareId)
-    : loadedSessionId === 'idle';
+    ? loadedSessionId === (sessionId || shareId) || (sessionId ? sessionCache.has(sessionId) : false)
+    : true;
 
   if (!isWorkspaceReady) {
     return (
@@ -734,7 +1096,7 @@ export default function ChatWorkspace({
           top: 0,
           left: 0,
           right: 0,
-          padding: '1rem 1.75rem',
+          padding: '0.5rem 1rem',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -744,158 +1106,83 @@ export default function ChatWorkspace({
           pointerEvents: 'none',
         }}
       >
-        {/* Left: Session title indicator or Public Share badge */}
+        {/* Left: Spacer / Public Share badge */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', pointerEvents: 'auto' }}>
-          {isPublicShare ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span
-                className="badge badge-accent"
-                style={{
-                  fontSize: '11px',
-                  padding: '4px 10px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  borderRadius: '9999px',
-                  fontWeight: 600,
-                }}
-              >
-                <Share2 size={12} />
-                <span>{language === 'en' ? 'Shared Conversation' : 'Tautan Dibagikan'}</span>
-              </span>
-              {sessionTitle && (
-                <span
-                  style={{
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    color: 'var(--text-secondary)',
-                    maxWidth: '300px',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                  title={sessionTitle}
-                >
-                  {sessionTitle}
-                </span>
-              )}
-            </div>
-          ) : (
-            hasMessages && (
-              <span
-                style={{
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  color: 'var(--text-muted)',
-                  maxWidth: '240px',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-                title={sessionTitle}
-              >
-                {sessionTitle}
-              </span>
-            )
+          {isPublicShare && (
+            <span
+              className="badge badge-accent"
+              style={{
+                fontSize: '10.5px',
+                padding: '2px 8px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                borderRadius: '9999px',
+                fontWeight: 600,
+              }}
+            >
+              <Share2 size={11} />
+              <span>{language === 'en' ? 'Shared Conversation' : 'Tautan Dibagikan'}</span>
+            </span>
           )}
         </div>
 
-        {/* Right: Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', pointerEvents: 'auto' }}>
+        {/* Right: Only Share action */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', pointerEvents: 'auto' }}>
           {isGuestOnShare && (
             <button
               onClick={handleLoginRedirect}
               className="btn btn-primary btn-sm"
               style={{
                 borderRadius: '9999px',
-                padding: '6px 14px',
-                fontSize: '12.5px',
+                padding: '3px 10px',
+                fontSize: '11px',
+                height: '26px',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
-                boxShadow: '0 2px 10px rgba(15, 23, 42, 0.08)',
+                gap: '5px',
+                boxShadow: '0 1px 4px rgba(15, 23, 42, 0.08)',
               }}
             >
-              <LogIn size={13} />
+              <LogIn size={12} />
               <span>{language === 'en' ? 'Log in' : 'Masuk ke Akun'}</span>
             </button>
           )}
 
-          {hasMessages && !isPublicShare && (
+          {!isPublicShare && (
             <button
               onClick={handleShareConversation}
-              disabled={isSharing}
+              disabled={isSharing || !hasMessages}
               className="btn btn-outline btn-sm"
               style={{
                 borderRadius: '9999px',
-                padding: '6px 14px',
-                fontSize: '12.5px',
+                padding: '3px 12px',
+                fontSize: '11.5px',
+                height: '26px',
                 backgroundColor: 'var(--bg-card)',
                 backdropFilter: 'blur(12px)',
                 WebkitBackdropFilter: 'blur(12px)',
                 borderColor: 'var(--border-default)',
                 color: 'var(--text-primary)',
-                boxShadow: '0 2px 10px rgba(15, 23, 42, 0.06)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                opacity: isSharing ? 0.7 : 1,
-                cursor: isSharing ? 'not-allowed' : 'pointer',
-              }}
-              title="Salin tautan publik percakapan ini"
-            >
-              {isSharing ? (
-                <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
-              ) : (
-                <Share2 size={13} />
-              )}
-              <span>{isSharing ? 'Menyimpan...' : language === 'en' ? 'Share' : 'Share Conversation'}</span>
-            </button>
-          )}
-
-          <button
-            onClick={handleNewChat}
-            className="btn btn-outline btn-sm"
-            style={{
-              borderRadius: '9999px',
-              padding: '6px 14px',
-              fontSize: '12.5px',
-              backgroundColor: 'var(--bg-card)',
-              backdropFilter: 'blur(12px)',
-              WebkitBackdropFilter: 'blur(12px)',
-              borderColor: 'var(--border-default)',
-              color: 'var(--text-primary)',
-              boxShadow: '0 2px 10px rgba(15, 23, 42, 0.06)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '5px',
-            }}
-          >
-            <Plus size={13} />
-            <span>{language === 'en' ? 'New Chat' : 'Chat Baru'}</span>
-          </button>
-
-          {hasPermission('documents:upload') && (
-            <button
-              onClick={() => router.push('/upload')}
-              className="btn btn-outline btn-sm"
-              style={{
-                borderRadius: '9999px',
-                padding: '6px 14px',
-                fontSize: '12.5px',
-                backgroundColor: 'var(--bg-card)',
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
-                borderColor: 'var(--border-default)',
-                color: 'var(--text-primary)',
-                boxShadow: '0 2px 10px rgba(15, 23, 42, 0.06)',
+                boxShadow: '0 1px 4px rgba(15, 23, 42, 0.06)',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '5px',
+                opacity: isSharing || !hasMessages ? 0.45 : 1,
+                cursor: isSharing || !hasMessages ? 'not-allowed' : 'pointer',
               }}
+              title={
+                !hasMessages
+                  ? (language === 'en' ? 'Start a conversation to share' : 'Mulai obrolan terlebih dahulu untuk membagikan tautan')
+                  : (language === 'en' ? 'Share link to this chat' : 'Salin tautan publik percakapan ini')
+              }
             >
-              <Plus size={13} />
-              <span>{language === 'en' ? 'Upload PDF' : 'Unggah PDF'}</span>
+              {isSharing ? (
+                <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
+              ) : (
+                <Share2 size={12} />
+              )}
+              <span>{isSharing ? (language === 'en' ? 'Saving...' : 'Menyimpan...') : 'Share'}</span>
             </button>
           )}
         </div>
@@ -903,6 +1190,8 @@ export default function ChatWorkspace({
 
       {/* ── 2. SCROLLABLE MIDDLE CONTAINER ───────────────────────────── */}
       <div
+        ref={scrollContainerRef}
+        onScroll={handleContainerScroll}
         style={{
           width: '100%',
           height: '100%',
@@ -918,8 +1207,8 @@ export default function ChatWorkspace({
             maxWidth: '52rem',
             margin: '0 auto',
             padding: hasMessages
-              ? '4.75rem 1.5rem 8.5rem'
-              : '4.5rem 1.5rem 7.5rem',
+              ? '3.5rem 1rem 5.5rem'
+              : '3.25rem 1rem 5rem',
             flex: 1,
             display: 'flex',
             flexDirection: 'column',
@@ -927,95 +1216,16 @@ export default function ChatWorkspace({
         >
 
           {!hasMessages ? (
-            /* Center Stage Hero */
-            <div
-              style={{
-                flex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '2rem 0',
+            <ChatStarterView
+              userName={currentUser?.name}
+              promptChips={promptChips}
+              onSelectChip={(chip) => {
+                setInputQuery(chip);
+                handleSend(chip);
               }}
-            >
-              {/* Greeting Heading */}
-              <div style={{ textAlign: 'center', marginBottom: '2rem', maxWidth: '42rem' }}>
-                <h1
-                  style={{
-                    fontSize: 'clamp(28px, 4.5vw, 44px)',
-                    fontWeight: 400,
-                    letterSpacing: '-0.025em',
-                    color: 'var(--text-primary)',
-                    lineHeight: 1.25,
-                  }}
-                >
-                  {currentUser
-                    ? `Hi ${currentUser.name.split(' ')[0]}, what's on your mind?`
-                    : "Hi, what's on your mind?"}
-                </h1>
-              </div>
-
-              {/* Suggested Query Chips */}
-              <div
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '10px',
-                  marginTop: '0.5rem',
-                }}
-              >
-                {promptChips.map((chip) => (
-                  <button
-                    key={chip}
-                    type="button"
-                    onClick={() => {
-                      setInputQuery(chip);
-                      handleSend(chip);
-                    }}
-                    className="prompt-chip"
-                  >
-                    {chip}
-                  </button>
-                ))}
-              </div>
-
-              {/* Loading indicator */}
-              {isLoading && (
-                <div id="statusToast" style={{ marginTop: '1.5rem', textAlign: 'center' }}>
-                  <div
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '6px 16px',
-                      borderRadius: '9999px',
-                      backgroundColor: 'var(--color-primary-subtle)',
-                      border: '1px solid var(--color-primary-border)',
-                      fontSize: '12px',
-                      color: 'var(--color-primary)',
-                      fontWeight: 500,
-                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: '6px',
-                        height: '6px',
-                        borderRadius: '50%',
-                        backgroundColor: 'var(--color-primary)',
-                        animation: 'ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite',
-                      }}
-                    />
-                    <span id="statusToastText">
-                      Searching isolated internal documents
-                      {activeQueryText ? ` for "${activeQueryText}"...` : '...'}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
+              isLoading={isLoading}
+              activeQueryText={activeQueryText}
+            />
           ) : (
             /* Active Message Stream */
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -1023,8 +1233,12 @@ export default function ChatWorkspace({
                 <React.Fragment key={msg.id}>
                   <ChatMessageItem
                     message={msg}
+                    animateEntrance={msg.id === animatingMessageId}
                     onSelectCitation={(source) => setInspectingSource(source)}
-                    onSwitchVariant={(newIndex) => handleSwitchVariant(msg.id, newIndex)}
+                    onSwitchVariant={(newIndex) => {
+                      setAnimatingMessageId(msg.id);
+                      handleSwitchVariant(msg.id, newIndex);
+                    }}
                     onRetry={() => {
                       if (isPublicShare) return;
                       if (msg.sender === 'user') {
@@ -1038,6 +1252,11 @@ export default function ChatWorkspace({
                         }
                       }
                     }}
+                    onEditPrompt={
+                      msg.sender === 'user' && !isPublicShare
+                        ? (newText) => handleEditUserPrompt(idx, newText)
+                        : undefined
+                    }
                   />
 
                   {/* Privacy Divider: Titik pemisah pesan yang telah dibagikan ke publik */}
@@ -1092,31 +1311,17 @@ export default function ChatWorkspace({
                 </React.Fragment>
               ))}
 
-              {isLoading && (
-                <div
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    color: 'var(--text-secondary)',
-                    fontSize: '13px',
-                    padding: '10px 16px',
-                    backgroundColor: 'var(--bg-card)',
-                    borderRadius: '9999px',
-                    border: '1px solid var(--border-default)',
-                    width: 'fit-content',
-                    boxShadow: 'var(--shadow-xs)',
-                    marginBottom: '1rem',
-                  }}
-                >
-                  <Loader2 size={15} className="animate-spin" color="#2563EB" />
-                  <span style={{ fontWeight: 500 }}>
-                    {language === 'en'
-                      ? 'Searching isolated internal documents...'
-                      : 'Menganalisis dokumen internal...'}
-                  </span>
-                </div>
-              )}
+              {/* AI Thinking Indicator: strictly only show when waiting for AI response to the latest user message */}
+              {isLoading &&
+                messages.length > 0 &&
+                messages[messages.length - 1]?.sender === 'user' && (
+                  <div style={{ marginBottom: '1.25rem', display: 'flex', justifyContent: 'flex-start' }}>
+                    <AiThinkingIndicator
+                      queryText={activeQueryText}
+                      isStarterScreen={false}
+                    />
+                  </div>
+                )}
 
               <div ref={messagesEndRef} />
             </div>
@@ -1135,7 +1340,7 @@ export default function ChatWorkspace({
           backgroundColor: 'transparent',
           borderTop: 'none',
           zIndex: 30,
-          padding: '0 1.5rem 1.25rem',
+          padding: '0 1rem 0.85rem',
           pointerEvents: 'none',
         }}
       >
@@ -1210,14 +1415,14 @@ export default function ChatWorkspace({
                 border: 'none',
                 outline: 'none',
                 color: 'var(--text-primary)',
-                fontSize: '15.5px',
-                padding: '0 14px',
+                fontSize: '12.5px',
+                padding: '0 10px',
                 fontWeight: 400,
                 cursor: isGuestOnShare ? 'pointer' : 'text',
               }}
             />
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
               {/* Voice Input Icon (only in active workspace) */}
               {!isPublicShare && (
                 <button
@@ -1226,8 +1431,8 @@ export default function ChatWorkspace({
                   aria-label="Use microphone"
                   title={isListening ? 'Mendengarkan...' : 'Gunakan Mikrofon'}
                   style={{
-                    width: '36px',
-                    height: '36px',
+                    width: '28px',
+                    height: '28px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -1240,11 +1445,11 @@ export default function ChatWorkspace({
                   }}
                   className="hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
-                  <Mic size={19} />
+                  <Mic size={15} />
                 </button>
               )}
 
-              {/* Circular Action Button: LogIn icon in guest mode, ArrowUp send icon in active chat */}
+              {/* Circular Action Button: LogIn, Stop Generation (during streaming), or Send */}
               <button
                 type="button"
                 id="sendBtn"
@@ -1254,48 +1459,64 @@ export default function ChatWorkspace({
                     handleLoginRedirect();
                     return;
                   }
+                  if (isLoading || aiAbortControllerRef.current) {
+                    handleStopGeneration();
+                    return;
+                  }
                   handleSend();
                 }}
-                disabled={!isGuestOnShare && (isLoading || !inputQuery.trim())}
-                aria-label={isGuestOnShare ? 'Log in to chat' : 'Submit query'}
-                title={isGuestOnShare ? (language === 'en' ? 'Log in to chat' : 'Masuk untuk mulai chat') : undefined}
+                disabled={!isGuestOnShare && !isLoading && !aiAbortControllerRef.current && !inputQuery.trim()}
+                aria-label={
+                  isGuestOnShare
+                    ? 'Log in to chat'
+                    : isLoading || aiAbortControllerRef.current
+                    ? 'Stop generating'
+                    : 'Submit query'
+                }
+                title={
+                  isGuestOnShare
+                    ? (language === 'en' ? 'Log in to chat' : 'Masuk untuk mulai chat')
+                    : isLoading || aiAbortControllerRef.current
+                    ? (language === 'en' ? 'Stop generating' : 'Hentikan jawaban')
+                    : undefined
+                }
                 style={{
-                  width: '36px',
-                  height: '36px',
+                  width: '28px',
+                  height: '28px',
                   borderRadius: '50%',
-                  backgroundColor: '#2563EB',
+                  backgroundColor: isLoading || aiAbortControllerRef.current ? '#0F172A' : '#2563EB',
                   color: '#FFFFFF',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   border: 'none',
                   cursor: 'pointer',
-                  opacity: !isGuestOnShare && (isLoading || !inputQuery.trim()) ? 0.6 : 1,
-                  boxShadow: '0 2px 8px rgba(37, 99, 235, 0.3)',
+                  opacity: !isGuestOnShare && !isLoading && !aiAbortControllerRef.current && !inputQuery.trim() ? 0.6 : 1,
+                  boxShadow: isLoading || aiAbortControllerRef.current
+                    ? '0 2px 6px rgba(15, 23, 42, 0.2)'
+                    : '0 2px 6px rgba(37, 99, 235, 0.25)',
                   transition: 'all 0.15s ease',
                 }}
               >
                 {isGuestOnShare ? (
-                  <LogIn size={17} strokeWidth={2.2} />
-                ) : isLoading ? (
-                  <Loader2 size={17} className="animate-spin" />
+                  <LogIn size={14} strokeWidth={2.2} />
+                ) : isLoading || aiAbortControllerRef.current ? (
+                  <Square size={11} fill="currentColor" strokeWidth={0} />
                 ) : (
-                  <ArrowUp size={18} strokeWidth={2.5} />
+                  <ArrowUp size={15} strokeWidth={2.5} />
                 )}
               </button>
             </div>
           </div>
 
-
-
           {/* Disclaimer */}
           <p
             style={{
-              fontSize: '12px',
+              fontSize: '11px',
               color: 'var(--text-muted)',
               fontWeight: 400,
               textAlign: 'center',
-              marginTop: '10px',
+              marginTop: '6px',
             }}
           >
             Apps Brilian answers strictly from uploaded internal documents with zero external leaks.
@@ -1311,160 +1532,12 @@ export default function ChatWorkspace({
       />
 
       {/* ── Share Link Modal Dialog ──────────────────────────────────── */}
-      {shareModalUrl && (
-        <div
-          onClick={() => setShareModalUrl(null)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(15, 23, 42, 0.45)',
-            backdropFilter: 'blur(4px)',
-            WebkitBackdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: '1rem',
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              backgroundColor: 'var(--bg-card, #ffffff)',
-              borderRadius: '16px',
-              maxWidth: '520px',
-              width: '100%',
-              padding: '24px',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-              border: '1px solid var(--border-default, #e2e8f0)',
-              position: 'relative',
-            }}
-          >
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '10px',
-                    backgroundColor: 'rgba(37, 99, 235, 0.1)',
-                    color: '#2563EB',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Share2 size={18} />
-                </div>
-                <div>
-                  <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary, #0f172a)', margin: 0 }}>
-                    {language === 'en' ? 'Share link to Chat' : 'Bagikan Tautan Percakapan'}
-                  </h3>
-                  <p style={{ fontSize: '13px', color: 'var(--text-secondary, #64748b)', margin: '2px 0 0' }}>
-                    {language === 'en'
-                      ? 'Anyone with this link will be able to view this conversation.'
-                      : 'Siapa saja yang memiliki link ini dapat melihat percakapan ini.'}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShareModalUrl(null)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text-muted, #94a3b8)',
-                  cursor: 'pointer',
-                  padding: '4px',
-                  borderRadius: '6px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Link Input & Actions */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                marginTop: '18px',
-                backgroundColor: 'var(--bg-app, #f8fafc)',
-                border: '1px solid var(--border-default, #cbd5e1)',
-                borderRadius: '10px',
-                padding: '6px 8px 6px 12px',
-              }}
-            >
-              <input
-                type="text"
-                readOnly
-                value={shareModalUrl}
-                onClick={(e) => (e.target as HTMLInputElement).select()}
-                style={{
-                  flex: 1,
-                  background: 'transparent',
-                  border: 'none',
-                  outline: 'none',
-                  fontSize: '13px',
-                  color: 'var(--text-primary, #0f172a)',
-                  fontFamily: 'monospace',
-                }}
-              />
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(shareModalUrl);
-                    setHasCopiedShareUrl(true);
-                    setTimeout(() => setHasCopiedShareUrl(false), 2000);
-                    toast.success(language === 'en' ? 'Link copied!' : 'Tautan berhasil disalin!');
-                  } catch {
-                    toast.error('Gagal menyalin tautan');
-                  }
-                }}
-                className="btn btn-primary btn-sm"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  borderRadius: '8px',
-                  padding: '6px 14px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {hasCopiedShareUrl ? <Check size={14} /> : <Copy size={14} />}
-                <span>{hasCopiedShareUrl ? (language === 'en' ? 'Copied!' : 'Tersalin!') : (language === 'en' ? 'Copy Link' : 'Salin Link')}</span>
-              </button>
-              <a
-                href={shareModalUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-outline btn-sm"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  borderRadius: '8px',
-                  padding: '6px 10px',
-                  fontSize: '13px',
-                  color: 'var(--text-secondary, #64748b)',
-                  textDecoration: 'none',
-                }}
-                title={language === 'en' ? 'Open link in new tab' : 'Buka link di tab baru'}
-              >
-                <ExternalLink size={14} />
-              </a>
-            </div>
-          </div>
-        </div>
-      )}
+      <ChatShareModal
+        shareUrl={shareModalUrl}
+        isOpen={Boolean(shareModalUrl)}
+        onClose={() => setShareModalUrl(null)}
+        language={language}
+      />
     </div>
   );
 }

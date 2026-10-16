@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserByEmail, getUserByEmailOrUsername, ensureUsersAndRolesTables } from '@lib/db/userStore';
+import { createSession } from '@lib/db/sessionStore';
 import { getPool } from '@lib/db/dbClient';
+import { checkRateLimit, recordRateLimitHit, resetRateLimit } from '@lib/security/rateLimiter';
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,6 +26,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Rate Limiting & Brute-Force Shield
+    const clientIp =
+      req.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
+      req.headers.get('x-real-ip') ||
+      '127.0.0.1';
+    const rateLimitKey = `login:${clientIp}:${cleanInput}`;
+    const rateCheck = checkRateLimit(rateLimitKey, { maxAttempts: 5, windowSeconds: 900 });
+
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: `Terlalu banyak percobaan login gagal. Akun/IP dibatasi sementara demi keamanan. Coba lagi dalam ${rateCheck.retryAfterSeconds} detik.`,
+        },
+        { status: 429 }
+      );
+    }
+
     // Ensure database tables exist and superadmin is seeded
     await ensureUsersAndRolesTables();
 
@@ -44,11 +63,15 @@ export async function POST(req: NextRequest) {
     if (isSuperadminMatch) {
       // Validate password if not SSO
       if (!isSso && !isPasswordValid(cleanPassword)) {
+        recordRateLimitHit(rateLimitKey);
         return NextResponse.json(
           { error: 'Incorrect username or password.' },
           { status: 401 }
         );
       }
+
+      // Successful credentials, reset rate limit counter
+      resetRateLimit(rateLimitKey);
 
       // Find or insert superadmin in DB
       let user = await getUserByEmail(envSuperadminEmail);
@@ -102,9 +125,23 @@ export async function POST(req: NextRequest) {
         await pool.query('UPDATE users SET last_login_at = now() WHERE id = $1', [user.id]);
       }
 
+      const userAgent = req.headers.get('user-agent') || undefined;
+      const forwardedFor = req.headers.get('x-forwarded-for');
+      const ipAddress = forwardedFor ? forwardedFor.split(',')[0].trim() : req.headers.get('x-real-ip') || undefined;
+      const sessionToken = await createSession(user.id, userAgent, ipAddress);
+
       const response = NextResponse.json({
         success: true,
         user,
+      });
+      response.cookies.set({
+        name: 'brilian_session_token',
+        value: sessionToken,
+        path: '/',
+        maxAge: 30 * 24 * 60 * 60,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
       });
       response.cookies.set({
         name: 'brilian_active_user_id',
@@ -133,6 +170,7 @@ export async function POST(req: NextRequest) {
     // Check other registered database users
     const dbUser = await getUserByEmailOrUsername(cleanInput);
     if (!dbUser) {
+      recordRateLimitHit(rateLimitKey);
       return NextResponse.json(
         { error: 'Incorrect username or password.' },
         { status: 401 }
@@ -155,18 +193,36 @@ export async function POST(req: NextRequest) {
 
     // Standard password check against environment password
     if (!isSso && !isPasswordValid(cleanPassword)) {
+      recordRateLimitHit(rateLimitKey);
       return NextResponse.json(
         { error: 'Incorrect username or password.' },
         { status: 401 }
       );
     }
 
+    // Successful credentials, reset rate limit counter
+    resetRateLimit(rateLimitKey);
+
     const pool = getPool();
     await pool.query('UPDATE users SET last_login_at = now() WHERE id = $1', [dbUser.id]);
+
+    const userAgent = req.headers.get('user-agent') || undefined;
+    const forwardedFor = req.headers.get('x-forwarded-for');
+    const ipAddress = forwardedFor ? forwardedFor.split(',')[0].trim() : req.headers.get('x-real-ip') || undefined;
+    const sessionToken = await createSession(dbUser.id, userAgent, ipAddress);
 
     const response = NextResponse.json({
       success: true,
       user: dbUser,
+    });
+    response.cookies.set({
+      name: 'brilian_session_token',
+      value: sessionToken,
+      path: '/',
+      maxAge: 30 * 24 * 60 * 60,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
     });
     response.cookies.set({
       name: 'brilian_active_user_id',

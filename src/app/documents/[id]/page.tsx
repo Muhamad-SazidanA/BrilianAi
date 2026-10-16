@@ -168,31 +168,6 @@ export default function DocumentStudioPage() {
       requiredPermission="documents:read"
       title={batch ? `Studio: ${batch.original_filename}` : t('studio.title')}
       subtitle={t('studio.subtitle')}
-      actions={
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {hasPermission('documents:read') && (
-            <Link href="/documents" className="btn btn-outline btn-sm">
-              <ArrowLeft size={14} />
-              <span>{t('studio.back_to_docs')}</span>
-            </Link>
-          )}
-          {hasPermission('chat:query') && (
-            <Link
-              href={
-                batch
-                  ? `/chat?q=${encodeURIComponent(
-                      `Tolong jelaskan ringkasan dan intisari penting dari dokumen "${batch.original_filename}"`
-                    )}`
-                  : '/chat'
-              }
-              className="btn btn-primary btn-sm"
-            >
-              <MessageSquare size={14} />
-              <span>{t('studio.ask_doc')}</span>
-            </Link>
-          )}
-        </div>
-      }
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         {/* Document Header Card */}

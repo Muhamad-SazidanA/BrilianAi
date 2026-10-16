@@ -539,6 +539,56 @@ export function extractKeywords(text: string): string[] {
 }
 
 /**
+ * Calculates cosine similarity between two numeric vectors in memory.
+ */
+export function cosineSimilarity(vecA: number[], vecB: number[]): number {
+  if (vecA.length !== vecB.length || vecA.length === 0) return 0;
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < vecA.length; i++) {
+    dotProduct += vecA[i] * vecB[i];
+    normA += vecA[i] * vecA[i];
+    normB += vecB[i] * vecB[i];
+  }
+  if (normA === 0 || normB === 0) return 0;
+  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+/**
+ * Enterprise Helper: Parameterizes ABAC and lifecycle filter clauses with typed bind values.
+ * Completely eliminates SQL injection risk and enables Postgres query execution plan caching.
+ */
+function appendAbacClause(
+  ctx: { params: any[] },
+  options?: SearchOptions
+): string {
+  const statusCondition = options?.onlyActiveStatus !== false
+    ? "AND (b.status IS NULL OR b.status = 'Aktif')"
+    : '';
+
+  let divisionCondition = '';
+  if (options?.divisionId && options.divisionId !== 'all') {
+    ctx.params.push(options.divisionId);
+    divisionCondition = `AND (b.division_id IS NULL OR b.division_id = 'General' OR b.division_id = $${ctx.params.length})`;
+  }
+
+  let classificationCondition = '';
+  if (options?.allowedClassifications && options.allowedClassifications.length > 0) {
+    ctx.params.push(options.allowedClassifications);
+    classificationCondition = `AND (b.classification IS NULL OR b.classification = ANY($${ctx.params.length}::text[]))`;
+  }
+
+  let explicitGrantCondition = '';
+  if (options?.grantedBatchIds && options.grantedBatchIds.length > 0) {
+    ctx.params.push(options.grantedBatchIds);
+    explicitGrantCondition = `OR b.id = ANY($${ctx.params.length}::uuid[])`;
+  }
+
+  return `AND ((1=1 ${statusCondition} ${divisionCondition} ${classificationCondition}) ${explicitGrantCondition})`;
+}
+
+/**
  * Searches for the most relevant document chunks based on Hybrid Search (pgvector cosine distance + keyword match).
  *
  * @param queryEmbedding - 1024-dimensional embedding vector of the search query
@@ -560,30 +610,6 @@ export async function searchSimilarChunks(
     ? 'AND (COALESCE(b.is_active_knowledge, false) = true OR NOT EXISTS (SELECT 1 FROM upload_batches ub WHERE COALESCE(ub.is_active_knowledge, false) = true))'
     : '';
 
-  // PRD v2.0: ABAC & Lifecycle Filters
-  const statusCondition = options?.onlyActiveStatus !== false
-    ? "AND (b.status IS NULL OR b.status = 'Aktif')"
-    : '';
-
-  let divisionCondition = '';
-  if (options?.divisionId && options.divisionId !== 'all') {
-    divisionCondition = `AND (b.division_id IS NULL OR b.division_id = 'General' OR b.division_id = '${options.divisionId.replace(/'/g, "''")}')`;
-  }
-
-  let classificationCondition = '';
-  if (options?.allowedClassifications && options.allowedClassifications.length > 0) {
-    const classList = options.allowedClassifications.map(c => `'${c.replace(/'/g, "''")}'`).join(', ');
-    classificationCondition = `AND (b.classification IS NULL OR b.classification IN (${classList}))`;
-  }
-
-  let explicitGrantCondition = '';
-  if (options?.grantedBatchIds && options.grantedBatchIds.length > 0) {
-    const grantList = options.grantedBatchIds.map((id) => `'${id.replace(/'/g, "''")}'`).join(', ');
-    explicitGrantCondition = `OR b.id IN (${grantList})`;
-  }
-
-  const abacFilter = `AND ((1=1 ${statusCondition} ${divisionCondition} ${classificationCondition}) ${explicitGrantCondition})`;
-
   const results: SimilarChunkResult[] = [];
   const seenIds = new Set<string | number>();
 
@@ -591,6 +617,9 @@ export async function searchSimilarChunks(
   if (queryEmbedding && queryEmbedding.length > 0) {
     try {
       const vectorString = `[${queryEmbedding.join(',')}]`;
+      const ctx = { params: [vectorString, batchId, limit] };
+      const abacFilter = appendAbacClause(ctx, options);
+
       const sql = `
         SELECT
           c.id,
@@ -612,7 +641,7 @@ export async function searchSimilarChunks(
         LIMIT $3;
       `;
 
-      const result = await pool.query<SimilarChunkResult>(sql, [vectorString, batchId, limit]);
+      const result = await pool.query<SimilarChunkResult>(sql, ctx.params);
       const minSim = options?.minSimilarity !== undefined ? options.minSimilarity : 0.20;
 
       for (const row of (result?.rows || [])) {
@@ -661,8 +690,84 @@ export async function searchSimilarChunks(
           results.sort((a, b) => b.similarity - a.similarity);
         }
       }
-    } catch (err) {
-      console.warn('[VectorStore] searchSimilarChunks vector search warning:', err);
+    } catch (err: any) {
+      const isMissingOperator =
+        err?.code === '42883' || (typeof err?.message === 'string' && err.message.includes('operator does not exist'));
+
+      if (isMissingOperator) {
+        // Fallback: pgvector C-extension is not installed in local PostgreSQL instance.
+        // Perform fast in-memory cosine similarity calculation from stored embedding vectors.
+        try {
+          const fbCtx = { params: [batchId] };
+          const fbAbacFilter = appendAbacClause(fbCtx, options);
+          const fallbackSql = `
+            SELECT
+              c.id,
+              c.upload_batch_id AS "uploadBatchId",
+              b.original_filename AS "originalFilename",
+              c.chunk_index AS "chunkIndex",
+              c.content,
+              c.source_page_start AS "sourcePageStart",
+              c.source_page_end AS "sourcePageEnd",
+              COALESCE(b.classification, 'Internal') AS classification,
+              COALESCE(b.version, '1.0') AS version,
+              c.embedding
+            FROM document_chunks c
+            JOIN upload_batches b ON b.id = c.upload_batch_id
+            WHERE ($1::uuid IS NULL OR c.upload_batch_id = $1)
+              ${activeCondition}
+              ${fbAbacFilter}
+              AND c.embedding IS NOT NULL
+            LIMIT 250;
+          `;
+          const fallbackRes = await pool.query(fallbackSql, fbCtx.params);
+          const minSim = options?.minSimilarity !== undefined ? options.minSimilarity : 0.20;
+
+          for (const row of fallbackRes.rows) {
+            if (row.embedding) {
+              try {
+                let parsed: number[] | null = null;
+                if (Array.isArray(row.embedding)) {
+                  parsed = row.embedding;
+                } else if (typeof row.embedding === 'string') {
+                  const trimmed = row.embedding.trim();
+                  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+                    parsed = JSON.parse(trimmed);
+                  }
+                }
+                if (parsed && parsed.length === queryEmbedding.length) {
+                  const sim = cosineSimilarity(queryEmbedding, parsed);
+                  if (sim >= minSim) {
+                    results.push({
+                      id: row.id,
+                      uploadBatchId: row.uploadBatchId,
+                      originalFilename: row.originalFilename,
+                      chunkIndex: row.chunkIndex,
+                      content: row.content,
+                      sourcePageStart: row.sourcePageStart,
+                      sourcePageEnd: row.sourcePageEnd,
+                      classification: row.classification,
+                      version: row.version,
+                      similarity: sim,
+                    });
+                    seenIds.add(row.id);
+                  }
+                }
+              } catch {
+                // skip unparseable
+              }
+            }
+          }
+          results.sort((a, b) => b.similarity - a.similarity);
+          if (results.length > limit) {
+            results.splice(limit);
+          }
+        } catch {
+          // quiet fallback
+        }
+      } else {
+        console.warn('[VectorStore] searchSimilarChunks vector search warning:', err?.message || err);
+      }
     }
   }
 
@@ -674,6 +779,9 @@ export async function searchSimilarChunks(
         const keywordLikes = keywords.map((kw) => `%${kw}%`);
         const orClauses = keywordLikes.map((_, i) => `c.content ILIKE $${i + 3}`).join(' OR ');
         const remainingLimit = limit - results.length;
+
+        const kwCtx = { params: [batchId, remainingLimit, ...keywordLikes] };
+        const kwAbacFilter = appendAbacClause(kwCtx, options);
 
         const kwSql = `
           SELECT
@@ -691,13 +799,13 @@ export async function searchSimilarChunks(
           JOIN upload_batches b ON b.id = c.upload_batch_id
           WHERE ($1::uuid IS NULL OR c.upload_batch_id = $1)
             ${activeCondition}
-            ${abacFilter}
+            ${kwAbacFilter}
             AND (${orClauses})
           ORDER BY c.chunk_index ASC
           LIMIT $2;
         `;
 
-        const kwRes = await pool.query<SimilarChunkResult>(kwSql, [batchId, remainingLimit, ...keywordLikes]);
+        const kwRes = await pool.query<SimilarChunkResult>(kwSql, kwCtx.params);
         for (const row of (kwRes?.rows || [])) {
           if (!seenIds.has(row.id)) {
             row.similarity = Number(row.similarity) || 0.88;
@@ -716,6 +824,9 @@ export async function searchSimilarChunks(
     const cleanQ = options.textQuery.replace(/[^\w\s]/g, '').trim();
     if (cleanQ.length >= 3 && cleanQ.length <= 60) {
       try {
+        const exCtx = { params: [batchId, limit, `%${cleanQ}%`] };
+        const exAbacFilter = appendAbacClause(exCtx, options);
+
         const fallbackSql = `
           SELECT
             c.id,
@@ -732,12 +843,12 @@ export async function searchSimilarChunks(
           JOIN upload_batches b ON b.id = c.upload_batch_id
           WHERE ($1::uuid IS NULL OR c.upload_batch_id = $1)
             ${activeCondition}
-            ${abacFilter}
+            ${exAbacFilter}
             AND c.content ILIKE $3
           ORDER BY c.chunk_index ASC
           LIMIT $2;
         `;
-        const fbRes = await pool.query<SimilarChunkResult>(fallbackSql, [batchId, limit, `%${cleanQ}%`]);
+        const fbRes = await pool.query<SimilarChunkResult>(fallbackSql, exCtx.params);
         for (const row of (fbRes?.rows || [])) {
           if (!seenIds.has(row.id)) {
             row.similarity = Number(row.similarity) || 0.80;
@@ -785,24 +896,6 @@ export async function searchSimilarCuratedInsights(
     ? 'AND (COALESCE(b.is_active_knowledge, false) = true OR NOT EXISTS (SELECT 1 FROM upload_batches ub WHERE COALESCE(ub.is_active_knowledge, false) = true))'
     : '';
 
-  // PRD v2.0: ABAC & Lifecycle Filters
-  const statusCondition = options?.onlyActiveStatus !== false
-    ? "AND (b.status IS NULL OR b.status = 'Aktif')"
-    : '';
-
-  let divisionCondition = '';
-  if (options?.divisionId && options.divisionId !== 'all') {
-    divisionCondition = `AND (b.division_id IS NULL OR b.division_id = 'General' OR b.division_id = '${options.divisionId.replace(/'/g, "''")}')`;
-  }
-
-  let explicitGrantCondition = '';
-  if (options?.grantedBatchIds && options.grantedBatchIds.length > 0) {
-    const grantList = options.grantedBatchIds.map((id) => `'${id.replace(/'/g, "''")}'`).join(', ');
-    explicitGrantCondition = `OR b.id IN (${grantList})`;
-  }
-
-  const abacFilter = `AND ((1=1 ${statusCondition} ${divisionCondition} ${classificationCondition}) ${explicitGrantCondition})`;
-
   const results: SimilarCuratedResult[] = [];
   const seenIds = new Set<string | number>();
 
@@ -810,6 +903,9 @@ export async function searchSimilarCuratedInsights(
   if (queryEmbedding && queryEmbedding.length > 0) {
     try {
       const vectorString = `[${queryEmbedding.join(',')}]`;
+      const ctx = { params: [vectorString, batchId, limit] };
+      const abacFilter = appendAbacClause(ctx, options);
+
       const sql = `
         SELECT
           ci.id,
@@ -832,7 +928,7 @@ export async function searchSimilarCuratedInsights(
         LIMIT $3;
       `;
 
-      const result = await pool.query<SimilarCuratedResult>(sql, [vectorString, batchId, limit]);
+      const result = await pool.query<SimilarCuratedResult>(sql, ctx.params);
       const minSim = options?.minSimilarity !== undefined ? options.minSimilarity : 0.20;
 
       for (const row of (result?.rows || [])) {
@@ -880,8 +976,83 @@ export async function searchSimilarCuratedInsights(
           results.sort((a, b) => b.similarity - a.similarity);
         }
       }
-    } catch (err) {
-      console.warn('[VectorStore] searchSimilarCuratedInsights vector warning:', err);
+    } catch (err: any) {
+      const isMissingOperator =
+        err?.code === '42883' || (typeof err?.message === 'string' && err.message.includes('operator does not exist'));
+
+      if (isMissingOperator) {
+        try {
+          const fbCtx = { params: [batchId] };
+          const fbAbacFilter = appendAbacClause(fbCtx, options);
+
+          const fallbackSql = `
+            SELECT
+              ci.id,
+              ci.upload_batch_id AS "uploadBatchId",
+              b.original_filename AS "originalFilename",
+              ci.title,
+              ci.content,
+              ci.importance,
+              ci.category,
+              ci.tags,
+              ci.source_pages AS "sourcePages",
+              ci.embedding
+            FROM curated_insights ci
+            JOIN upload_batches b ON b.id = ci.upload_batch_id
+            WHERE ($1::uuid IS NULL OR ci.upload_batch_id = $1)
+              ${activeCondition}
+              ${fbAbacFilter}
+              AND ci.embedding IS NOT NULL
+            LIMIT 150;
+          `;
+          const res = await pool.query(fallbackSql, fbCtx.params);
+          const minSim = options?.minSimilarity !== undefined ? options.minSimilarity : 0.20;
+
+          for (const row of res.rows) {
+            if (row.embedding) {
+              try {
+                let parsed: number[] | null = null;
+                if (Array.isArray(row.embedding)) {
+                  parsed = row.embedding;
+                } else if (typeof row.embedding === 'string') {
+                  const trimmed = row.embedding.trim();
+                  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+                    parsed = JSON.parse(trimmed);
+                  }
+                }
+                if (parsed && parsed.length === queryEmbedding.length) {
+                  const sim = cosineSimilarity(queryEmbedding, parsed);
+                  if (sim >= minSim) {
+                    results.push({
+                      id: row.id,
+                      uploadBatchId: row.uploadBatchId,
+                      originalFilename: row.originalFilename,
+                      title: row.title,
+                      content: row.content,
+                      importance: row.importance,
+                      category: row.category,
+                      tags: row.tags,
+                      sourcePages: row.sourcePages,
+                      similarity: sim,
+                    });
+                    seenIds.add(row.id);
+                  }
+                }
+              } catch {
+                // skip unparseable
+              }
+            }
+          }
+          results.sort((a, b) => b.similarity - a.similarity);
+          if (results.length > limit) {
+            results.splice(limit);
+          }
+        } catch {
+          // quiet fallback
+        }
+      } else {
+        console.warn('[VectorStore] searchSimilarCuratedInsights vector warning:', err?.message || err);
+      }
     }
   }
 
@@ -891,10 +1062,16 @@ export async function searchSimilarCuratedInsights(
       const keywords = extractKeywords(options.textQuery);
       if (keywords.length > 0) {
         const keywordLikes = keywords.map((kw) => `%${kw}%`);
-        const orClauses = keywordLikes
-          .map((_, i) => `(ci.title ILIKE $${i + 3} OR ci.content ILIKE $${i + 3} OR ci.category ILIKE $${i + 3})`)
-          .join(' OR ');
         const remainingLimit = limit - results.length;
+        const kwCtx = { params: [batchId, remainingLimit] };
+        const kwAbacFilter = appendAbacClause(kwCtx, options);
+        const orClauses = keywordLikes
+          .map((kw) => {
+            kwCtx.params.push(kw);
+            const pIdx = kwCtx.params.length;
+            return `(ci.title ILIKE $${pIdx} OR ci.content ILIKE $${pIdx} OR ci.category ILIKE $${pIdx})`;
+          })
+          .join(' OR ');
 
         const kwSql = `
           SELECT
@@ -912,7 +1089,7 @@ export async function searchSimilarCuratedInsights(
           JOIN upload_batches b ON b.id = ci.upload_batch_id
           WHERE ($1::uuid IS NULL OR ci.upload_batch_id = $1)
             ${activeCondition}
-            ${abacFilter}
+            ${kwAbacFilter}
             AND (${orClauses})
           ORDER BY
             CASE ci.importance
@@ -925,7 +1102,7 @@ export async function searchSimilarCuratedInsights(
           LIMIT $2;
         `;
 
-        const kwRes = await pool.query<SimilarCuratedResult>(kwSql, [batchId, remainingLimit, ...keywordLikes]);
+        const kwRes = await pool.query<SimilarCuratedResult>(kwSql, kwCtx.params);
         for (const row of (kwRes?.rows || [])) {
           if (!seenIds.has(row.id)) {
             row.similarity = Number(row.similarity) || 0.92;

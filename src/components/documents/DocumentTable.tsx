@@ -17,6 +17,7 @@ import {
   Building2,
   Calendar,
   Users,
+  UploadCloud,
 } from 'lucide-react';
 import { UploadBatch, DocumentClassification, DocumentStatus } from '@/types/document';
 import RenameModal from './RenameModal';
@@ -32,6 +33,7 @@ interface DocumentTableProps {
   onRename: (_batchId: string, _newFilename: string) => Promise<void>;
   onToggleActive: (_batchId: string, _active: boolean) => Promise<void>;
   onActivateAll?: () => Promise<void>;
+  onUpload?: () => void;
 }
 
 export default function DocumentTable({
@@ -42,6 +44,7 @@ export default function DocumentTable({
   onRename,
   onToggleActive,
   onActivateAll,
+  onUpload,
 }: DocumentTableProps) {
   const { language, t } = useLanguage();
   const { hasPermission } = useUserSession();
@@ -62,16 +65,16 @@ export default function DocumentTable({
   });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
       {/* Controls Bar: Search, Filter Tabs, Refresh Button */}
-      <div className="ui-card" style={{ padding: '1rem 1.25rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+      <div className="ui-card" style={{ padding: '0.65rem 0.85rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
           {/* Search box */}
-          <div style={{ position: 'relative', flex: 1, minWidth: '260px' }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
             <Search
-              size={16}
+              size={13}
               color="var(--text-muted)"
-              style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }}
+              style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }}
             />
             <input
               type="text"
@@ -79,7 +82,7 @@ export default function DocumentTable({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="input-text"
-              style={{ paddingLeft: '38px', borderRadius: 'var(--radius-sm)' }}
+              style={{ paddingLeft: '30px', borderRadius: 'var(--radius-xs)' }}
             />
           </div>
 
@@ -89,8 +92,8 @@ export default function DocumentTable({
               display: 'flex',
               alignItems: 'center',
               backgroundColor: 'var(--bg-app)',
-              padding: '4px',
-              borderRadius: 'var(--radius-sm)',
+              padding: '2px',
+              borderRadius: 'var(--radius-xs)',
               border: '1px solid var(--border-default)',
               gap: '2px',
             }}
@@ -100,8 +103,8 @@ export default function DocumentTable({
               className={`btn btn-sm ${filterActive === 'all' ? 'btn-primary' : 'btn-ghost'}`}
               style={{
                 borderRadius: 'var(--radius-xs)',
-                padding: '5px 12px',
-                fontSize: '12.5px',
+                padding: '3px 9px',
+                fontSize: '11px',
                 fontWeight: 600,
               }}
             >
@@ -112,8 +115,8 @@ export default function DocumentTable({
               className={`btn btn-sm ${filterActive === 'active' ? 'btn-primary' : 'btn-ghost'}`}
               style={{
                 borderRadius: 'var(--radius-xs)',
-                padding: '5px 12px',
-                fontSize: '12.5px',
+                padding: '3px 9px',
+                fontSize: '11px',
                 fontWeight: 600,
               }}
             >
@@ -124,8 +127,8 @@ export default function DocumentTable({
               className={`btn btn-sm ${filterActive === 'inactive' ? 'btn-primary' : 'btn-ghost'}`}
               style={{
                 borderRadius: 'var(--radius-xs)',
-                padding: '5px 12px',
-                fontSize: '12.5px',
+                padding: '3px 9px',
+                fontSize: '11px',
                 fontWeight: 600,
               }}
             >
@@ -164,6 +167,19 @@ export default function DocumentTable({
               <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
               <span>{t('table.refresh')}</span>
             </button>
+
+            {/* Upload New Document Action */}
+            {onUpload && hasPermission('documents:upload') && (
+              <button
+                type="button"
+                onClick={onUpload}
+                className="btn btn-primary btn-sm"
+                style={{ fontWeight: 600, gap: '6px' }}
+              >
+                <UploadCloud size={14} />
+                <span>{t('dash.upload_new')}</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -211,26 +227,26 @@ export default function DocumentTable({
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13.5px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px' }}>
               <thead>
                 <tr
                   style={{
                     backgroundColor: 'var(--bg-app)',
                     borderBottom: '1px solid var(--border-default)',
                     color: 'var(--text-secondary)',
-                    fontSize: '11.5px',
+                    fontSize: '10.5px',
                     fontWeight: 700,
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
                   }}
                 >
-                  <th style={{ padding: '14px 1.5rem' }}>{t('table.col_doc')}</th>
-                  <th style={{ padding: '14px 1rem' }}>{t('table.col_pages')}</th>
-                  <th style={{ padding: '14px 1rem' }}>{t('table.col_chunks')}</th>
-                  <th style={{ padding: '14px 1rem' }}>{t('table.col_time')}</th>
-                  <th style={{ padding: '14px 1rem' }}>{t('table.col_curation')}</th>
-                  <th style={{ padding: '14px 1rem' }}>{t('table.col_status')}</th>
-                  <th style={{ padding: '14px 1.5rem', textAlign: 'right' }}>{t('table.col_actions')}</th>
+                  <th style={{ padding: '7px 10px' }}>{t('table.col_doc')}</th>
+                  <th style={{ padding: '7px 10px' }}>{t('table.col_pages')}</th>
+                  <th style={{ padding: '7px 10px' }}>{t('table.col_chunks')}</th>
+                  <th style={{ padding: '7px 10px' }}>{t('table.col_time')}</th>
+                  <th style={{ padding: '7px 10px' }}>{t('table.col_curation')}</th>
+                  <th style={{ padding: '7px 10px' }}>{t('table.col_status')}</th>
+                  <th style={{ padding: '7px 10px', textAlign: 'right' }}>{t('table.col_actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -247,13 +263,13 @@ export default function DocumentTable({
                       className="hover:bg-subtle"
                     >
                       {/* Name & ID */}
-                      <td style={{ padding: '14px 1.5rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <td style={{ padding: '7px 10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <div
                             style={{
-                              width: '36px',
-                              height: '36px',
-                              borderRadius: 'var(--radius-sm)',
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: 'var(--radius-xs)',
                               backgroundColor: 'var(--color-primary-subtle)',
                               display: 'flex',
                               alignItems: 'center',
@@ -262,17 +278,17 @@ export default function DocumentTable({
                               flexShrink: 0,
                             }}
                           >
-                            <FileText size={18} />
+                            <FileText size={13} />
                           </div>
                           <div>
                             <Link
                               href={`/documents/${batch.id}`}
-                              style={{ fontWeight: 600, color: 'var(--text-primary)' }}
+                              style={{ fontWeight: 600, fontSize: '12px', color: 'var(--text-primary)' }}
                               className="hover:text-primary hover:underline"
                             >
                               {batch.original_filename}
                             </Link>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap', marginTop: '4px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', marginTop: '2px' }}>
                               {/* Classification Badge (ABAC) */}
                               <span
                                 className={`badge ${
@@ -284,25 +300,25 @@ export default function DocumentTable({
                                     ? 'badge-danger'
                                     : 'badge-neutral'
                                 }`}
-                                style={{ fontSize: '10.5px', padding: '1px 6px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                                style={{ fontSize: '9.5px', padding: '1px 5px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
                               >
-                                {batch.classification === 'Sangat Rahasia' ? <Lock size={10} /> : <Shield size={10} />}
+                                {batch.classification === 'Sangat Rahasia' ? <Lock size={9} /> : <Shield size={9} />}
                                 <span>{batch.classification || 'Internal'}</span>
                               </span>
 
                               {/* Division Tag */}
                               <span
                                 className="badge badge-neutral"
-                                style={{ fontSize: '10.5px', padding: '1px 6px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                                style={{ fontSize: '9.5px', padding: '1px 5px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
                               >
-                                <Building2 size={10} />
+                                <Building2 size={9} />
                                 <span>{batch.division_id || 'General'}</span>
                               </span>
 
                               {/* Version Tag */}
                               <span
                                 className="badge badge-neutral font-mono"
-                                style={{ fontSize: '10.5px', padding: '1px 6px' }}
+                                style={{ fontSize: '9.5px', padding: '1px 5px' }}
                               >
                                 v{batch.version || '1.0'}
                               </span>
@@ -311,10 +327,10 @@ export default function DocumentTable({
                               {batch.has_user_grant && (
                                 <span
                                   className="badge badge-accent"
-                                  style={{ fontSize: '10px', padding: '1px 6px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                                  style={{ fontSize: '9.5px', padding: '1px 5px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
                                   title="Anda memiliki hak akses khusus ke dokumen ini"
                                 >
-                                  <Users size={10} />
+                                  <Users size={9} />
                                   <span>Akses Khusus</span>
                                 </span>
                               )}
@@ -324,24 +340,24 @@ export default function DocumentTable({
                       </td>
 
                       {/* Pages */}
-                      <td style={{ padding: '14px 1rem' }}>
-                        <span className="badge badge-neutral font-mono">
+                      <td style={{ padding: '7px 10px' }}>
+                        <span className="badge badge-neutral font-mono" style={{ fontSize: '9.5px', padding: '1px 5px' }}>
                           {batch.page_count} {language === 'en' ? 'pgs' : 'hal'}
                         </span>
                       </td>
 
                       {/* Chunks */}
-                      <td style={{ padding: '14px 1rem' }}>
-                        <span className="badge badge-accent font-mono">{batch.chunk_count} chunks</span>
+                      <td style={{ padding: '7px 10px' }}>
+                        <span className="badge badge-accent font-mono" style={{ fontSize: '9.5px', padding: '1px 5px' }}>{batch.chunk_count} chunks</span>
                       </td>
 
                       {/* Upload Date */}
-                      <td style={{ padding: '14px 1rem', color: 'var(--text-secondary)', fontSize: '12.5px' }}>
+                      <td style={{ padding: '7px 10px', color: 'var(--text-secondary)', fontSize: '11.5px' }}>
                         {formattedDate}
                       </td>
 
                       {/* Curation Status */}
-                      <td style={{ padding: '14px 1rem' }}>
+                      <td style={{ padding: '7px 10px' }}>
                         {(() => {
                           const total = batch.chunk_count || 0;
                           const processed = batch.processed_chunks || 0;
@@ -356,14 +372,14 @@ export default function DocumentTable({
                                 style={{
                                   display: 'inline-flex',
                                   alignItems: 'center',
-                                  gap: '5px',
-                                  fontSize: '11.5px',
-                                  padding: '4px 8px',
+                                  gap: '4px',
+                                  fontSize: '10.5px',
+                                  padding: '2px 6px',
                                   fontWeight: 600,
                                 }}
                                 title={`Seluruh ${total} raw chunks telah selesai dikurasi menjadi ${count} insight.`}
                               >
-                                <CheckCircle2 size={12} />
+                                <CheckCircle2 size={11} />
                                 <span>100% Terkurasi ({count} Insight)</span>
                               </span>
                             );
@@ -377,9 +393,9 @@ export default function DocumentTable({
                                 style={{
                                   display: 'inline-flex',
                                   alignItems: 'center',
-                                  gap: '5px',
-                                  fontSize: '11.5px',
-                                  padding: '4px 8px',
+                                  gap: '4px',
+                                  fontSize: '10.5px',
+                                  padding: '2px 6px',
                                   fontWeight: 600,
                                 }}
                                 title={`${processed} dari ${total} raw chunk diproses.`}
@@ -395,16 +411,16 @@ export default function DocumentTable({
                               style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '5px',
-                                fontSize: '11.5px',
-                                padding: '4px 8px',
+                                gap: '4px',
+                                fontSize: '10.5px',
+                                padding: '2px 6px',
                                 fontWeight: 600,
                                 backgroundColor: 'var(--bg-subtle)',
                                 color: 'var(--text-muted)',
                                 border: '1px solid var(--border-default)',
                               }}
                             >
-                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--color-warning)' }} />
+                              <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: 'var(--color-warning)' }} />
                               <span>{t('table.uncurated_badge')}</span>
                             </span>
                           );
@@ -412,8 +428,8 @@ export default function DocumentTable({
                       </td>
 
                       {/* AI Knowledge Base Toggle (Separated Status and Clear Action Button) */}
-                      <td style={{ padding: '14px 1rem' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', alignItems: 'flex-start' }}>
+                      <td style={{ padding: '7px 10px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'flex-start' }}>
                           {/* Lifecycle Badge */}
                           <span
                             className={`badge ${
@@ -425,7 +441,7 @@ export default function DocumentTable({
                                 ? 'badge-neutral'
                                 : 'badge-neutral'
                             }`}
-                            style={{ fontSize: '11px', padding: '2px 7px', fontWeight: 600 }}
+                            style={{ fontSize: '10px', padding: '1px 6px', fontWeight: 600 }}
                           >
                             {batch.status || (batch.is_active_knowledge ? 'Aktif' : 'Draft')}
                           </span>
@@ -436,13 +452,13 @@ export default function DocumentTable({
                               style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '4px',
-                                fontSize: '10.5px',
+                                gap: '3px',
+                                fontSize: '10px',
                                 fontWeight: 600,
                                 color: 'var(--color-success)',
                               }}
                             >
-                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--color-success)' }} />
+                              <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: 'var(--color-success)' }} />
                               RAG Aktif
                             </span>
                           ) : (
@@ -450,21 +466,21 @@ export default function DocumentTable({
                               style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '4px',
-                                fontSize: '10.5px',
+                                gap: '3px',
+                                fontSize: '10px',
                                 fontWeight: 500,
                                 color: 'var(--text-muted)',
                               }}
                             >
-                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--border-default)' }} />
+                              <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: 'var(--border-default)' }} />
                               Standby
                             </span>
                           )}
 
                           {/* Review due date if set */}
                           {batch.review_due_date && (
-                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                              <Calendar size={10} />
+                            <span style={{ fontSize: '9.5px', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                              <Calendar size={9} />
                               {new Date(batch.review_due_date).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' })}
                             </span>
                           )}
@@ -475,22 +491,22 @@ export default function DocumentTable({
                               onClick={() => onToggleActive(batch.id, !batch.is_active_knowledge)}
                               className={`btn btn-xs ${batch.is_active_knowledge ? 'btn-ghost-danger' : 'btn-outline'}`}
                               style={{
-                                padding: '2px 7px',
-                                fontSize: '10.5px',
+                                padding: '1px 6px',
+                                fontSize: '9.5px',
                                 borderRadius: 'var(--radius-xs)',
                                 fontWeight: 600,
-                                marginTop: '2px',
+                                marginTop: '1px',
                               }}
                               title={t('table.toggle_tooltip')}
                             >
                               {batch.is_active_knowledge ? (
                                 <>
-                                  <XCircle size={10} />
+                                  <XCircle size={9} />
                                   <span>{t('table.action_deactivate')}</span>
                                 </>
                               ) : (
                                 <>
-                                  <CheckCircle2 size={10} />
+                                  <CheckCircle2 size={9} />
                                   <span>{t('table.action_activate')}</span>
                                 </>
                               )}
@@ -500,41 +516,44 @@ export default function DocumentTable({
                       </td>
 
                       {/* Actions */}
-                      <td style={{ padding: '14px 1.5rem', textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <td style={{ padding: '7px 10px', textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                           {hasPermission('chat:query') && (
                             <Link
                               href={`/chat?q=${encodeURIComponent(`Tolong jelaskan intisari dan ringkasan dari dokumen "${batch.original_filename}"`)}`}
-                              className="btn btn-ghost btn-sm"
+                              className="btn btn-ghost btn-xs"
                               title="Tanya AI seputar dokumen ini"
-                              style={{ color: 'var(--color-primary)' }}
+                              style={{ color: 'var(--color-primary)', padding: '3px 5px' }}
                             >
-                              <MessageSquare size={15} />
+                              <MessageSquare size={13} />
                             </Link>
                           )}
                           <Link
                             href={`/documents/${batch.id}`}
-                            className="btn btn-ghost btn-sm"
+                            className="btn btn-ghost btn-xs"
                             title={t('table.open_studio_tooltip')}
+                            style={{ padding: '3px 5px' }}
                           >
-                            <ExternalLink size={15} />
+                            <ExternalLink size={13} />
                           </Link>
                           {hasPermission('documents:upload') && (
                             <button
                               onClick={() => setSelectedForRename(batch)}
-                              className="btn btn-ghost btn-sm"
+                              className="btn btn-ghost btn-xs"
                               title={t('table.rename_tooltip')}
+                              style={{ padding: '3px 5px' }}
                             >
-                              <Pencil size={14} />
+                              <Pencil size={13} />
                             </button>
                           )}
                           {hasPermission('documents:delete') && (
                             <button
                               onClick={() => onDelete(batch.id, batch.original_filename)}
-                              className="btn btn-ghost-danger btn-sm"
+                              className="btn btn-ghost-danger btn-xs"
                               title={t('table.delete_tooltip')}
+                              style={{ padding: '3px 5px' }}
                             >
-                              <Trash2 size={14} />
+                              <Trash2 size={13} />
                             </button>
                           )}
                         </div>

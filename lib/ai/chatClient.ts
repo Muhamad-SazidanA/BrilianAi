@@ -184,3 +184,91 @@ ${query}`;
 
   throw new Error('Gagal memproses respons AI setelah beberapa kali percobaan.');
 }
+
+/**
+ * Streams an AI response token-by-token using Llama 3.2 via Ollama stream API.
+ * Calls onToken as each text chunk arrives from the local model.
+ *
+ * @param query - User question
+ * @param contextText - Formatted chunks context from vector store
+ * @param allowPublicKnowledge - If false, enforces strict grounding on document context only
+ * @param options - Client options & onToken callback
+ * @returns Promise<string> - Full accumulated AI response text
+ */
+export async function generateChatResponseStream(
+  query: string,
+  contextText: string,
+  allowPublicKnowledge: boolean = false,
+  options?: ChatClientOptions & { onToken?: (token: string) => void; signal?: AbortSignal }
+): Promise<string> {
+  const model =
+    options?.model ||
+    process.env.CHAT_MODEL_NAME ||
+    process.env.CHAT_MODEL ||
+    'llama3.2:3b';
+
+  let baseUrl =
+    options?.baseUrl ||
+    process.env.OLLAMA_ENDPOINT ||
+    process.env.OLLAMA_BASE_URL ||
+    'http://localhost:11434';
+
+  if (baseUrl.includes('//ollama:') && !process.env.DOCKER_CONTAINER) {
+    baseUrl = baseUrl.replace('//ollama:', '//localhost:');
+  }
+
+  const temperature = options?.temperature ?? (allowPublicKnowledge ? 0.3 : 0.0);
+  const systemPrompt = allowPublicKnowledge ? SYSTEM_PUBLIC_PROMPT : SYSTEM_STRICT_PROMPT;
+
+  const formatInstruction = parseUserFormattingInstruction(query);
+  const formatDirective = formatInstruction ? formatInstructionPrompt(formatInstruction) : '';
+
+  const userMessageContent = `--- KONTEKS DOKUMEN ---
+${contextText || '(Tidak ada konteks dokumen yang ditemukan)'}
+-----------------------
+${formatDirective ? `\n${formatDirective}\n` : ''}
+PERTANYAAN PENGGUNA:
+${query}`;
+
+  const messages: BaseMessage[] = [
+    new SystemMessage(systemPrompt),
+    new HumanMessage(userMessageContent),
+  ];
+
+  try {
+    const client = new ChatOllama({
+      model,
+      baseUrl,
+      temperature,
+      numCtx: 4096,
+      keepAlive: '1h',
+    });
+
+    const stream = await client.stream(messages, {
+      signal: options?.signal || AbortSignal.timeout(300000),
+    });
+
+    let fullAnswer = '';
+    for await (const chunk of stream) {
+      const text = typeof chunk.content === 'string' ? chunk.content : '';
+      if (text) {
+        fullAnswer += text;
+        options?.onToken?.(text);
+      }
+    }
+
+    if (fullAnswer.trim().length > 0) {
+      return fullAnswer;
+    }
+
+    // Fallback if stream was empty
+    const fallbackAnswer = await generateChatResponse(query, contextText, allowPublicKnowledge, options);
+    options?.onToken?.(fallbackAnswer);
+    return fallbackAnswer;
+  } catch (err) {
+    console.warn('[ChatClient] Stream error, falling back to invoke:', err);
+    const nonStreamed = await generateChatResponse(query, contextText, allowPublicKnowledge, options);
+    options?.onToken?.(nonStreamed);
+    return nonStreamed;
+  }
+}

@@ -1,5 +1,5 @@
 import { parseUserFormattingInstruction, formatInstructionPrompt } from '../chat/chatUtils';
-import { SYSTEM_STRICT_PROMPT, generateChatResponse } from './chatClient';
+import { SYSTEM_STRICT_PROMPT, generateChatResponse, generateChatResponseStream } from './chatClient';
 
 /* ==========================================================================
    AGENT 3: Guardrail & Router (OpenAI GPT-4o-mini)
@@ -283,6 +283,140 @@ export async function runRagSynthesizer(
 
   // 4. Ultimate Fallback: Ollama local chat client
   return await generateChatResponse(userQuery, contextDocument, false);
+}
+
+/**
+ * Streams the RAG synthesizer response token-by-token:
+ * 1. DeepSeek-V3 stream (if DEEPSEEK_API_KEY)
+ * 2. OpenAI stream (if OPENAI_API_KEY)
+ * 3. Local Ollama stream (default & offline)
+ */
+export async function runRagSynthesizerStream(
+  userQuery: string,
+  contextDocument: string,
+  options?: SynthesizerOptions & { onToken?: (token: string) => void; signal?: AbortSignal }
+): Promise<string> {
+  // Unit test fast-path: delegate to generateChatResponseStream
+  if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
+    return await generateChatResponseStream(
+      userQuery,
+      contextDocument,
+      options?.allowPublicKnowledge ?? false,
+      options
+    );
+  }
+
+  const deepseekApiKey = process.env.DEEPSEEK_API_KEY;
+  const openAiApiKey = process.env.OPENAI_API_KEY;
+
+  const formatInstruction = parseUserFormattingInstruction(userQuery);
+  const formattingGuide = formatInstruction ? formatInstructionPrompt(formatInstruction) : '';
+
+  let systemPrompt = SYSTEM_STRICT_PROMPT;
+  if (formattingGuide) {
+    systemPrompt += `\n\n${formattingGuide}`;
+  }
+
+  const userContent = `=== KONTEKS DOKUMEN ===\n${contextDocument}\n\n=== PERTANYAAN PENGGUNA ===\n${userQuery}`;
+
+  // Helper for parsing OpenAI-compatible SSE streams
+  const streamOpenAiCompatible = async (
+    url: string,
+    apiKey: string,
+    modelName: string,
+    temp: number
+  ): Promise<string | null> => {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: modelName,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userContent },
+          ],
+          temperature: temp,
+          max_tokens: 4096,
+          stream: true,
+        }),
+        signal: options?.signal,
+      });
+
+      if (!res.ok || !res.body) {
+        return null;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulated = '';
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith(':')) continue;
+          if (trimmed === 'data: [DONE]') continue;
+          if (trimmed.startsWith('data: ')) {
+            try {
+              const parsed = JSON.parse(trimmed.slice(6));
+              const token = parsed?.choices?.[0]?.delta?.content;
+              if (token && typeof token === 'string') {
+                accumulated += token;
+                options?.onToken?.(token);
+              }
+            } catch {
+              // ignore partial line parse
+            }
+          }
+        }
+      }
+
+      return accumulated.trim() ? accumulated : null;
+    } catch (err: any) {
+      console.warn(`[SynthesizerStream] SSE from ${url} aborted/failed:`, err?.message);
+      return null;
+    }
+  };
+
+  // 1. Primary: DeepSeek-V3 stream
+  if (deepseekApiKey) {
+    const dsResult = await streamOpenAiCompatible(
+      'https://api.deepseek.com/chat/completions',
+      deepseekApiKey,
+      options?.model || process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+      options?.temperature ?? 0.2
+    );
+    if (dsResult) return dsResult;
+  }
+
+  // 2. Secondary: OpenAI GPT-4o-mini stream
+  if (openAiApiKey) {
+    const oaiResult = await streamOpenAiCompatible(
+      'https://api.openai.com/v1/chat/completions',
+      openAiApiKey,
+      process.env.OPENAI_MODEL || 'gpt-4o-mini',
+      options?.temperature ?? 0.2
+    );
+    if (oaiResult) return oaiResult;
+  }
+
+  // 3. Fallback: Local Ollama stream
+  return await generateChatResponseStream(
+    userQuery,
+    contextDocument,
+    options?.allowPublicKnowledge ?? false,
+    options
+  );
 }
 
 /* ==========================================================================

@@ -38,7 +38,7 @@ function ChatSessionPageContent() {
 
 export default function ChatSessionPage() {
   return (
-    <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center' }}>...</div>}>
+    <Suspense fallback={null}>
       <ChatSessionPageContent />
     </Suspense>
   );

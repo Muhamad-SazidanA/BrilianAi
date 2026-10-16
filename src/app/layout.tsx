@@ -3,6 +3,7 @@ import { Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { LanguageProvider } from '@/context/LanguageContext';
 import { UserSessionProvider } from '@/context/UserSessionContext';
+import { SidebarProvider } from '@/context/SidebarContext';
 import ToastProvider from '@/components/providers/ToastProvider';
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -39,11 +40,28 @@ export default function RootLayout({
 }) {
   return (
     <html lang="id" className={`${plusJakarta.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  if (localStorage.getItem('sidebar_collapsed') === 'true') {
+                    document.documentElement.setAttribute('data-sidebar-collapsed', 'true');
+                  }
+                } catch(e) {}
+              })();
+            `,
+          }}
+        />
+      </head>
       <body className={plusJakarta.className} suppressHydrationWarning>
         <LanguageProvider>
           <UserSessionProvider>
-            {children}
-            <ToastProvider />
+            <SidebarProvider>
+              {children}
+              <ToastProvider />
+            </SidebarProvider>
           </UserSessionProvider>
         </LanguageProvider>
       </body>

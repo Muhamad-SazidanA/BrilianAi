@@ -1,12 +1,11 @@
 'use client';
 
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
-  UploadCloud,
   FolderTree,
   MessageSquare,
   ChevronsLeft,
@@ -27,6 +26,9 @@ import { ChatSession } from '@/types/chat';
 import ChatHistoryItem from '@/components/chat/ChatHistoryItem';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import { toast } from 'sonner';
+
+// Module-level in-memory cache for instant zero-flicker sidebar history
+let cachedSidebarSessions: ChatSession[] | null = null;
 
 interface SidebarProps {
   stats?: {
@@ -49,28 +51,43 @@ export default function Sidebar({
   const [docCount, setDocCount] = useState<number>(stats?.totalDocuments || 0);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
-  // ── Chat History State ────────────────────────────────────────────
-  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+  // ── Chat History State (Instantly seeded from in-memory cache) ──
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>(() => cachedSidebarSessions || []);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [newChatLoading, setNewChatLoading] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<{ id: string; title: string } | null>(null);
   const [isDeletingSession, setIsDeletingSession] = useState(false);
 
-  // Active session UUID from URL /chat/w/[uuid]
-  const activeSessionId = useMemo(() => {
+  // Active session UUID from URL /chat/w/[uuid] or dynamically updated
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+
+  useEffect(() => {
     const match = pathname.match(/^\/chat\/w\/([0-9a-f-]{36})$/i);
-    return match ? match[1] : null;
+    setCurrentSessionId(match ? match[1] : null);
   }, [pathname]);
 
-  // Fetch chat sessions (only if user has chat permission)
-  const fetchChatSessions = useCallback(async () => {
+  const activeSessionId = useMemo(() => {
+    return currentSessionId;
+  }, [currentSessionId]);
+
+  const isNewChatActive = useMemo(() => {
+    if (pathname.startsWith('/chat/w/')) return false;
+    return (pathname === '/chat' || pathname.startsWith('/share')) && !activeSessionId;
+  }, [pathname, activeSessionId]);
+
+  // Fetch chat sessions with silent background revalidation (no spinner when cached)
+  const fetchChatSessions = useCallback(async (silent = false) => {
     if (!hasPermission('chat:query') || !currentUser) return;
-    setSessionsLoading(true);
+    if (!silent && !cachedSidebarSessions) {
+      setSessionsLoading(true);
+    }
     try {
       const res = await fetch('/api/chat-sessions');
       if (res.ok) {
         const data = await res.json();
-        setChatSessions(data.sessions || []);
+        const list: ChatSession[] = data.sessions || [];
+        cachedSidebarSessions = list;
+        setChatSessions(list);
       }
     } catch {
       // Quiet fallback
@@ -79,18 +96,61 @@ export default function Sidebar({
     }
   }, [hasPermission, currentUser]);
 
-  // Re-fetch whenever we navigate to/from chat routes
+  const fetchChatSessionsRef = useRef(fetchChatSessions);
+  fetchChatSessionsRef.current = fetchChatSessions;
+
+  // Initial fetch on mount or when user ID changes (silent if cache exists)
   useEffect(() => {
-    fetchChatSessions();
-  }, [fetchChatSessions, pathname]);
+    if (currentUser?.id) {
+      fetchChatSessionsRef.current(cachedSidebarSessions !== null);
+    }
+  }, [currentUser?.id]);
+
+  // Listen to new chat and session creation events across tabs/components (attached once)
+  useEffect(() => {
+    const onSessionCreated = (e: any) => {
+      if (e?.detail?.id) {
+        setCurrentSessionId(e.detail.id);
+      }
+      fetchChatSessionsRef.current(true);
+    };
+    const onNewChat = () => {
+      setCurrentSessionId(null);
+    };
+    const onSessionsChanged = () => {
+      fetchChatSessionsRef.current(true);
+    };
+    window.addEventListener('brilian_chat_session_created', onSessionCreated);
+    window.addEventListener('brilian_new_chat', onNewChat);
+    window.addEventListener('brilian_chat_sessions_changed', onSessionsChanged);
+    return () => {
+      window.removeEventListener('brilian_chat_session_created', onSessionCreated);
+      window.removeEventListener('brilian_new_chat', onNewChat);
+      window.removeEventListener('brilian_chat_sessions_changed', onSessionsChanged);
+    };
+  }, []);
 
   // ── Session Actions ───────────────────────────────────────────────
-  const handleNewChat = async () => {
-    if (newChatLoading) return;
-    if (!currentUser) {
-      router.push('/login');
-      return;
+  const handleNewChat = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
     }
+    if (newChatLoading) return;
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('brilian_new_chat'));
+
+      if (window.location.pathname.startsWith('/chat')) {
+        if (pathname.startsWith('/chat/w/')) {
+          router.push('/chat');
+        } else if (window.location.pathname !== '/chat') {
+          window.history.pushState(null, '', '/chat');
+        }
+        return;
+      }
+    }
+
     setNewChatLoading(true);
     router.push('/chat');
     setNewChatLoading(false);
@@ -109,6 +169,9 @@ export default function Sidebar({
         body: JSON.stringify({ title: newTitle }),
       });
       if (res.ok) {
+        if (cachedSidebarSessions) {
+          cachedSidebarSessions = cachedSidebarSessions.map((s) => (s.id === sessionId ? { ...s, title: newTitle } : s));
+        }
         setChatSessions((prev) =>
           prev.map((s) => (s.id === sessionId ? { ...s, title: newTitle } : s))
         );
@@ -126,16 +189,19 @@ export default function Sidebar({
         body: JSON.stringify({ is_pinned: !currentPinned }),
       });
       if (res.ok) {
-        setChatSessions((prev) => {
-          const updated = prev.map((s) =>
+        const sortPinned = (list: typeof chatSessions) => {
+          const updated = list.map((s) =>
             s.id === sessionId ? { ...s, is_pinned: !currentPinned } : s
           );
-          // Re-sort: pinned first
           return [...updated].sort((a, b) => {
             if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
             return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
           });
-        });
+        };
+        if (cachedSidebarSessions) {
+          cachedSidebarSessions = sortPinned(cachedSidebarSessions);
+        }
+        setChatSessions((prev) => sortPinned(prev));
       }
     } catch {
       toast.error('Gagal mengubah status pin');
@@ -153,8 +219,14 @@ export default function Sidebar({
     try {
       const res = await fetch(`/api/chat-sessions/${sessionToDelete.id}`, { method: 'DELETE' });
       if (res.ok) {
+        if (cachedSidebarSessions) {
+          cachedSidebarSessions = cachedSidebarSessions.filter((s) => s.id !== sessionToDelete.id);
+        }
         setChatSessions((prev) => prev.filter((s) => s.id !== sessionToDelete.id));
-        if (activeSessionId === sessionToDelete.id) {
+        if (activeSessionId === sessionToDelete.id || (typeof window !== 'undefined' && window.location.pathname.includes(sessionToDelete.id))) {
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('brilian_new_chat'));
+          }
           router.push('/chat');
         }
         const title = sessionToDelete.title;
@@ -220,7 +292,7 @@ export default function Sidebar({
     const isDark = theme === 'dark';
     if (isCollapsed) {
       return isDark
-        ? '/images/Brilian.AI%20logo-Close-P.svg'
+        ? '/images/BrilianLogo-Close-P.svg'
         : '/images/BrilianLogo-Close-B.svg';
     } else {
       return isDark
@@ -258,20 +330,12 @@ export default function Sidebar({
         },
 
         {
-          label: t('nav.upload'),
-          href: '/upload',
-          icon: UploadCloud,
-          badge: null,
-          isActive: pathname === '/upload',
-          permission: 'documents:upload' as PermissionKey,
-        },
-        {
           label: t('nav.documents'),
           href: '/documents',
           icon: FolderTree,
           badge: docCount > 0 ? `${docCount}` : null,
           badgeVariant: 'badge-neutral',
-          isActive: pathname.startsWith('/documents'),
+          isActive: pathname.startsWith('/documents') || pathname.startsWith('/upload'),
           permission: 'documents:read' as PermissionKey,
         },
         {
@@ -318,7 +382,7 @@ export default function Sidebar({
   const hasChatAccess = hasPermission('chat:query');
 
   return (
-    <aside className={`app-sidebar ${isCollapsed ? 'collapsed' : ''}`}>
+    <aside className={`app-sidebar ${isCollapsed ? 'collapsed' : ''}`} suppressHydrationWarning>
       {/* ── Collapse / Expand Toggle Button ── */}
       {onToggleCollapse && (
         <button
@@ -326,14 +390,14 @@ export default function Sidebar({
           onClick={onToggleCollapse}
           style={{
             position: 'absolute',
-            right: '-13px',
-            top: '22px',
-            width: '26px',
-            height: '26px',
+            right: '-11px',
+            top: '13px',
+            width: '22px',
+            height: '22px',
             borderRadius: '50%',
             backgroundColor: 'var(--bg-card)',
             border: '1px solid var(--border-default)',
-            boxShadow: 'var(--shadow-sm)',
+            boxShadow: '0 1px 4px rgba(0, 0, 0, 0.12)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -348,9 +412,9 @@ export default function Sidebar({
           aria-label={isCollapsed ? t('nav.open_sidebar') : t('nav.close_sidebar')}
         >
           {isCollapsed ? (
-            <ChevronsRight size={14} strokeWidth={2} />
+            <ChevronsRight size={12} strokeWidth={2.2} />
           ) : (
-            <ChevronsLeft size={14} strokeWidth={2} />
+            <ChevronsLeft size={12} strokeWidth={2.2} />
           )}
         </button>
       )}
@@ -369,6 +433,12 @@ export default function Sidebar({
       >
         <Link
           href="/chat"
+          onClick={(e) => {
+            if (pathname.startsWith('/chat')) {
+              e.preventDefault();
+              handleNewChat();
+            }
+          }}
           aria-label="Brilian.Ai"
           style={{
             display: 'inline-flex',
@@ -387,8 +457,8 @@ export default function Sidebar({
               key={`collapsed-${theme}`}
               src={logoSrc}
               alt="Brilian.Ai"
-              width={32}
-              height={32}
+              width={26}
+              height={26}
               priority
               style={{ objectFit: 'contain', display: 'block' }}
             />
@@ -398,39 +468,108 @@ export default function Sidebar({
               src={logoSrc}
               alt="Brilian.Ai"
               width={120}
-              height={36}
+              height={30}
               priority
-              style={{ objectFit: 'contain', display: 'block', maxHeight: '34px', width: 'auto' }}
+              style={{ objectFit: 'contain', display: 'block', height: '30px', width: 'auto' }}
             />
           )}
         </Link>
       </div>
 
-      {/* ── Navigation Links ─────────────────────────────────── */}
+      {/* ── 1. Fixed Navigation Area (AI Workspace, Admin, AI Assistant - Non-Scrollable) ── */}
       <div
         style={{
-          padding: isCollapsed ? '0.75rem 0.35rem' : '1rem 0.75rem',
-          flex: 1,
+          flexShrink: 0,
+          padding: isCollapsed ? '0.45rem 0' : '0.45rem 0.75rem 0.25rem',
           display: 'flex',
           flexDirection: 'column',
-          gap: isCollapsed ? '0.75rem' : '1.25rem',
-          overflowY: 'auto',
-          overflowX: 'hidden',
+          gap: isCollapsed ? '0.35rem' : '0.4rem',
         }}
       >
-        {/* ── Workspace and administration groups stay above Assistant ── */}
-        {navGroups.map((group) => (
-          <div key={group.group} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        {/* ── Assistant Button (At the very top) ── */}
+        {(hasChatAccess || !currentUser) && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
             {!isCollapsed && (
               <div
                 style={{
-                  fontSize: '11px',
-                  fontWeight: 700,
+                  fontSize: '9.5px',
+                  fontWeight: 600,
                   textTransform: 'uppercase',
                   color: 'var(--text-muted)',
-                  letterSpacing: '0.06em',
-                  padding: '4px 12px',
-                  marginBottom: '2px',
+                  letterSpacing: '0.04em',
+                  padding: '1px 8px',
+                  marginBottom: '0',
+                }}
+              >
+                {language === 'en' ? 'Assistant' : 'Asisten AI'}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={handleNewChat}
+              className={`nav-link assistant-nav-link ${isNewChatActive ? 'active' : ''}`}
+              style={{
+                width: isCollapsed ? '34px' : '100%',
+                height: isCollapsed ? '34px' : undefined,
+                minHeight: isCollapsed ? '34px' : '28px',
+                margin: isCollapsed ? '0 auto' : undefined,
+                justifyContent: isCollapsed ? 'center' : 'flex-start',
+                padding: isCollapsed ? 0 : '3px 7px',
+                borderRadius: '8px',
+                backgroundColor: isNewChatActive ? undefined : 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+              title={isCollapsed ? t('chat.new_chat') : undefined}
+              disabled={newChatLoading}
+            >
+              <MessageSquare
+                size={14}
+                strokeWidth={isNewChatActive ? 2 : 1.7}
+              />
+              {!isCollapsed && (
+                <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '11.5px' }}>
+                  {t('nav.chat')}
+                </span>
+              )}
+              {!isCollapsed && (
+                <span
+                  title="Chat baru"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '16px',
+                    height: '16px',
+                    borderRadius: '3px',
+                    color: 'var(--text-muted)',
+                    flexShrink: 0,
+                    transition: 'background-color 0.15s ease, color 0.15s ease',
+                  }}
+                  className="hover:bg-muted"
+                >
+                  {newChatLoading ? <span className="chat-new-spinner" /> : <Plus size={10} strokeWidth={2.5} />}
+                </span>
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* ── Workspace and administration groups below Assistant ── */}
+        {navGroups.map((group) => (
+          <div key={group.group} style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+            {!isCollapsed && (
+              <div
+                style={{
+                  fontSize: '9.5px',
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  color: 'var(--text-muted)',
+                  letterSpacing: '0.04em',
+                  padding: '1px 8px',
+                  marginBottom: '0',
                 }}
               >
                 {group.group}
@@ -445,22 +584,27 @@ export default function Sidebar({
                   href={item.href}
                   className={`nav-link ${item.isActive ? 'active' : ''}`}
                   style={{
+                    width: isCollapsed ? '34px' : '100%',
+                    height: isCollapsed ? '34px' : undefined,
+                    minHeight: isCollapsed ? '34px' : '28px',
+                    margin: isCollapsed ? '0 auto' : undefined,
                     justifyContent: isCollapsed ? 'center' : 'flex-start',
-                    padding: isCollapsed ? '10px 0' : '9px 12px',
+                    padding: isCollapsed ? 0 : '3px 7px',
+                    borderRadius: '8px',
                     position: 'relative',
                   }}
                   title={isCollapsed ? item.label : undefined}
                 >
-                  <Icon size={18} strokeWidth={item.isActive ? 2.2 : 1.75} />
+                  <Icon size={14} strokeWidth={item.isActive ? 2 : 1.7} />
                   {!isCollapsed && (
                     <>
-                      <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '11.5px' }}>
                         {item.label}
                       </span>
                       {item.badge && (
                         <span
                           className={`badge ${item.isActive ? 'badge-accent' : (item as any).badgeVariant || 'badge-neutral'}`}
-                          style={{ fontSize: '10.5px', padding: '1px 7px' }}
+                          style={{ fontSize: '9px', padding: '0 5px', height: '15px', lineHeight: '15px' }}
                         >
                           {item.badge}
                         </span>
@@ -471,10 +615,10 @@ export default function Sidebar({
                     <span
                       style={{
                         position: 'absolute',
-                        top: '6px',
-                        right: '12px',
-                        width: '6px',
-                        height: '6px',
+                        top: '3px',
+                        right: '6px',
+                        width: '4px',
+                        height: '4px',
                         borderRadius: '50%',
                         backgroundColor: item.isActive ? 'var(--color-primary)' : 'var(--text-muted)',
                       }}
@@ -485,128 +629,80 @@ export default function Sidebar({
             })}
           </div>
         ))}
-
-        {/* ── Assistant Group (special: includes Recents) ── */}
-        {(hasChatAccess || !currentUser) && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-
-            {!isCollapsed && (
-              <div
-                style={{
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  color: 'var(--text-muted)',
-                  letterSpacing: '0.06em',
-                  padding: '4px 12px',
-                  marginBottom: '2px',
-                }}
-              >
-                {language === 'en' ? 'Assistant' : 'Asisten AI'}
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={handleNewChat}
-              className={`nav-link assistant-nav-link ${pathname.startsWith('/chat') || pathname.startsWith('/share') ? 'active' : ''}`}
-              style={{
-                width: '100%',
-                justifyContent: isCollapsed ? 'center' : 'flex-start',
-                padding: isCollapsed ? '10px 0' : '9px 12px',
-                backgroundColor: pathname.startsWith('/chat') || pathname.startsWith('/share') ? undefined : 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                textAlign: 'left',
-              }}
-              title={isCollapsed ? t('chat.new_chat') : undefined}
-              disabled={newChatLoading}
-            >
-              <MessageSquare
-                size={18}
-                strokeWidth={pathname.startsWith('/chat') || pathname.startsWith('/share') ? 2.2 : 1.75}
-              />
-              {!isCollapsed && (
-                <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {t('nav.chat')}
-                </span>
-              )}
-              {!isCollapsed && (
-                <span
-                  title="Chat baru"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: '20px',
-                    height: '20px',
-                    borderRadius: '5px',
-                    color: 'var(--text-muted)',
-                    flexShrink: 0,
-                    transition: 'background-color 0.15s ease, color 0.15s ease',
-                  }}
-                  className="hover:bg-muted"
-                >
-                  {newChatLoading ? <span className="chat-new-spinner" /> : <Plus size={13} strokeWidth={2.5} />}
-                </span>
-              )}
-            </button>
-
-            {!isCollapsed && currentUser && (
-              <div className="chat-recents-panel">
-                <div className="chat-recents-heading">
-
-                  <span>{t('chat.recents')}</span>
-                </div>
-
-                {sessionsLoading ? (
-                  <div className="chat-recents-empty">
-                    <span className="chat-history-spinner" />
-                    <span>{t('chat.loading_history')}</span>
-                  </div>
-                ) : chatSessions.length === 0 ? (
-                  <div className="chat-recents-empty">{t('chat.no_recents')}</div>
-                ) : (
-                  <div className="chat-recents-list">
-                    {chatSessions.map((session) => (
-                      <ChatHistoryItem
-                        key={session.id}
-                        session={session}
-                        isActive={activeSessionId === session.id}
-                        isCollapsed={isCollapsed}
-                        onClick={() => handleSessionClick(session.id)}
-                        onRename={(newTitle) => handleRename(session.id, newTitle)}
-                        onPin={() => handlePin(session.id, session.is_pinned)}
-                        onDelete={() => handleDelete(session.id)}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {isCollapsed && chatSessions.slice(0, 5).map((session) => (
-              <ChatHistoryItem
-                key={session.id}
-                session={session}
-                isActive={activeSessionId === session.id}
-                isCollapsed={isCollapsed}
-                onClick={() => handleSessionClick(session.id)}
-                onRename={(newTitle) => handleRename(session.id, newTitle)}
-                onPin={() => handlePin(session.id, session.is_pinned)}
-                onDelete={() => handleDelete(session.id)}
-              />
-            ))}
-          </div>
-        )}
       </div>
+
+      {/* ── 2. Recents Panel (Heading is FIXED, only the session list scrolls) ── */}
+      {!isCollapsed && currentUser && (
+        <div
+          className="chat-recents-panel"
+          style={{
+            flex: 1,
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            padding: '4px 0.75rem 0.25rem',
+            overflow: 'hidden',
+          }}
+        >
+          {/* Header "Recent / Terkini" - Fixed at top, NEVER scrolls */}
+          <div className="chat-recents-heading" style={{ flexShrink: 0 }}>
+            <span>{t('chat.recents')}</span>
+          </div>
+
+          {/* Scrollable list of chats - ONLY this part scrolls, scrollbar hidden */}
+          <div
+            className="chat-recents-scroll-area no-scrollbar"
+            style={{
+              flex: 1,
+              minHeight: 0,
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            {sessionsLoading && chatSessions.length === 0 ? (
+              <div className="chat-recents-empty">
+                <span className="chat-history-spinner" />
+                <span>{t('chat.loading_history')}</span>
+              </div>
+            ) : chatSessions.length === 0 ? (
+              <div className="chat-recents-empty">{t('chat.no_recents')}</div>
+            ) : (
+              <div className="chat-recents-list">
+                {chatSessions.map((session) => (
+                  <ChatHistoryItem
+                    key={session.id}
+                    session={session}
+                    isActive={activeSessionId === session.id}
+                    isCollapsed={isCollapsed}
+                    onClick={() => handleSessionClick(session.id)}
+                    onRename={(newTitle) => handleRename(session.id, newTitle)}
+                    onPin={() => handlePin(session.id, session.is_pinned)}
+                    onDelete={() => handleDelete(session.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Spacer to push user footer to bottom when collapsed or if no recents/guest */}
+      {(isCollapsed || !currentUser || !hasChatAccess) && (
+        <div style={{ flex: 1 }} />
+      )}
 
       {/* ── User Footer Section ──────────────────────────────── */}
       <div
         style={{
-          padding: isCollapsed ? '8px 4px' : '8px',
+          flexShrink: 0,
+          padding: isCollapsed ? '10px 0' : '8px 12px',
           borderTop: '1px solid var(--border-default)',
           backgroundColor: 'var(--bg-card)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
         }}
       >
         {currentUser ? (
@@ -624,13 +720,16 @@ export default function Sidebar({
             onClick={() => router.push('/login')}
             className="nav-link"
             style={{
-              width: '100%',
+              width: isCollapsed ? '34px' : '100%',
+              height: isCollapsed ? '34px' : undefined,
+              minHeight: isCollapsed ? '34px' : '28px',
+              margin: isCollapsed ? '0 auto' : undefined,
               display: 'flex',
               alignItems: 'center',
               justifyContent: isCollapsed ? 'center' : 'flex-start',
-              gap: '10px',
-              padding: isCollapsed ? '10px 0' : '8px 12px',
-              borderRadius: 'var(--radius-sm)',
+              gap: isCollapsed ? 0 : '10px',
+              padding: isCollapsed ? 0 : '8px 12px',
+              borderRadius: '8px',
               backgroundColor: 'var(--color-primary-subtle)',
               border: '1px solid var(--color-primary-border)',
               color: 'var(--color-primary)',

@@ -16,6 +16,7 @@ import {
   ThumbsDown,
   Send,
   X,
+  Pencil,
 } from 'lucide-react';
 import { ChatMessage, ChatSource } from '@/types/chat';
 import MarkdownContent from '@/components/ui/MarkdownContent';
@@ -27,6 +28,8 @@ interface ChatMessageItemProps {
   onSelectCitation: (_source: ChatSource) => void;
   onRetry?: () => void;
   onSwitchVariant?: (_newIndex: number) => void;
+  onEditPrompt?: (_newText: string) => void;
+  animateEntrance?: boolean;
 }
 
 export default function ChatMessageItem({
@@ -34,6 +37,8 @@ export default function ChatMessageItem({
   onSelectCitation,
   onRetry,
   onSwitchVariant,
+  onEditPrompt,
+  animateEntrance = false,
 }: ChatMessageItemProps) {
   const { language, t } = useLanguage();
   const isUser = message.sender === 'user';
@@ -41,6 +46,22 @@ export default function ChatMessageItem({
   const [isCopied, setIsCopied] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(message.text);
+  const [isPromptHovered, setIsPromptHovered] = useState(false);
+
+  React.useEffect(() => {
+    setEditText(message.text);
+  }, [message.text]);
+
+  const handleSaveEdit = () => {
+    const trimmed = editText.trim();
+    if (!trimmed) return;
+    setIsEditing(false);
+    if (trimmed !== message.text && onEditPrompt) {
+      onEditPrompt(trimmed);
+    }
+  };
 
   // Feedback loop states (PRD v2.0 Section B8)
   const [feedbackRating, setFeedbackRating] = useState<'helpful' | 'incorrect' | 'outdated' | null>(null);
@@ -177,67 +198,228 @@ export default function ChatMessageItem({
 
   return (
     <div
+      className={
+        isUser
+          ? (animateEntrance ? 'user-message-entrance' : '')
+          : (animateEntrance ? 'ai-response-entrance' : '')
+      }
       style={{
         display: 'flex',
         flexDirection: 'column',
         alignItems: isUser ? 'flex-end' : 'flex-start',
-        marginBottom: isUser ? '1.75rem' : '2.25rem',
+        marginBottom: isUser ? '0.75rem' : '1.25rem',
         width: '100%',
       }}
     >
       {/* User Message View */}
       {isUser ? (
         <div
+          className="user-prompt-container group"
+          onMouseEnter={() => setIsPromptHovered(true)}
+          onMouseLeave={() => setIsPromptHovered(false)}
           style={{
-            maxWidth: '85%',
+            maxWidth: isEditing ? '75%' : '85%',
+            width: isEditing ? '75%' : 'auto',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'flex-end',
+            position: 'relative',
           }}
         >
-          {/* User Bubble */}
-          <div
-            style={{
-              padding: '14px 20px',
-              borderRadius: '20px 20px 6px 20px',
-              backgroundColor: 'var(--user-bubble-bg)',
-              color: 'var(--user-bubble-text)',
-              fontSize: '15px',
-              lineHeight: '24px',
-              fontWeight: 400,
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-              boxShadow: 'none',
-              border: 'none',
-            }}
-          >
-            <div>{displayText}</div>
+          {isEditing ? (
+            /* Inline Edit View (Image 1 & 3: 75% Pill Container + Bottom Right Actions) */
+            <div
+              style={{
+                width: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-end',
+                gap: '8px',
+              }}
+            >
+              {/* Pill Bordered Text Box */}
+              <div
+                style={{
+                  width: '100%',
+                  borderRadius: '20px',
+                  backgroundColor: 'var(--user-bubble-bg)',
+                  border: '1.5px solid var(--color-primary, #2563EB)',
+                  padding: '12px 18px',
+                  boxShadow: '0 0 0 1px rgba(37, 99, 235, 0.12)',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <textarea
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      setIsEditing(false);
+                      setEditText(message.text);
+                    } else if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSaveEdit();
+                    }
+                  }}
+                  rows={Math.min(6, Math.max(2, editText.split('\n').length))}
+                  style={{
+                    width: '100%',
+                    resize: 'none',
+                    border: 'none',
+                    outline: 'none',
+                    background: 'transparent',
+                    fontSize: '13px',
+                    lineHeight: '21px',
+                    color: 'var(--user-bubble-text, var(--text-main))',
+                    fontFamily: 'inherit',
+                  }}
+                  autoFocus
+                />
+              </div>
 
-            {/* Show More / Show Less Button for Long User Prompts */}
-            {isLongMessage && (
-              <button
-                type="button"
-                onClick={() => setIsExpanded(!isExpanded)}
+              {/* Actions Below Box: Cancel (Text) + Update (Pill) */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditing(false);
+                    setEditText(message.text);
+                  }}
+                  className="cancel-edit-btn"
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-muted, #94A3B8)',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    padding: '4px 6px',
+                    transition: 'color 0.15s ease',
+                  }}
+                >
+                  {language === 'en' ? 'Cancel' : 'Cancel'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSaveEdit}
+                  disabled={!editText.trim()}
+                  className="update-edit-btn"
+                  style={{
+                    borderRadius: '9999px',
+                    padding: '7px 20px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    border: 'none',
+                    cursor: editText.trim() ? 'pointer' : 'not-allowed',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {language === 'en' ? 'Update' : 'Update'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* User Bubble */}
+              <div
+                style={{
+                  padding: '8px 13px',
+                  borderRadius: '14px 14px 4px 14px',
+                  backgroundColor: 'var(--user-bubble-bg)',
+                  color: 'var(--user-bubble-text)',
+                  fontSize: '12.5px',
+                  lineHeight: '19px',
+                  fontWeight: 400,
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  boxShadow: 'none',
+                  border: 'none',
+                }}
+              >
+                <div>{displayText}</div>
+
+                {/* Show More / Show Less Button for Long User Prompts */}
+                {isLongMessage && (
+                  <button
+                    type="button"
+                    onClick={() => setIsExpanded(!isExpanded)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      marginTop: '10px',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      color: 'var(--user-bubble-text)',
+                      opacity: 0.85,
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: 0,
+                    }}
+                  >
+                    <span>{isExpanded ? 'Show less' : 'Show more'}</span>
+                    {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  </button>
+                )}
+              </div>
+
+              {/* Hover Action Bar: Copy FIRST, Edit SECOND (Image 2) */}
+              <div
+                className="user-prompt-actions"
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '4px',
-                  marginTop: '10px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  color: 'var(--user-bubble-text)',
-                  opacity: 0.85,
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: 0,
+                  gap: '6px',
+                  marginTop: '4px',
+                  opacity: isPromptHovered ? 1 : 0,
+                  pointerEvents: isPromptHovered ? 'auto' : 'none',
+                  transition: 'opacity 0.15s ease, transform 0.15s ease',
+                  transform: isPromptHovered ? 'translateY(0)' : 'translateY(-2px)',
                 }}
               >
-                <span>{isExpanded ? 'Show less' : 'Show more'}</span>
-                {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-              </button>
-            )}
-          </div>
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  className="user-prompt-action-btn"
+                  title={
+                    isCopied
+                      ? language === 'en'
+                        ? 'Copied!'
+                        : 'Tersalin!'
+                      : language === 'en'
+                      ? 'Copy'
+                      : 'Salin'
+                  }
+                  aria-label={language === 'en' ? 'Copy' : 'Salin'}
+                >
+                  {isCopied ? <Check size={13} color="#10B981" /> : <Copy size={13} />}
+                </button>
+
+                {onEditPrompt && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditText(message.text);
+                      setIsEditing(true);
+                    }}
+                    className="user-prompt-action-btn"
+                    title={language === 'en' ? 'Edit' : 'Edit'}
+                    aria-label={language === 'en' ? 'Edit' : 'Edit'}
+                  >
+                    <Pencil size={13} />
+                  </button>
+                )}
+              </div>
+            </>
+          )}
         </div>
       ) : (
         /* AI Assistant Response View (Borderless, Clean Text on Canvas) */
@@ -252,14 +434,14 @@ export default function ChatMessageItem({
           {/* AI Response Text (No Bubble Card Background) */}
           <div
             style={{
-              fontSize: '15px',
-              lineHeight: '26px',
+              fontSize: '12.5px',
+              lineHeight: '21px',
               color: message.isError
                 ? 'var(--color-danger-text)'
                 : 'var(--text-primary)',
               wordBreak: 'break-word',
               fontWeight: 400,
-              padding: '4px 0',
+              padding: '2px 0',
               maxWidth: '100%',
               width: '100%',
             }}
@@ -273,12 +455,13 @@ export default function ChatMessageItem({
 
           {/* Action Icons Row (Variants Pager, Salin, Read Audio, Try Again) & Verified Source Citations */}
           <div
+            className="ai-response-actions"
             style={{
-              marginTop: '12px',
+              marginTop: '8px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              gap: '12px',
+              gap: '8px',
               width: '100%',
               flexWrap: 'wrap',
             }}
@@ -366,8 +549,8 @@ export default function ChatMessageItem({
                 onClick={handleCopy}
                 title={language === 'en' ? 'Copy response' : 'Salin jawaban'}
                 style={{
-                  padding: '6px',
-                  borderRadius: '6px',
+                  padding: '4px',
+                  borderRadius: '5px',
                   border: 'none',
                   backgroundColor: 'transparent',
                   color: isCopied ? '#10B981' : 'var(--text-muted)',
@@ -379,7 +562,7 @@ export default function ChatMessageItem({
                 }}
                 className="hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200"
               >
-                {isCopied ? <Check size={16} /> : <Copy size={16} />}
+                {isCopied ? <Check size={13} /> : <Copy size={13} />}
               </button>
 
               {/* 2. Read Audio (Voice synthesis) */}
@@ -396,8 +579,8 @@ export default function ChatMessageItem({
                     : 'Putar audio jawaban'
                 }
                 style={{
-                  padding: '6px',
-                  borderRadius: '6px',
+                  padding: '4px',
+                  borderRadius: '5px',
                   border: 'none',
                   backgroundColor: isSpeaking ? 'var(--color-primary-subtle)' : 'transparent',
                   color: isSpeaking ? 'var(--color-primary)' : 'var(--text-muted)',
@@ -409,7 +592,7 @@ export default function ChatMessageItem({
                 }}
                 className="hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200"
               >
-                <Volume2 size={16} />
+                <Volume2 size={13} />
               </button>
 
               {/* 3. Try Again (Regenerate) */}
@@ -418,8 +601,8 @@ export default function ChatMessageItem({
                 onClick={handleTryAgain}
                 title={language === 'en' ? 'Try again' : 'Coba lagi (Try again)'}
                 style={{
-                  padding: '6px',
-                  borderRadius: '6px',
+                  padding: '4px',
+                  borderRadius: '5px',
                   border: 'none',
                   backgroundColor: 'transparent',
                   color: 'var(--text-muted)',
@@ -431,7 +614,7 @@ export default function ChatMessageItem({
                 }}
                 className="hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200"
               >
-                <RefreshCw size={16} />
+                <RefreshCw size={13} />
               </button>
 
               {/* 4. Thumbs Up (Helpful) */}
@@ -440,8 +623,8 @@ export default function ChatMessageItem({
                 onClick={handleRateHelpful}
                 title="Bermanfaat (Helpful)"
                 style={{
-                  padding: '6px',
-                  borderRadius: '6px',
+                  padding: '4px',
+                  borderRadius: '5px',
                   border: 'none',
                   backgroundColor: feedbackRating === 'helpful' ? 'var(--color-success-subtle)' : 'transparent',
                   color: feedbackRating === 'helpful' ? 'var(--color-success)' : 'var(--text-muted)',
@@ -453,7 +636,7 @@ export default function ChatMessageItem({
                 }}
                 className="hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200"
               >
-                <ThumbsUp size={15} />
+                <ThumbsUp size={13} />
               </button>
 
               {/* 5. Thumbs Down (Feedback / Outdated / Incorrect) */}
@@ -464,8 +647,8 @@ export default function ChatMessageItem({
                 }}
                 title="Kurang tepat atau usang"
                 style={{
-                  padding: '6px',
-                  borderRadius: '6px',
+                  padding: '4px',
+                  borderRadius: '5px',
                   border: 'none',
                   backgroundColor:
                     feedbackRating === 'incorrect' || feedbackRating === 'outdated'
@@ -483,7 +666,7 @@ export default function ChatMessageItem({
                 }}
                 className="hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200"
               >
-                <ThumbsDown size={15} />
+                <ThumbsDown size={13} />
               </button>
             </div>
 

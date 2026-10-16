@@ -16,7 +16,7 @@ export default function ChatPage() {
       hideHeader={true}
       allowGuest={true}
     >
-      <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center' }}>Memuat Chat Workspace...</div>}>
+      <Suspense fallback={null}>
         <ChatWorkspace />
       </Suspense>
     </AppShell>
