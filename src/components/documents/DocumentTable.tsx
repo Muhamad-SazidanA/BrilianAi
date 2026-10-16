@@ -28,6 +28,7 @@ interface DocumentTableProps {
   onToggleActive: (_batchId: string, _active: boolean) => Promise<void>;
   onActivateAll?: () => Promise<void>;
   onUpload?: () => void;
+  stickyTop?: number;
 }
 
 export default function DocumentTable({
@@ -39,6 +40,7 @@ export default function DocumentTable({
   onToggleActive,
   onActivateAll,
   onUpload,
+  stickyTop,
 }: DocumentTableProps) {
   const { language, t } = useLanguage();
   const { hasPermission } = useUserSession();
@@ -93,17 +95,28 @@ export default function DocumentTable({
 
   return (
     <>
-      <div className="enterprise-card" style={{ display: 'flex', flexDirection: 'column', minHeight: '380px' }}>
-        {/* ── Unified Header Controls (Sticky Freeze Header) ── */}
+      <div
+        className="enterprise-card"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: '380px',
+          overflow: 'visible',
+        }}
+      >
+        {/* ── Unified Header Controls (Sticky Freeze Header below 4 Stats Cards) ── */}
         <div
           className="enterprise-card-header"
           style={{
             flexWrap: 'wrap',
             gap: '8px',
             position: 'sticky',
-            top: 0,
-            zIndex: 10,
+            top: stickyTop ? `${stickyTop}px` : '176px',
+            zIndex: 20,
             backgroundColor: 'var(--bg-card, #ffffff)',
+            borderTopLeftRadius: 'var(--radius-lg, 12px)',
+            borderTopRightRadius: 'var(--radius-lg, 12px)',
+            boxShadow: '0 2px 4px rgba(15, 23, 42, 0.04)',
           }}
         >
         {/* Left: Title + Inline Segmented Switcher */}
@@ -278,9 +291,6 @@ export default function DocumentTable({
             flex: 1,
             display: 'flex',
             flexDirection: 'column',
-            overflowY: 'auto',
-            maxHeight: 'min(500px, calc(100vh - 300px))',
-            minHeight: '260px',
           }}
         >
           {isLoading ? (

@@ -56,6 +56,23 @@ export default function KnowledgeGapsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  // Dynamic sticky measurement for 4 stats cards
+  const statsRef = useRef<HTMLDivElement>(null);
+  const [statsHeight, setStatsHeight] = useState(130);
+
+  useEffect(() => {
+    if (!statsRef.current) return;
+    const updateHeight = () => {
+      if (statsRef.current) {
+        setStatsHeight(statsRef.current.offsetHeight);
+      }
+    };
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(statsRef.current);
+    return () => observer.disconnect();
+  }, [gaps]);
+
   // Reset to page 1 on search or filter change
   useEffect(() => {
     setCurrentPage(1);
@@ -181,6 +198,7 @@ export default function KnowledgeGapsPage() {
 
         {/* 4 Pure Enterprise Metric Cards (Sticky Freeze below Header) */}
         <div
+          ref={statsRef}
           style={{
             position: 'sticky',
             top: 'var(--header-height, 48px)',
@@ -246,17 +264,28 @@ export default function KnowledgeGapsPage() {
         </div>
 
         {/* ── Unified Knowledge Gaps Stream Card (Linear / Vercel style) ── */}
-        <div className="enterprise-card" style={{ display: 'flex', flexDirection: 'column', minHeight: '380px' }}>
-          {/* Unified Header Controls (Sticky Freeze Header) */}
+        <div
+          className="enterprise-card"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: '380px',
+            overflow: 'visible',
+          }}
+        >
+          {/* Unified Header Controls (Sticky Freeze Header below 4 Stats Cards) */}
           <div
             className="enterprise-card-header"
             style={{
               flexWrap: 'wrap',
               gap: '8px',
               position: 'sticky',
-              top: 0,
-              zIndex: 10,
+              top: `${48 + statsHeight}px`,
+              zIndex: 20,
               backgroundColor: 'var(--bg-card, #ffffff)',
+              borderTopLeftRadius: 'var(--radius-lg, 12px)',
+              borderTopRightRadius: 'var(--radius-lg, 12px)',
+              boxShadow: '0 2px 4px rgba(15, 23, 42, 0.04)',
             }}
           >
             {/* Left: Title + Inline Segmented Switcher */}
@@ -431,9 +460,6 @@ export default function KnowledgeGapsPage() {
               flex: 1,
               display: 'flex',
               flexDirection: 'column',
-              overflowY: 'auto',
-              maxHeight: 'min(500px, calc(100vh - 300px))',
-              minHeight: '260px',
             }}
           >
             {isLoading ? (

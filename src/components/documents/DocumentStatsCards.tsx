@@ -8,11 +8,13 @@ import { useLanguage } from '@/context/LanguageContext';
 interface DocumentStatsCardsProps {
   batches: UploadBatch[];
   isLoading?: boolean;
+  containerRef?: React.Ref<HTMLDivElement>;
 }
 
 export default function DocumentStatsCards({
   batches,
   isLoading = false,
+  containerRef,
 }: DocumentStatsCardsProps) {
   const { language } = useLanguage();
 
@@ -23,6 +25,7 @@ export default function DocumentStatsCards({
 
   return (
     <div
+      ref={containerRef}
       style={{
         position: 'sticky',
         top: 'var(--header-height, 48px)',

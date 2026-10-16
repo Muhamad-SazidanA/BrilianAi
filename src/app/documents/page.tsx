@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, Suspense } from 'react';
+import React, { useEffect, useState, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { UploadCloud } from 'lucide-react';
 import AppShell from '@/components/layout/AppShell';
@@ -25,6 +25,23 @@ function DocumentsContent() {
   const [deletingDoc, setDeletingDoc] = useState<{ id: string; filename: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+
+  // Dynamic sticky measurement for 4 stats cards
+  const statsRef = useRef<HTMLDivElement>(null);
+  const [statsHeight, setStatsHeight] = useState(130);
+
+  useEffect(() => {
+    if (!statsRef.current) return;
+    const updateHeight = () => {
+      if (statsRef.current) {
+        setStatsHeight(statsRef.current.offsetHeight);
+      }
+    };
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(statsRef.current);
+    return () => observer.disconnect();
+  }, [batches]);
 
   useEffect(() => {
     if (searchParams.get('action') === 'upload') {
@@ -191,7 +208,7 @@ function DocumentsContent() {
         />
 
         {/* Document Stats Cards (Pure 4-card enterprise metrics) */}
-        <DocumentStatsCards batches={batches} isLoading={isLoading} />
+        <DocumentStatsCards batches={batches} isLoading={isLoading} containerRef={statsRef} />
 
         {/* Document Table with High-Density Controls & Shimmer Skeleton */}
         <DocumentTable
@@ -203,6 +220,7 @@ function DocumentsContent() {
           onToggleActive={handleToggleActive}
           onActivateAll={handleActivateAll}
           onUpload={() => setIsUploadOpen(true)}
+          stickyTop={48 + statsHeight}
         />
       </div>
 
