@@ -48,7 +48,13 @@ export async function GET(
       );
     }
 
-    const grants = await listDocumentGrants(id);
+    let grants: any[] = [];
+    try {
+      grants = await listDocumentGrants(id);
+    } catch (dbErr) {
+      console.warn(`[API /api/documents/${id}/grants GET] fallback to empty grants:`, dbErr);
+      grants = [];
+    }
     return NextResponse.json({ grants }, { status: 200 });
   } catch (error) {
     console.error(`[API /api/documents/${params?.id}/grants GET] Error:`, error);

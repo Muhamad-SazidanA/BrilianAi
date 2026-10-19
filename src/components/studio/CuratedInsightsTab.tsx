@@ -419,40 +419,17 @@ export default function CuratedInsightsTab({
 
       {/* Real-time 1-100% Curation Progress Bar Card */}
       {isCurating && (
-        <div
-          className="ui-card"
-          style={{
-            padding: '1.25rem 1.5rem',
-            background: 'linear-gradient(135deg, var(--bg-card) 0%, var(--bg-subtle) 100%)',
-            border: '1px solid var(--color-primary)',
-            borderRadius: 'var(--radius-lg)',
-            boxShadow: '0 4px 20px rgba(37, 99, 235, 0.12)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div
-                style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  backgroundColor: 'var(--color-primary-subtle)',
-                  color: 'var(--color-primary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Loader2 size={16} className="animate-spin" />
+        <div className="bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-900/60 rounded-2xl p-5 shadow-sm space-y-3.5 animate-in fade-in duration-200">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-100 dark:border-blue-900/50 text-blue-600 flex items-center justify-center">
+                <Loader2 size={18} className="animate-spin text-blue-600" />
               </div>
               <div>
-                <h4 style={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
                   {language === 'en' ? 'AI Curation in Progress...' : 'Kurasi AI Sedang Berjalan...'}
                 </h4>
-                <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                   {progress?.currentChunkTitle
                     ? `${language === 'en' ? 'Current target' : 'Memproses'}: "${progress.currentChunkTitle}"`
                     : language === 'en'
@@ -463,45 +440,21 @@ export default function CuratedInsightsTab({
             </div>
 
             {/* Percentage Number */}
-            <div style={{ textAlign: 'right' }}>
-              <span
-                style={{
-                  fontSize: '22px',
-                  fontWeight: 800,
-                  fontFamily: 'var(--font-mono)',
-                  color: 'var(--color-primary)',
-                }}
-              >
+            <div className="text-right">
+              <span className="text-2xl font-black font-mono text-blue-600 dark:text-blue-400">
                 {Math.max(1, currentPercent)}%
               </span>
-              <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                {progress?.processedChunks || progress?.curatedChunks || 0} / {progress?.totalChunks || '?'} raw chunk diproses
-              </div>
-              <div style={{ fontSize: '11px', color: 'var(--color-primary)', fontWeight: 600, marginTop: '2px' }}>
-                {progress?.curatedInsightsCount || insights.length} insight dibuat
+              <div className="text-xs text-slate-400">
+                {progress?.processedChunks || progress?.curatedChunks || 0} / {progress?.totalChunks || '?'} chunk diproses
               </div>
             </div>
           </div>
 
           {/* Progress Bar Track */}
-          <div
-            style={{
-              width: '100%',
-              height: '8px',
-              backgroundColor: 'var(--border-default)',
-              borderRadius: '999px',
-              overflow: 'hidden',
-              position: 'relative',
-            }}
-          >
+          <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden p-0.5">
             <div
-              style={{
-                width: `${Math.max(2, Math.min(100, currentPercent))}%`,
-                height: '100%',
-                background: 'linear-gradient(90deg, #2563eb 0%, #3b82f6 50%, #10b981 100%)',
-                borderRadius: '999px',
-                transition: 'width 0.4s ease-in-out',
-              }}
+              className="h-full rounded-full bg-gradient-to-r from-blue-600 via-indigo-500 to-emerald-500 transition-all duration-300 shadow-sm"
+              style={{ width: `${Math.max(2, Math.min(100, currentPercent))}%` }}
             />
           </div>
         </div>
@@ -539,103 +492,78 @@ export default function CuratedInsightsTab({
 
       {/* Insights Grid */}
       {isLoading ? (
-        <div style={{ padding: '3.5rem 0', textAlign: 'center', color: 'var(--text-secondary)' }}>
-          <div
-            className="animate-spin"
-            style={{
-              width: '26px',
-              height: '26px',
-              border: '2px solid var(--border-default)',
-              borderTopColor: 'var(--color-primary)',
-              borderRadius: '50%',
-              margin: '0 auto 10px',
-            }}
-          />
-          <p style={{ fontSize: '13px' }}>{t('curate.loading')}</p>
+        <div className="py-16 text-center text-slate-400 flex flex-col items-center gap-2">
+          <Loader2 size={24} className="animate-spin text-blue-600" />
+          <p className="text-xs font-medium text-slate-500">{t('curate.loading')}</p>
         </div>
       ) : insights.length === 0 ? null : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1.25rem' }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {insights.map((item) => {
-            const importanceBadge =
+            const badgeClasses =
               item.importance === 'high'
-                ? 'badge-danger'
+                ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800'
                 : item.importance === 'medium'
-                ? 'badge-warning'
-                : 'badge-neutral';
+                ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800'
+                : 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700';
 
             return (
               <div
                 key={item.id}
-                className="ui-card"
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px',
-                  borderTop: item.importance === 'high' ? '3px solid var(--color-danger)' : undefined,
-                }}
+                className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-5 shadow-xs hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 transition-all flex flex-col justify-between gap-3.5 group"
               >
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
-                  <div>
-                    <span className={`badge ${importanceBadge}`} style={{ fontSize: '10.5px' }}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase border ${badgeClasses}`}>
                       {item.importance.toUpperCase()}
                     </span>
-                    <h4 style={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '6px', lineHeight: '20px' }}>
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-white mt-2 leading-snug line-clamp-2">
                       {item.title}
                     </h4>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+
+                  <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
                     {hasPermission('curation:edit') && (
                       <button
                         onClick={() => {
                           setEditingInsight(item);
                           setIsModalOpen(true);
                         }}
-                        className="btn btn-ghost btn-sm"
-                        style={{ padding: '6px' }}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors"
                         title="Edit insight"
                       >
-                        <Pencil size={14} />
+                        <Pencil size={13} />
                       </button>
                     )}
                     {hasPermission('curation:delete') && (
                       <button
                         onClick={() => handleDeleteInsight(item.id)}
-                        className="btn btn-ghost-danger btn-sm"
-                        style={{ padding: '6px' }}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors"
                         title="Hapus insight"
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={13} />
                       </button>
                     )}
                   </div>
                 </div>
 
-                <div style={{ flex: 1, minHeight: 0 }}>
+                <div className="flex-1 min-h-0 text-xs text-slate-600 dark:text-slate-300 leading-relaxed overflow-hidden">
                   <MarkdownContent content={item.content} compact />
                 </div>
 
                 {/* Footer: Source Pages and Tags */}
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    borderTop: '1px solid var(--border-default)',
-                    paddingTop: '10px',
-                    fontSize: '12px',
-                    color: 'var(--text-secondary)',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <BookOpen size={13} color="var(--color-primary)" />
-                    <span style={{ fontWeight: 500 }}>{formatSourcePages(item.source_pages, t('curate.page'))}</span>
+                <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400">
+                  <div className="flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-400">
+                    <BookOpen size={13} className="text-blue-600 dark:text-blue-400" />
+                    <span>{formatSourcePages(item.source_pages, t('curate.page'))}</span>
                   </div>
 
                   {item.tags && item.tags.length > 0 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
-                      <Tag size={12} color="var(--text-muted)" />
+                    <div className="flex items-center gap-1 flex-wrap justify-end">
                       {item.tags.slice(0, 3).map((tag) => (
-                        <span key={tag} className="badge badge-neutral" style={{ fontSize: '10.5px', padding: '1px 6px' }}>
+                        <span
+                          key={tag}
+                          className="inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+                        >
                           #{tag}
                         </span>
                       ))}

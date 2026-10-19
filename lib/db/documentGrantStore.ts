@@ -1,4 +1,5 @@
 import { getPool } from './dbClient';
+import { ensureUsersAndRolesTables } from './userStore';
 
 export interface DocumentGrantRecord {
   id: string | number;
@@ -24,6 +25,12 @@ export async function ensureGrantTableExists(): Promise<void> {
   if (isGrantTableInitialized) return;
   const pool = getPool();
   try {
+    // 1. Ensure users and roles exist first to prevent foreign key errors
+    await ensureUsersAndRolesTables().catch((e) => {
+      console.warn('[DocumentGrantStore] ensureUsersAndRolesTables warn:', e?.message || e);
+    });
+
+    // 2. Create document_access_grants table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS document_access_grants (
         id BIGSERIAL PRIMARY KEY,
@@ -40,8 +47,8 @@ export async function ensureGrantTableExists(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_doc_grants_level ON document_access_grants (access_level);
     `);
     isGrantTableInitialized = true;
-  } catch (err) {
-    console.warn('[DocumentGrantStore] ensureGrantTableExists warning:', err);
+  } catch (err: any) {
+    console.warn('[DocumentGrantStore] ensureGrantTableExists warning:', err?.message || err);
   }
 }
 

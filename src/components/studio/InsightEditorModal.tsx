@@ -72,61 +72,49 @@ export default function InsightEditorModal({ insight, isOpen, onClose, onSave }:
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(20, 22, 27, 0.5)',
-        backdropFilter: 'blur(2px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-        padding: '1rem',
-      }}
+      className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-[9999] p-4 animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
-        className="ui-card"
-        style={{
-          width: '100%',
-          maxWidth: '560px',
-          boxShadow: 'var(--shadow-float)',
-          backgroundColor: 'var(--bg-card)',
-          maxHeight: '90vh',
-          overflowY: 'auto',
-        }}
+        className="w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <BookOpen size={18} color="var(--color-primary)" />
-            <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>
+        <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 mb-5">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-100 dark:border-blue-900/50 text-blue-600 flex items-center justify-center">
+              <BookOpen size={16} />
+            </div>
+            <h3 className="text-sm md:text-base font-bold text-slate-900 dark:text-white">
               {insight ? t('insight.title_edit') : t('insight.title_create')}
             </h3>
           </div>
-          <button onClick={onClose} className="btn btn-ghost" style={{ padding: '6px' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          >
             <X size={16} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
-            <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '5px' }}>
+            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
               {t('insight.field_title')}
             </label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="input-text"
-              placeholder="Contoh: Ringkasan Perkembangan Fisioterapi..."
+              className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              placeholder="Contoh: Ringkasan Prosedur Operasional..."
               required
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '5px' }}>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
                 {t('insight.importance')}
               </label>
               <EnterpriseSelect
@@ -142,86 +130,58 @@ export default function InsightEditorModal({ insight, isOpen, onClose, onSave }:
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '5px' }}>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
                 {t('insight.source_pages')}
               </label>
               <input
                 type="text"
                 value={sourcePages}
                 onChange={(e) => setSourcePages(e.target.value)}
-                className="input-text"
+                className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 placeholder="Contoh: 1-3"
               />
             </div>
           </div>
 
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
-              <label style={{ fontSize: '12.5px', fontWeight: 500, color: 'var(--text-secondary)' }}>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">
                 {t('insight.content')}
               </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg">
                 <button
                   type="button"
                   onClick={() => setPreviewMode(false)}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '2px 8px',
-                    fontSize: '11px',
-                    borderRadius: '4px',
-                    border: 'none',
-                    backgroundColor: !previewMode ? 'var(--bg-subtle)' : 'transparent',
-                    color: !previewMode ? 'var(--color-primary)' : 'var(--text-muted)',
-                    fontWeight: !previewMode ? 600 : 400,
-                    cursor: 'pointer',
-                  }}
+                  className={`inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded-md transition-all font-medium ${
+                    !previewMode
+                      ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800'
+                  }`}
                 >
-                  <Edit3 size={12} />
+                  <Edit3 size={11} />
                   <span>Edit</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setPreviewMode(true)}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '2px 8px',
-                    fontSize: '11px',
-                    borderRadius: '4px',
-                    border: 'none',
-                    backgroundColor: previewMode ? 'var(--bg-subtle)' : 'transparent',
-                    color: previewMode ? 'var(--color-primary)' : 'var(--text-muted)',
-                    fontWeight: previewMode ? 600 : 400,
-                    cursor: 'pointer',
-                  }}
+                  className={`inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded-md transition-all font-medium ${
+                    previewMode
+                      ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800'
+                  }`}
                 >
-                  <Eye size={12} />
-                  <span>Pratinjau Tabel & Teks</span>
+                  <Eye size={11} />
+                  <span>Pratinjau</span>
                 </button>
               </div>
             </div>
 
             {previewMode ? (
-              <div
-                style={{
-                  minHeight: '130px',
-                  maxHeight: '260px',
-                  overflowY: 'auto',
-                  padding: '10px 12px',
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1px solid var(--border-default)',
-                  backgroundColor: 'var(--bg-app)',
-                }}
-              >
+              <div className="min-h-[140px] max-h-[260px] overflow-y-auto p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 text-xs">
                 {content.trim() ? (
                   <MarkdownContent content={content} compact />
                 ) : (
-                  <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                    Belum ada teks untuk dipratinjau.
-                  </span>
+                  <span className="text-slate-400 italic">Belum ada teks untuk dipratinjau.</span>
                 )}
               </div>
             ) : (
@@ -229,7 +189,7 @@ export default function InsightEditorModal({ insight, isOpen, onClose, onSave }:
                 rows={6}
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                className="input-text"
+                className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-mono leading-relaxed"
                 placeholder="Tuliskan sintesis atau tabel Markdown intisari dokumen..."
                 required
               />
@@ -237,23 +197,31 @@ export default function InsightEditorModal({ insight, isOpen, onClose, onSave }:
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '5px' }}>
+            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
               {t('insight.tags')}
             </label>
             <input
               type="text"
               value={tagsStr}
               onChange={(e) => setTagsStr(e.target.value)}
-              className="input-text"
-              placeholder="sejarah, definisi, kementerian..."
+              className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              placeholder="karyawan, sop, prosedur, perizinan..."
             />
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '10px' }}>
-            <button type="button" onClick={onClose} className="btn btn-outline btn-sm">
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 mt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-xs font-semibold rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+            >
               {t('insight.cancel')}
             </button>
-            <button type="submit" disabled={isSaving || !title.trim() || !content.trim()} className="btn btn-primary btn-sm">
+            <button
+              type="submit"
+              disabled={isSaving || !title.trim() || !content.trim()}
+              className="px-5 py-2 text-xs font-semibold rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-sm transition-all disabled:opacity-50 cursor-pointer"
+            >
               {isSaving ? t('insight.saving') : t('insight.save')}
             </button>
           </div>

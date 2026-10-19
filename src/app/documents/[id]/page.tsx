@@ -124,38 +124,20 @@ export default function DocumentStudioPage() {
   if (!isLoading && !batch) {
     return (
       <AppShell requiredPermission="documents:read">
-        <div
-          className="ui-card"
-          style={{
-            maxWidth: '520px',
-            margin: '5rem auto',
-            padding: '2.5rem 2rem',
-            textAlign: 'center',
-            borderRadius: 'var(--radius-xl)',
-          }}
-        >
-          <div
-            style={{
-              width: '50px',
-              height: '50px',
-              borderRadius: '50%',
-              backgroundColor: 'var(--bg-subtle)',
-              color: 'var(--text-secondary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 1.25rem',
-            }}
-          >
+        <div className="max-w-md mx-auto my-20 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 text-center shadow-lg flex flex-col items-center">
+          <div className="w-14 h-14 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-900/60 text-amber-600 flex items-center justify-center mb-4">
             <Lock size={24} />
           </div>
-          <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
+          <h2 className="text-base font-bold text-slate-900 dark:text-white mb-2">
             Dokumen Tidak Ditemukan atau Akses Dibatasi
           </h2>
-          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '20px', marginBottom: '1.75rem' }}>
+          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
             Dokumen ini tidak tersedia atau memiliki klasifikasi kerahasiaan / divisi di luar izin akun Anda.
           </p>
-          <Link href="/documents" className="btn btn-primary btn-md">
+          <Link
+            href="/documents"
+            className="inline-flex items-center justify-center px-5 py-2.5 rounded-full text-xs font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-sm transition-all"
+          >
             Kembali ke Knowledge Base
           </Link>
         </div>
