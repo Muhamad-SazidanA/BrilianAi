@@ -13,6 +13,7 @@ import UserAvatar from '@/components/ui/UserAvatar';
 
 import EnterprisePagination from '@/components/ui/EnterprisePagination';
 import EnterpriseSelect, { EnterpriseSelectOption } from '@/components/ui/EnterpriseSelect';
+import { ENTERPRISE_DIVISIONS } from '@lib/constants/divisions';
 
 function fmtDate(iso?: string | null) {
   if (!iso) return '-';
@@ -229,12 +230,14 @@ export default function UsersManagementView() {
 
   // Approve form
   const [aRoleId, setARoleId] = useState('member');
-  const [aDept, setADept] = useState('Google Account');
+  const [aDept, setADept] = useState('General');
+  const [aCustomDept, setACustomDept] = useState(false);
 
   // Create form
   const [cName, setCName] = useState('');
   const [cEmail, setCEmail] = useState('');
-  const [cDept, setCDept] = useState('');
+  const [cDept, setCDept] = useState('General');
+  const [cCustomDept, setCCustomDept] = useState(false);
   const [cPassword, setCPassword] = useState('');
   const [cRoleId, setCRoleId] = useState('member');
   const [cActive, setCActive] = useState(true);
@@ -242,7 +245,8 @@ export default function UsersManagementView() {
   // Edit form
   const [eName, setEName] = useState('');
   const [eEmail, setEEmail] = useState('');
-  const [eDept, setEDept] = useState('');
+  const [eDept, setEDept] = useState('General');
+  const [eCustomDept, setECustomDept] = useState(false);
   const [eRoleId, setERoleId] = useState('member');
   const [eStatus, setEStatus] = useState<'active' | 'inactive' | 'pending_approval'>('active');
 
@@ -314,10 +318,26 @@ export default function UsersManagementView() {
     { value: 'inactive', label: 'Nonaktif' },
   ];
 
+  // Master Enterprise Divisions combined with distinct real departments from existing users (excluding dummy 'Google Account')
+  const departmentOptions: EnterpriseSelectOption[] = useMemo(() => {
+    const set = new Set<string>(ENTERPRISE_DIVISIONS);
+    users.forEach((u) => {
+      const d = (u.department || '').trim();
+      if (d && d.toLowerCase() !== 'google account') {
+        set.add(d);
+      }
+    });
+    return Array.from(set).map((dept) => ({
+      value: dept,
+      label: dept,
+    }));
+  }, [users]);
+
   const openCreate = () => {
     setCName('');
     setCEmail('');
-    setCDept('');
+    setCDept('General');
+    setCCustomDept(false);
     setCPassword('');
     setCRoleId(roles[0]?.id || 'member');
     setCActive(true);
@@ -327,7 +347,9 @@ export default function UsersManagementView() {
   const openEdit = (u: User) => {
     setEName(u.name);
     setEEmail(u.email);
-    setEDept(u.department || '');
+    const d = u.department && u.department.toLowerCase() !== 'google account' ? u.department : 'General';
+    setEDept(d);
+    setECustomDept(!ENTERPRISE_DIVISIONS.includes(d as any) && !departmentOptions.some((o) => o.value === d));
     setERoleId(u.role_id);
     setEStatus(u.status);
     setDetailUser(null);
@@ -337,7 +359,9 @@ export default function UsersManagementView() {
   const openApprove = (u: User) => {
     setApprovingUser(u);
     setARoleId(u.role_id || 'member');
-    setADept(u.department || 'Google Account');
+    const validDept = u.department && u.department.toLowerCase() !== 'google account' ? u.department : 'General';
+    setADept(validDept);
+    setACustomDept(false);
   };
 
   const handleApprove = async (e: React.FormEvent) => {
@@ -1035,14 +1059,34 @@ export default function UsersManagementView() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
                 <div>
-                  <label style={LBL}>Departemen / Divisi</label>
-                  <input
-                    type="text"
-                    placeholder="Contoh: Operasional"
-                    value={cDept}
-                    onChange={(e) => setCDept(e.target.value)}
-                    style={INP}
-                  />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
+                    <label style={{ ...LBL, marginBottom: 0 }}>Departemen / Divisi *</label>
+                    <button
+                      type="button"
+                      onClick={() => setCCustomDept(!cCustomDept)}
+                      style={{ fontSize: '11px', color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                    >
+                      {cCustomDept ? 'Pilih dari List' : '+ Tambah Baru'}
+                    </button>
+                  </div>
+                  {cCustomDept ? (
+                    <input
+                      type="text"
+                      placeholder="Ketik nama divisi baru..."
+                      value={cDept}
+                      onChange={(e) => setCDept(e.target.value)}
+                      style={INP}
+                      required
+                    />
+                  ) : (
+                    <EnterpriseSelect
+                      value={cDept || 'General'}
+                      onChange={(val) => setCDept(String(val))}
+                      options={departmentOptions}
+                      size="sm"
+                      width="100%"
+                    />
+                  )}
                 </div>
                 <div>
                   <label style={LBL}>Role Akses (RBAC)</label>
@@ -1361,13 +1405,34 @@ export default function UsersManagementView() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
                 <div>
-                  <label style={LBL}>Departemen / Unit</label>
-                  <input
-                    type="text"
-                    value={eDept}
-                    onChange={(e) => setEDept(e.target.value)}
-                    style={INP}
-                  />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
+                    <label style={{ ...LBL, marginBottom: 0 }}>Departemen / Divisi *</label>
+                    <button
+                      type="button"
+                      onClick={() => setECustomDept(!eCustomDept)}
+                      style={{ fontSize: '11px', color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                    >
+                      {eCustomDept ? 'Pilih dari List' : '+ Tambah Baru'}
+                    </button>
+                  </div>
+                  {eCustomDept ? (
+                    <input
+                      type="text"
+                      placeholder="Ketik nama divisi baru..."
+                      value={eDept}
+                      onChange={(e) => setEDept(e.target.value)}
+                      style={INP}
+                      required
+                    />
+                  ) : (
+                    <EnterpriseSelect
+                      value={eDept || 'General'}
+                      onChange={(val) => setEDept(String(val))}
+                      options={departmentOptions}
+                      size="sm"
+                      width="100%"
+                    />
+                  )}
                 </div>
                 <div>
                   <label style={LBL}>Role Akses</label>
@@ -1520,14 +1585,36 @@ export default function UsersManagementView() {
               </div>
 
               <div style={{ marginBottom: '1.5rem' }}>
-                <label style={LBL}>Departemen / Unit Kerja</label>
-                <input
-                  type="text"
-                  value={aDept}
-                  onChange={(e) => setADept(e.target.value)}
-                  placeholder="Contoh: Operasional, IT, Medis, dll."
-                  style={INP}
-                />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
+                  <label style={{ ...LBL, marginBottom: 0 }}>
+                    Departemen / Divisi <span style={{ color: '#dc2626' }}>*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setACustomDept(!aCustomDept)}
+                    style={{ fontSize: '11px', color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                  >
+                    {aCustomDept ? 'Pilih dari List' : '+ Tambah Baru'}
+                  </button>
+                </div>
+                {aCustomDept ? (
+                  <input
+                    type="text"
+                    value={aDept}
+                    onChange={(e) => setADept(e.target.value)}
+                    placeholder="Contoh: Operasional, IT, Medis, dll."
+                    style={INP}
+                    required
+                  />
+                ) : (
+                  <EnterpriseSelect
+                    value={aDept || 'General'}
+                    onChange={(val) => setADept(String(val))}
+                    options={departmentOptions}
+                    size="sm"
+                    width="100%"
+                  />
+                )}
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>

@@ -2,15 +2,29 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  ShieldCheck, Plus, Search, X, Lock, Loader2,
+  ShieldCheck, Shield, Plus, Search, X, Lock, Loader2,
   Users, Trash2, Pencil, Eye, Copy, Check,
 } from 'lucide-react';
 import { Role, PermissionKey, PERMISSIONS_CATALOG, PermissionCategory } from '@/types/user';
+import { DocumentClassification } from '@/types/document';
 import EnterprisePagination from '@/components/ui/EnterprisePagination';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserSession } from '@/context/UserSessionContext';
 import { toast } from 'sonner';
 
+export const ALL_CLASSIFICATIONS: {
+  key: DocumentClassification;
+  label: string;
+  desc: string;
+  color: string;
+  bg: string;
+  border: string;
+}[] = [
+  { key: 'Publik', label: 'Publik', desc: 'Dapat membaca dokumen umum & materi terbuka', color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' },
+  { key: 'Internal', label: 'Internal', desc: 'Dokumen operasional internal standar', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+  { key: 'Rahasia', label: 'Rahasia', desc: 'Dokumen tim sensitif, manajerial & keuangan', color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
+  { key: 'Sangat Rahasia', label: 'Sangat Rahasia', desc: 'Dokumen strategis direksi & data rahasia tertinggi', color: '#dc2626', bg: '#fef2f2', border: '#fecaca' },
+];
 
 /* ─── Category labels ─────────────────────────────── */
 const CAT_LABELS: Record<PermissionCategory, string> = {
@@ -192,6 +206,7 @@ export default function RolesPermissionsView() {
   const [formDesc, setFormDesc] = useState('');
   const [formIsDefault, setFormIsDefault] = useState(false);
   const [selectedPerms, setSelectedPerms] = useState<PermissionKey[]>([]);
+  const [selectedClassifications, setSelectedClassifications] = useState<DocumentClassification[]>(['Publik', 'Internal']);
   const [permSearch, setPermSearch] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -250,6 +265,7 @@ export default function RolesPermissionsView() {
     setFormDesc('');
     setFormIsDefault(false);
     setSelectedPerms([]);
+    setSelectedClassifications(['Publik', 'Internal']);
     setPermSearch('');
     setEditor({ mode: 'create', role: null });
   };
@@ -258,6 +274,11 @@ export default function RolesPermissionsView() {
     setFormDesc(role.description || '');
     setFormIsDefault(false);
     setSelectedPerms([...role.permissions]);
+    setSelectedClassifications(
+      role.allowed_classifications && role.allowed_classifications.length > 0
+        ? [...role.allowed_classifications]
+        : ['Publik', 'Internal']
+    );
     setPermSearch('');
     setEditor({ mode: 'edit', role });
   };
@@ -266,6 +287,11 @@ export default function RolesPermissionsView() {
     setFormDesc(role.description || '');
     setFormIsDefault(false);
     setSelectedPerms([...role.permissions]);
+    setSelectedClassifications(
+      role.allowed_classifications && role.allowed_classifications.length > 0
+        ? [...role.allowed_classifications]
+        : ['Publik', 'Internal']
+    );
     setPermSearch('');
     setEditor({ mode: 'view', role });
   };
@@ -274,6 +300,11 @@ export default function RolesPermissionsView() {
     setFormDesc(role.description || '');
     setFormIsDefault(false);
     setSelectedPerms([...role.permissions]);
+    setSelectedClassifications(
+      role.allowed_classifications && role.allowed_classifications.length > 0
+        ? [...role.allowed_classifications]
+        : ['Publik', 'Internal']
+    );
     setPermSearch('');
     setEditor({ mode: 'create', role: null });
     toast.info(`Menduplikasi role "${role.name}". Silakan sesuaikan konfigurasi dan simpan.`);
@@ -289,6 +320,14 @@ export default function RolesPermissionsView() {
     const catKeys = PERMISSIONS_CATALOG.filter((p) => p.category === cat).map((p) => p.key);
     setSelectedPerms((prev) =>
       selectAll ? Array.from(new Set([...prev, ...catKeys])) : prev.filter((k) => !catKeys.includes(k))
+    );
+  };
+  const toggleClassification = (cls: DocumentClassification) => {
+    if (editor?.mode === 'view') return;
+    setSelectedClassifications((prev) =>
+      prev.includes(cls)
+        ? (prev.length > 1 ? prev.filter((c) => c !== cls) : prev)
+        : [...prev, cls]
     );
   };
 
@@ -326,6 +365,7 @@ export default function RolesPermissionsView() {
             name: formName.trim(),
             description: formDesc.trim(),
             permissions: selectedPerms,
+            allowed_classifications: selectedClassifications,
           }),
         });
         const data = await res.json();
@@ -339,6 +379,7 @@ export default function RolesPermissionsView() {
             name: formName.trim(),
             description: formDesc.trim(),
             permissions: selectedPerms,
+            allowed_classifications: selectedClassifications,
           }),
         });
         const data = await res.json();
@@ -495,10 +536,11 @@ export default function RolesPermissionsView() {
             <thead>
               <tr>
                 {[
-                  { label: 'Role & Deskripsi', width: '46%', align: 'left' },
-                  { label: 'Pengguna', width: '16%', align: 'center' },
-                  { label: 'Cakupan Izin', width: '20%', align: 'center' },
-                  { label: 'Aksi', width: '18%', align: 'center' },
+                  { label: 'Role & Deskripsi', width: '32%', align: 'left' },
+                  { label: 'Pengguna', width: '10%', align: 'center' },
+                  { label: 'Cakupan Izin', width: '16%', align: 'center' },
+                  { label: 'Klasifikasi Akses', width: '26%', align: 'center' },
+                  { label: 'Aksi', width: '16%', align: 'center' },
                 ].map((col) => (
                   <th
                     key={col.label}
@@ -528,7 +570,7 @@ export default function RolesPermissionsView() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={4} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-secondary)', verticalAlign: 'middle' }}>
+                  <td colSpan={5} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-secondary)', verticalAlign: 'middle' }}>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
                       <Loader2 size={16} className="animate-spin" color="var(--color-primary, #2563eb)" />
                       <span>Memuat data role...</span>
@@ -537,7 +579,7 @@ export default function RolesPermissionsView() {
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={4} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)', verticalAlign: 'middle' }}>
+                  <td colSpan={5} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)', verticalAlign: 'middle' }}>
                     <p style={{ margin: 0, fontWeight: 600, color: 'var(--text-primary)', fontSize: '13px' }}>
                       Tidak ada role yang cocok
                     </p>
@@ -636,6 +678,42 @@ export default function RolesPermissionsView() {
                       >
                         {role.permissions.length} Hak Akses
                       </span>
+                    </td>
+
+                    {/* Klasifikasi Akses */}
+                    <td style={{ padding: '10px 14px', textAlign: 'center', verticalAlign: 'middle' }}>
+                      <div style={{ display: 'inline-flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'center', maxWidth: '280px' }}>
+                        {(role.allowed_classifications && role.allowed_classifications.length > 0
+                          ? role.allowed_classifications
+                          : (role.id === 'admin' ? ALL_CLASSIFICATIONS.map(c => c.key) : ['Publik', 'Internal'])
+                        ).map((clsKey) => {
+                          const meta = ALL_CLASSIFICATIONS.find(c => c.key === clsKey) || {
+                            label: clsKey,
+                            color: '#64748b',
+                            bg: '#f8fafc',
+                            border: '#e2e8f0',
+                          };
+                          return (
+                            <span
+                              key={clsKey}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                padding: '1px 6px',
+                                borderRadius: '4px',
+                                fontSize: '10.5px',
+                                fontWeight: 600,
+                                backgroundColor: meta.bg,
+                                color: meta.color,
+                                border: `1px solid ${meta.border}`,
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {meta.label}
+                            </span>
+                          );
+                        })}
+                      </div>
                     </td>
 
                     {/* Actions */}
@@ -801,6 +879,97 @@ export default function RolesPermissionsView() {
                       fontFamily: 'inherit',
                     }}
                   />
+                </div>
+
+                {/* ── Izin Klasifikasi Dokumen (Security Clearance) ── */}
+                <div
+                  style={{
+                    marginBottom: '18px',
+                    padding: '14px 16px',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border-default, #e2e8f0)',
+                    backgroundColor: 'var(--bg-subtle, #f8fafc)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                      <Shield size={15} color="#2563eb" />
+                      <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text-primary)' }}>
+                        Izin Tingkat Kerahasiaan Dokumen (Security Clearance)
+                      </span>
+                    </div>
+                    <span
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        padding: '1px 8px',
+                        borderRadius: '9999px',
+                        backgroundColor: 'rgba(37, 99, 235, 0.08)',
+                        color: '#2563eb',
+                        border: '1px solid rgba(37, 99, 235, 0.18)',
+                      }}
+                    >
+                      {selectedClassifications.length} dari {ALL_CLASSIFICATIONS.length} diizinkan
+                    </span>
+                  </div>
+                  <p style={{ margin: '0 0 12px', fontSize: '11.5px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                    Menentukan tingkat klasifikasi dokumen divisi yang berhak dicari, dibaca, dan digunakan dalam prompt AI oleh pengguna dengan role ini.
+                  </p>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '8px' }}>
+                    {ALL_CLASSIFICATIONS.map((c) => {
+                      const isChecked = selectedClassifications.includes(c.key);
+                      return (
+                        <label
+                          key={c.key}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: '10px',
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            border: `1.5px solid ${isChecked ? c.color : 'var(--border-default, #e2e8f0)'}`,
+                            backgroundColor: isChecked ? c.bg : 'var(--bg-card, #ffffff)',
+                            cursor: isReadOnly ? 'default' : 'pointer',
+                            transition: 'all 0.15s ease',
+                            userSelect: 'none',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            disabled={isReadOnly}
+                            onChange={(e) => {
+                              if (isReadOnly) return;
+                              if (e.target.checked) {
+                                setSelectedClassifications((prev) => [...prev, c.key]);
+                              } else {
+                                setSelectedClassifications((prev) => prev.filter((k) => k !== c.key));
+                              }
+                            }}
+                            style={{
+                              marginTop: '2px',
+                              accentColor: c.color,
+                              cursor: isReadOnly ? 'default' : 'pointer',
+                              width: '15px',
+                              height: '15px',
+                              flexShrink: 0,
+                            }}
+                          />
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ fontSize: '12px', fontWeight: 700, color: isChecked ? c.color : 'var(--text-primary)' }}>
+                                {c.label}
+                              </span>
+                            </div>
+                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.35 }}>
+                              {c.desc}
+                            </span>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* Permission Section Header */}

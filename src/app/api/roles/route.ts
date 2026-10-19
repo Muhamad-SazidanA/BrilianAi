@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { id, name, description, permissions } = body;
+    const { id, name, description, permissions, allowed_classifications } = body;
 
     if (!id || !name) {
       return NextResponse.json(
@@ -53,6 +53,7 @@ export async function POST(req: NextRequest) {
       name,
       description: description || '',
       permissions: Array.isArray(permissions) ? permissions : [],
+      allowed_classifications: Array.isArray(allowed_classifications) ? allowed_classifications : undefined,
     });
 
     return NextResponse.json({ role: newRole }, { status: 201 });

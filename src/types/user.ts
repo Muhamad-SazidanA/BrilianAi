@@ -158,12 +158,15 @@ export const PERMISSIONS_CATALOG: PermissionDefinition[] = [
   },
 ];
 
+import type { DocumentClassification } from './document';
+
 export interface Role {
   id: string;
   name: string;
   description: string;
   is_system: boolean;
   permissions: PermissionKey[];
+  allowed_classifications?: DocumentClassification[];
   created_at?: string;
   updated_at?: string;
   user_count?: number;

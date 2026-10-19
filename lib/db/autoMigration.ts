@@ -69,9 +69,11 @@ export async function ensureCompleteDatabaseSchema(): Promise<void> {
           description TEXT,
           is_system BOOLEAN NOT NULL DEFAULT false,
           permissions JSONB NOT NULL DEFAULT '[]',
+          allowed_classifications JSONB NOT NULL DEFAULT '["Publik", "Internal"]'::jsonb,
           created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
           updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
       );
+      ALTER TABLE roles ADD COLUMN IF NOT EXISTS allowed_classifications JSONB NOT NULL DEFAULT '["Publik", "Internal"]'::jsonb;
 
       CREATE TABLE IF NOT EXISTS users (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -94,16 +96,21 @@ export async function ensureCompleteDatabaseSchema(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_users_status ON users (status);
     `).catch((e) => console.warn('[AutoMigration] roles & users warn:', e?.message));
 
-    // Seed default roles if empty
+    // Seed default roles if empty or update classifications
     await pool.query(`
-      INSERT INTO roles (id, name, description, is_system, permissions)
+      INSERT INTO roles (id, name, description, is_system, permissions, allowed_classifications)
       VALUES
-          ('admin', 'Super Administrator', 'Akses penuh ke seluruh modul sistem, dokumen, kurasi AI, manajemen pengguna, dan audit log.', true, '["dashboard:admin", "dashboard:documents", "dashboard:personal", "documents:read", "documents:upload", "documents:toggle_active", "documents:delete", "curation:trigger", "curation:edit", "curation:delete", "chat:query", "chat:export", "users:manage", "roles:manage", "audit:read"]'::jsonb),
-          ('editor', 'Knowledge Manager & Editor', 'Dapat mengunggah dokumen PDF, mengelola basis pengetahuan, menjalankan dan menyunting kurasi AI, serta bertanya ke Chatbot.', true, '["dashboard:documents", "dashboard:personal", "documents:read", "documents:upload", "documents:toggle_active", "curation:trigger", "curation:edit", "curation:delete", "chat:query", "chat:export"]'::jsonb),
-          ('member', 'Member / Viewer', 'Hak akses standar untuk membaca dokumen aktif dan bertanya pada AI Chatbot RAG.', true, '["dashboard:personal", "documents:read", "chat:query", "chat:export"]'::jsonb),
-          ('chat_only', 'Chatbot Specialist', 'Hak akses khusus percakapan: hanya dapat bertanya dan berdiskusi dengan AI Chatbot RAG.', false, '["chat:query", "chat:export"]'::jsonb),
-          ('knowledge_only', 'Knowledge Viewer', 'Hak akses khusus pembaca: hanya dapat membuka dan mempelajari repositori dokumen pengetahuan.', false, '["documents:read"]'::jsonb)
-      ON CONFLICT (id) DO NOTHING;
+          ('admin', 'Super Administrator', 'Akses penuh ke seluruh modul sistem, dokumen, kurasi AI, manajemen pengguna, dan audit log.', true, '["dashboard:admin", "dashboard:documents", "dashboard:personal", "documents:read", "documents:upload", "documents:toggle_active", "documents:delete", "curation:trigger", "curation:edit", "curation:delete", "chat:query", "chat:export", "users:manage", "roles:manage", "audit:read"]'::jsonb, '["Publik", "Internal", "Rahasia", "Sangat Rahasia"]'::jsonb),
+          ('editor', 'Knowledge Manager & Editor', 'Dapat mengunggah dokumen PDF, mengelola basis pengetahuan, menjalankan dan menyunting kurasi AI, serta bertanya ke Chatbot.', true, '["dashboard:documents", "dashboard:personal", "documents:read", "documents:upload", "documents:toggle_active", "curation:trigger", "curation:edit", "curation:delete", "chat:query", "chat:export"]'::jsonb, '["Publik", "Internal", "Rahasia"]'::jsonb),
+          ('member', 'Member / Viewer', 'Hak akses standar untuk membaca dokumen aktif dan bertanya pada AI Chatbot RAG.', true, '["dashboard:personal", "documents:read", "chat:query", "chat:export"]'::jsonb, '["Publik", "Internal"]'::jsonb),
+          ('chat_only', 'Chatbot Specialist', 'Hak akses khusus percakapan: hanya dapat bertanya dan berdiskusi dengan AI Chatbot RAG.', false, '["chat:query", "chat:export"]'::jsonb, '["Publik", "Internal"]'::jsonb),
+          ('knowledge_only', 'Knowledge Viewer', 'Hak akses khusus pembaca: hanya dapat membuka dan mempelajari repositori dokumen pengetahuan.', false, '["documents:read"]'::jsonb, '["Publik", "Internal"]'::jsonb)
+      ON CONFLICT (id) DO UPDATE SET 
+        allowed_classifications = CASE 
+          WHEN roles.id = 'admin' THEN '["Publik", "Internal", "Rahasia", "Sangat Rahasia"]'::jsonb
+          WHEN roles.id = 'editor' THEN '["Publik", "Internal", "Rahasia"]'::jsonb
+          ELSE COALESCE(roles.allowed_classifications, '["Publik", "Internal"]'::jsonb)
+        END;
     `).catch(() => {});
 
     // Seed default Super Admin

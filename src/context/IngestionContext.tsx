@@ -36,6 +36,7 @@ export interface IngestionTask {
 }
 
 export interface IngestionOptions {
+  ownerId?: string;
   divisionId?: string;
   classification?: string;
   status?: string;
@@ -208,6 +209,7 @@ export function IngestionProvider({ children }: { children: React.ReactNode }) {
       formData.append('file', file);
       formData.append('clientId', clientId);
       formData.append('async', 'true');
+      if (options.ownerId) formData.append('ownerId', options.ownerId);
       if (options.divisionId) formData.append('divisionId', options.divisionId);
       if (options.classification) formData.append('classification', options.classification);
       if (options.status) formData.append('status', options.status);

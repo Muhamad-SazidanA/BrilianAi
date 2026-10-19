@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import {
   X,
@@ -21,10 +21,12 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { useUserSession } from '@/context/UserSessionContext';
 import { DocumentClassification, DocumentStatus } from '@/types/document';
 import { toast } from 'sonner';
 import EnterpriseSelect from '@/components/ui/EnterpriseSelect';
 import { useIngestion } from '@/context/IngestionContext';
+import { ENTERPRISE_DIVISIONS } from '@lib/constants/divisions';
 
 export interface UserGrantSelection {
   userId: string;
@@ -48,24 +50,13 @@ interface DocumentUploadModalProps {
   onSuccess: () => void;
 }
 
-const DEFAULT_DIVISIONS = [
-  'General',
-  'Direksi',
-  'Manajemen Eksekutif',
-  'HRD',
-  'Legal & Compliance',
-  'Keuangan (Finance)',
-  'Operasional',
-  'IT & Engineering',
-  'Marketing & Bisnis',
-];
-
 export default function DocumentUploadModal({
   isOpen,
   onClose,
   onSuccess,
 }: DocumentUploadModalProps) {
   const { language } = useLanguage();
+  const { currentUser } = useUserSession();
   const { enqueueFiles, setIsDockMinimized } = useIngestion();
 
   // Multi-file selection state
@@ -96,6 +87,32 @@ export default function DocumentUploadModal({
   const [userGrants, setUserGrants] = useState<UserGrantSelection[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [selectedAccessLevel, setSelectedAccessLevel] = useState<'viewer' | 'editor'>('viewer');
+
+  // Dynamic divisions: master enterprise divisions + actual user departments (no dummy data)
+  const divisionOptions = useMemo(() => {
+    const set = new Set<string>(ENTERPRISE_DIVISIONS);
+    availableUsers.forEach((u) => {
+      const d = (u.department || '').trim();
+      if (d && d.toLowerCase() !== 'google account') {
+        set.add(d);
+      }
+    });
+    return [
+      ...Array.from(set).map((d) => ({ value: d, label: d })),
+      { value: 'custom', label: '+ Divisi Lainnya...' },
+    ];
+  }, [availableUsers]);
+
+  // Auto-populate default division from current user's actual department
+  useEffect(() => {
+    if (isOpen && currentUser) {
+      const userDept =
+        currentUser.department && currentUser.department.toLowerCase() !== 'google account'
+          ? currentUser.department
+          : 'General';
+      setDivisionId(userDept);
+    }
+  }, [isOpen, currentUser]);
 
   // Fetch users for grant selection
   useEffect(() => {
@@ -239,6 +256,7 @@ export default function DocumentUploadModal({
     try {
       // Enqueue all files into the persistent background ingestion queue
       await enqueueFiles(selectedFiles, {
+        ownerId: currentUser?.id,
         divisionId: finalDivision,
         classification,
         status: docStatus,
@@ -604,6 +622,45 @@ export default function DocumentUploadModal({
 
             {/* ── Right Column: Batch Metadata & Access Controls ── */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {/* Uploader / Owner Identity Info */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '6px 10px',
+                  backgroundColor: '#F8FAFC',
+                  borderRadius: '6px',
+                  border: '1px solid #E2E8F0',
+                  fontSize: '11px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                  <Building2 size={12} color="#2563EB" style={{ flexShrink: 0 }} />
+                  <span style={{ color: '#475569' }}>Pemilik:</span>
+                  <strong style={{ color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {currentUser?.name || 'User'}
+                  </strong>
+                  <span style={{ color: '#64748B', whiteSpace: 'nowrap' }}>
+                    ({currentUser?.department || 'General'})
+                  </span>
+                </div>
+                <span
+                  style={{
+                    fontSize: '10px',
+                    fontWeight: 600,
+                    padding: '1px 6px',
+                    borderRadius: '4px',
+                    backgroundColor: '#EFF6FF',
+                    color: '#2563EB',
+                    border: '1px solid #BFDBFE',
+                    flexShrink: 0,
+                  }}
+                >
+                  {currentUser?.role?.name || 'Member'}
+                </span>
+              </div>
+
               {/* Divisi & Klasifikasi */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 <div>
@@ -613,10 +670,7 @@ export default function DocumentUploadModal({
                   <EnterpriseSelect
                     value={divisionId}
                     onChange={(val) => setDivisionId(String(val))}
-                    options={[
-                      ...DEFAULT_DIVISIONS.map((d) => ({ value: d, label: d })),
-                      { value: 'custom', label: '+ Divisi Lainnya...' },
-                    ]}
+                    options={divisionOptions}
                     size="sm"
                   />
                   {divisionId === 'custom' && (
@@ -643,9 +697,22 @@ export default function DocumentUploadModal({
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '3px' }}>
-                    Klasifikasi Akses
-                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', margin: 0 }}>
+                      Klasifikasi Akses
+                    </label>
+                    {currentUser && currentUser.role_id !== 'admin' && currentUser.role?.allowed_classifications && (
+                      <span
+                        style={{
+                          fontSize: '9.5px',
+                          fontWeight: 600,
+                          color: currentUser.role.allowed_classifications.includes(classification) ? '#16a34a' : '#d97706',
+                        }}
+                      >
+                        {currentUser.role.allowed_classifications.includes(classification) ? '✓ Clearance OK' : '⚠ Perlu Clearance'}
+                      </span>
+                    )}
+                  </div>
                   <EnterpriseSelect
                     value={classification}
                     onChange={(val) => setClassification(val as DocumentClassification)}

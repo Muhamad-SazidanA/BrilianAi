@@ -46,9 +46,19 @@ export async function hasServerPermission(
 }
 
 /**
- * Returns allowed document classifications for a specific role according to PRD v2.0 D1.
+ * Returns allowed document classifications for a specific role according to role settings or PRD v2.0 defaults.
  */
-export function getAllowedClassificationsForRole(roleId?: string): DocumentClassification[] {
+export function getAllowedClassificationsForRole(
+  roleOrId?: string | { id?: string; allowed_classifications?: DocumentClassification[] }
+): DocumentClassification[] {
+  if (roleOrId && typeof roleOrId === 'object') {
+    if (Array.isArray(roleOrId.allowed_classifications) && roleOrId.allowed_classifications.length > 0) {
+      return roleOrId.allowed_classifications;
+    }
+    return getAllowedClassificationsForRole(roleOrId.id);
+  }
+
+  const roleId = typeof roleOrId === 'string' ? roleOrId : undefined;
   switch (roleId) {
     case 'superadmin':
     case 'admin':
@@ -70,7 +80,7 @@ export function getAllowedClassificationsForRole(roleId?: string): DocumentClass
  * 4. Division + Classification clearance
  */
 export function canUserAccessDocument(
-  user: { id?: string; role_id?: string; department?: string } | null | undefined,
+  user: { id?: string; role_id?: string; department?: string; role?: { id?: string; allowed_classifications?: DocumentClassification[] } } | null | undefined,
   doc: { id?: string; classification?: DocumentClassification | string; division_id?: string; owner_id?: string | null },
   explicitGrantedBatchIds?: Set<string> | string[]
 ): boolean {
@@ -101,26 +111,28 @@ export function canUserAccessDocument(
   }
 
   // 5. Classification check
-  const allowedClassifications = getAllowedClassificationsForRole(user.role_id);
+  const allowedClassifications = getAllowedClassificationsForRole(user.role || user.role_id);
   if (!allowedClassifications.includes(docClassification)) {
     return false;
   }
 
-  // 6. Division check
-  const docDivision = (doc.division_id || 'General').trim();
-  if (docDivision.toLowerCase() === 'general' || docDivision.toLowerCase() === 'semua') {
+  // 6. Division check (ABAC)
+  if (!doc.division_id || doc.division_id === 'General' || doc.division_id === 'all') {
+    return true;
+  }
+  const userDept = user.department?.trim();
+  if (!userDept || userDept === 'General' || userDept.toLowerCase() === doc.division_id.toLowerCase()) {
     return true;
   }
 
-  const userDepartment = (user.department || 'General').trim();
-  return docDivision.toLowerCase() === userDepartment.toLowerCase();
+  return false;
 }
 
 /**
  * Asynchronously checks document access, resolving explicit grants from the database if needed.
  */
 export async function canUserAccessDocumentAsync(
-  user: { id?: string; role_id?: string; department?: string } | null | undefined,
+  user: { id?: string; role_id?: string; department?: string; role?: { id?: string; allowed_classifications?: DocumentClassification[] } } | null | undefined,
   doc: { id?: string; classification?: DocumentClassification | string; division_id?: string; owner_id?: string | null }
 ): Promise<{ canAccess: boolean; canEdit: boolean; accessLevel?: 'viewer' | 'editor' | 'owner' | 'admin' | null }> {
   if (!user) {

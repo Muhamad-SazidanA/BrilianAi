@@ -24,51 +24,63 @@ export async function ensureUsersAndRolesTables(): Promise<void> {
           description TEXT,
           is_system BOOLEAN NOT NULL DEFAULT false,
           permissions JSONB NOT NULL DEFAULT '[]',
+          allowed_classifications JSONB NOT NULL DEFAULT '["Publik", "Internal"]'::jsonb,
           created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
           updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
       );
+      ALTER TABLE roles ADD COLUMN IF NOT EXISTS allowed_classifications JSONB NOT NULL DEFAULT '["Publik", "Internal"]'::jsonb;
     `);
 
     // Seed default roles
     await pool.query(`
-      INSERT INTO roles (id, name, description, is_system, permissions)
+      INSERT INTO roles (id, name, description, is_system, permissions, allowed_classifications)
       VALUES
           (
               'admin',
               'Super Administrator',
               'Akses penuh ke seluruh modul sistem, dokumen, kurasi AI, manajemen pengguna, dan audit log.',
               true,
-              '["dashboard:admin", "dashboard:documents", "dashboard:personal", "documents:read", "documents:upload", "documents:toggle_active", "documents:delete", "curation:trigger", "curation:edit", "curation:delete", "chat:query", "chat:export", "users:manage", "roles:manage", "audit:read"]'::jsonb
+              '["dashboard:admin", "dashboard:documents", "dashboard:personal", "documents:read", "documents:upload", "documents:toggle_active", "documents:delete", "curation:trigger", "curation:edit", "curation:delete", "chat:query", "chat:export", "users:manage", "roles:manage", "audit:read"]'::jsonb,
+              '["Publik", "Internal", "Rahasia", "Sangat Rahasia"]'::jsonb
           ),
           (
               'editor',
               'Knowledge Manager & Editor',
               'Dapat mengunggah dokumen PDF, mengelola basis pengetahuan, menjalankan dan menyunting kurasi AI, serta bertanya ke Chatbot.',
               true,
-              '["dashboard:documents", "dashboard:personal", "documents:read", "documents:upload", "documents:toggle_active", "curation:trigger", "curation:edit", "curation:delete", "chat:query", "chat:export"]'::jsonb
+              '["dashboard:documents", "dashboard:personal", "documents:read", "documents:upload", "documents:toggle_active", "curation:trigger", "curation:edit", "curation:delete", "chat:query", "chat:export"]'::jsonb,
+              '["Publik", "Internal", "Rahasia"]'::jsonb
           ),
           (
               'member',
               'Member / Viewer',
               'Hak akses standar untuk membaca dokumen aktif dan bertanya pada AI Chatbot RAG.',
               true,
-              '["dashboard:personal", "documents:read", "chat:query", "chat:export"]'::jsonb
+              '["dashboard:personal", "documents:read", "chat:query", "chat:export"]'::jsonb,
+              '["Publik", "Internal"]'::jsonb
           ),
           (
               'chat_only',
               'Chatbot Specialist',
               'Hak akses khusus percakapan: hanya dapat bertanya dan berdiskusi dengan AI Chatbot RAG.',
               false,
-              '["chat:query", "chat:export"]'::jsonb
+              '["chat:query", "chat:export"]'::jsonb,
+              '["Publik", "Internal"]'::jsonb
           ),
           (
               'knowledge_only',
               'Knowledge Viewer',
               'Hak akses khusus pembaca: hanya dapat membuka dan mempelajari repositori dokumen pengetahuan.',
               false,
-              '["documents:read"]'::jsonb
+              '["documents:read"]'::jsonb,
+              '["Publik", "Internal"]'::jsonb
           )
-      ON CONFLICT (id) DO NOTHING;
+      ON CONFLICT (id) DO UPDATE SET
+        allowed_classifications = CASE 
+          WHEN roles.id = 'admin' THEN '["Publik", "Internal", "Rahasia", "Sangat Rahasia"]'::jsonb
+          WHEN roles.id = 'editor' THEN '["Publik", "Internal", "Rahasia"]'::jsonb
+          ELSE COALESCE(roles.allowed_classifications, '["Publik", "Internal"]'::jsonb)
+        END;
     `);
 
     // 2. Table users
@@ -171,6 +183,7 @@ export async function listUsers(options?: {
       r.description as role_desc,
       r.is_system as role_is_system,
       r.permissions as role_permissions,
+      r.allowed_classifications as role_allowed_classifications,
       COALESCE(log_agg.question_count, 0) as question_count
     FROM users u
     LEFT JOIN roles r ON u.role_id = r.id
@@ -225,6 +238,11 @@ export async function listUsers(options?: {
       description: row.role_desc || '',
       is_system: row.role_is_system ?? true,
       permissions: Array.isArray(row.role_permissions) ? row.role_permissions : [],
+      allowed_classifications: Array.isArray(row.role_allowed_classifications)
+        ? row.role_allowed_classifications
+        : (typeof row.role_allowed_classifications === 'string'
+            ? JSON.parse(row.role_allowed_classifications || '[]')
+            : ['Publik', 'Internal']),
     },
   }));
 }
@@ -242,6 +260,7 @@ export async function getUserById(id: string): Promise<User | null> {
       u.id, u.name, u.email, u.role_id, u.status, u.department, u.avatar_color,
       u.last_login_at, u.created_at, u.updated_at,
       r.name as role_name, r.description as role_desc, r.is_system as role_is_system, r.permissions as role_permissions,
+      r.allowed_classifications as role_allowed_classifications,
       COALESCE(log_agg.question_count, 0) as question_count
     FROM users u
     LEFT JOIN roles r ON u.role_id = r.id
@@ -276,6 +295,11 @@ export async function getUserById(id: string): Promise<User | null> {
       description: row.role_desc || '',
       is_system: row.role_is_system ?? true,
       permissions: Array.isArray(row.role_permissions) ? row.role_permissions : [],
+      allowed_classifications: Array.isArray(row.role_allowed_classifications)
+        ? row.role_allowed_classifications
+        : (typeof row.role_allowed_classifications === 'string'
+            ? JSON.parse(row.role_allowed_classifications || '[]')
+            : ['Publik', 'Internal']),
     },
   };
 }
@@ -507,12 +531,13 @@ export async function listRoles(): Promise<Role[]> {
       r.description,
       r.is_system,
       r.permissions,
+      r.allowed_classifications,
       r.created_at,
       r.updated_at,
       COUNT(u.id) as user_count
     FROM roles r
     LEFT JOIN users u ON r.id = u.role_id
-    GROUP BY r.id, r.name, r.description, r.is_system, r.permissions, r.created_at, r.updated_at
+    GROUP BY r.id, r.name, r.description, r.is_system, r.permissions, r.allowed_classifications, r.created_at, r.updated_at
     ORDER BY r.is_system DESC, r.created_at ASC
   `);
 
@@ -522,6 +547,11 @@ export async function listRoles(): Promise<Role[]> {
     description: row.description,
     is_system: row.is_system,
     permissions: Array.isArray(row.permissions) ? row.permissions : [],
+    allowed_classifications: Array.isArray(row.allowed_classifications)
+      ? row.allowed_classifications
+      : (typeof row.allowed_classifications === 'string'
+          ? JSON.parse(row.allowed_classifications || '[]')
+          : ['Publik', 'Internal']),
     created_at: row.created_at,
     updated_at: row.updated_at,
     user_count: parseInt(row.user_count, 10) || 0,
@@ -538,12 +568,12 @@ export async function getRoleById(id: string): Promise<Role | null> {
   const res = await pool.query(
     `
     SELECT 
-      r.id, r.name, r.description, r.is_system, r.permissions, r.created_at, r.updated_at,
+      r.id, r.name, r.description, r.is_system, r.permissions, r.allowed_classifications, r.created_at, r.updated_at,
       COUNT(u.id) as user_count
     FROM roles r
     LEFT JOIN users u ON r.id = u.role_id
     WHERE r.id = $1
-    GROUP BY r.id, r.name, r.description, r.is_system, r.permissions, r.created_at, r.updated_at
+    GROUP BY r.id, r.name, r.description, r.is_system, r.permissions, r.allowed_classifications, r.created_at, r.updated_at
     `,
     [id]
   );
@@ -557,6 +587,11 @@ export async function getRoleById(id: string): Promise<Role | null> {
     description: row.description,
     is_system: row.is_system,
     permissions: Array.isArray(row.permissions) ? row.permissions : [],
+    allowed_classifications: Array.isArray(row.allowed_classifications)
+      ? row.allowed_classifications
+      : (typeof row.allowed_classifications === 'string'
+          ? JSON.parse(row.allowed_classifications || '[]')
+          : ['Publik', 'Internal']),
     created_at: row.created_at,
     updated_at: row.updated_at,
     user_count: parseInt(row.user_count, 10) || 0,
@@ -571,18 +606,22 @@ export async function createRole(data: {
   name: string;
   description: string;
   permissions: string[];
+  allowed_classifications?: string[];
 }): Promise<Role> {
   await ensureUsersAndRolesTables();
   const pool = getPool();
 
   const cleanId = data.id.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+  const classifications = Array.isArray(data.allowed_classifications) && data.allowed_classifications.length > 0
+    ? data.allowed_classifications
+    : ['Publik', 'Internal'];
 
   await pool.query(
     `
-    INSERT INTO roles (id, name, description, is_system, permissions)
-    VALUES ($1, $2, $3, false, $4::jsonb)
+    INSERT INTO roles (id, name, description, is_system, permissions, allowed_classifications)
+    VALUES ($1, $2, $3, false, $4::jsonb, $5::jsonb)
     `,
-    [cleanId, data.name.trim(), data.description.trim(), JSON.stringify(data.permissions)]
+    [cleanId, data.name.trim(), data.description.trim(), JSON.stringify(data.permissions), JSON.stringify(classifications)]
   );
 
   const newRole = await getRoleById(cleanId);
@@ -599,6 +638,7 @@ export async function updateRole(
     name?: string;
     description?: string;
     permissions?: string[];
+    allowed_classifications?: string[];
   }
 ): Promise<Role | null> {
   await ensureUsersAndRolesTables();
@@ -619,6 +659,10 @@ export async function updateRole(
   if (data.permissions !== undefined) {
     fields.push(`permissions = $${paramIdx++}::jsonb`);
     params.push(JSON.stringify(data.permissions));
+  }
+  if (data.allowed_classifications !== undefined) {
+    fields.push(`allowed_classifications = $${paramIdx++}::jsonb`);
+    params.push(JSON.stringify(data.allowed_classifications));
   }
 
   if (fields.length === 0) return getRoleById(id);
