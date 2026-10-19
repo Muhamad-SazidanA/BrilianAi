@@ -1164,6 +1164,36 @@ thead::-webkit-scrollbar {
   color: var(--text-primary);
 }
 
+.chat-bottom-dock-wrapper {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 30;
+  padding: 1.75rem 1rem 0.85rem;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.72) 20%,
+    rgba(255, 255, 255, 0.94) 45%,
+    #FFFFFF 70%,
+    #FFFFFF 100%
+  );
+}
+
+[data-theme="dark"] .chat-bottom-dock-wrapper {
+  background: linear-gradient(
+    180deg,
+    rgba(9, 13, 22, 0) 0%,
+    rgba(9, 13, 22, 0.72) 20%,
+    rgba(9, 13, 22, 0.94) 45%,
+    #090D16 70%,
+    #090D16 100%
+  );
+}
+
 /* =====================================================
    Clean Look Modern SaaS Component Styles
    ===================================================== */

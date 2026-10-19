@@ -1207,8 +1207,8 @@ export default function ChatWorkspace({
             maxWidth: '52rem',
             margin: '0 auto',
             padding: hasMessages
-              ? '3.5rem 1rem 5.5rem'
-              : '3.25rem 1rem 5rem',
+              ? '3.5rem 1rem 9.5rem'
+              : '3.25rem 1rem 6rem',
             flex: 1,
             display: 'flex',
             flexDirection: 'column',
@@ -1323,27 +1323,14 @@ export default function ChatWorkspace({
                   </div>
                 )}
 
-              <div ref={messagesEndRef} />
+              <div ref={messagesEndRef} style={{ height: '2rem', width: '100%', flexShrink: 0 }} />
             </div>
           )}
         </div>
       </div>
 
       {/* ── 3. FLOATING BOTTOM DOCK ───────────────────────────────────── */}
-      <div
-        style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          width: '100%',
-          backgroundColor: 'transparent',
-          borderTop: 'none',
-          zIndex: 30,
-          padding: '0 1rem 0.85rem',
-          pointerEvents: 'none',
-        }}
-      >
+      <div className="chat-bottom-dock-wrapper">
         <div
           style={{
             width: '100%',
