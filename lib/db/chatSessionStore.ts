@@ -28,6 +28,11 @@ function rowToSession(row: Record<string, any>): ChatSession {
   };
 }
 
+function isUuid(val?: string | null): boolean {
+  if (!val || typeof val !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val.trim());
+}
+
 /**
  * Buat sesi chat baru untuk user.
  */
@@ -53,6 +58,7 @@ export async function getChatSession(
   userId?: string,
   isAdmin: boolean = false
 ): Promise<ChatSession | null> {
+  if (!isUuid(sessionId)) return null;
   await ensureCompleteDatabaseSchema().catch(() => {});
   const pool = getPool();
 
@@ -81,6 +87,7 @@ export async function listUserChatSessions(
   limit: number = 30,
   isAdmin: boolean = false
 ): Promise<ChatSession[]> {
+  if (!isAdmin && !isUuid(userId)) return [];
   await ensureCompleteDatabaseSchema().catch(() => {});
   const pool = getPool();
 
@@ -122,6 +129,7 @@ export async function updateChatSession(
   updates: UpdateChatSessionInput,
   isAdmin: boolean = false
 ): Promise<ChatSession | null> {
+  if (!isUuid(sessionId)) return null;
   await ensureCompleteDatabaseSchema().catch(() => {});
   const pool = getPool();
 
@@ -167,6 +175,7 @@ export async function deleteChatSession(
   userId: string,
   isAdmin: boolean = false
 ): Promise<boolean> {
+  if (!isUuid(sessionId)) return false;
   await ensureCompleteDatabaseSchema().catch(() => {});
   const pool = getPool();
   let res;

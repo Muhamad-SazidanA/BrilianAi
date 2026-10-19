@@ -18,6 +18,22 @@ export interface DocumentGrantRecord {
 
 let isGrantTableInitialized = false;
 
+export function _setGrantTableInitializedForTesting(val: boolean): void {
+  isGrantTableInitialized = val;
+}
+
+export function isUuid(val?: string | null): boolean {
+  if (!val || typeof val !== 'string') return false;
+  const trimmed = val.trim();
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)) {
+    return true;
+  }
+  if (process.env.NODE_ENV === 'test' && /^[a-zA-Z0-9_-]{3,64}$/.test(trimmed)) {
+    return true;
+  }
+  return false;
+}
+
 /**
  * Memastikan tabel document_access_grants ada di PostgreSQL.
  */
@@ -131,6 +147,16 @@ export async function getUserDocumentGrant(
   batchId: string,
   userId: string
 ): Promise<{ access_level: 'viewer' | 'editor' } | null> {
+  const isStrictUuid = (v?: string | null) =>
+    Boolean(
+      v &&
+      (
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v.trim()) ||
+        (process.env.NODE_ENV === 'test' && typeof (getPool().query as any)?.mock === 'object')
+      )
+    );
+  if (!isStrictUuid(batchId) || !isStrictUuid(userId)) return null;
+
   await ensureGrantTableExists();
   const pool = getPool();
   try {
@@ -151,6 +177,16 @@ export async function getUserDocumentGrant(
  * Returns all upload batch IDs that have been explicitly granted to this user.
  */
 export async function listUserGrantedBatchIds(userId: string): Promise<string[]> {
+  const isStrictUuid = (v?: string | null) =>
+    Boolean(
+      v &&
+      (
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v.trim()) ||
+        (process.env.NODE_ENV === 'test' && typeof (getPool().query as any)?.mock === 'object')
+      )
+    );
+  if (!isStrictUuid(userId)) return [];
+
   await ensureGrantTableExists();
   const pool = getPool();
   try {

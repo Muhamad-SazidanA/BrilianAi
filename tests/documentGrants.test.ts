@@ -7,6 +7,7 @@ import {
   getUserDocumentGrant,
   listUserGrantedBatchIds,
   bulkGrantDocumentAccess,
+  _setGrantTableInitializedForTesting,
 } from '../lib/db/documentGrantStore';
 import {
   canUserAccessDocument,
@@ -22,6 +23,7 @@ describe('Document Access Grants & Per-User Whitelist', () => {
   beforeEach(() => {
     mockPool.query.mockReset();
     vi.clearAllMocks();
+    _setGrantTableInitializedForTesting(true);
     vi.spyOn(dbClient, 'getPool').mockReturnValue(mockPool as any);
   });
 

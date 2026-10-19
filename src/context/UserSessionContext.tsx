@@ -46,6 +46,7 @@ export const DEFAULT_ADMIN_USER: User = {
       'roles:manage',
       'audit:read',
     ],
+    allowed_classifications: ['Publik', 'Internal', 'Rahasia', 'Sangat Rahasia'],
   },
 };
 

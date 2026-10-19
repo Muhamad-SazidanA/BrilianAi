@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     }
 
     const isSuperOrAdmin = authenticatedUser.role_id === 'superadmin' || authenticatedUser.role_id === 'admin';
-    const allowedClassifications = getAllowedClassificationsForRole(authenticatedUser.role_id);
+    const allowedClassifications = getAllowedClassificationsForRole(authenticatedUser.role || authenticatedUser.role_id);
     const userDivision = isSuperOrAdmin ? 'all' : (authenticatedUser.department || 'General');
 
     // Retrieve explicit user access grants from database

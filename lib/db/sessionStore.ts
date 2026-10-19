@@ -83,6 +83,7 @@ export async function validateSession(sessionToken: string): Promise<User | null
       u.id, u.name, u.email, u.role_id, u.status, u.department, u.avatar_color,
       u.last_login_at, u.created_at, u.updated_at,
       r.name as role_name, r.description as role_desc, r.is_system as role_is_system, r.permissions as role_permissions,
+      r.allowed_classifications as role_allowed_classifications,
       s.id as session_id, s.expires_at, s.revoked_at
     FROM user_sessions s
     JOIN users u ON u.id = s.user_id
@@ -120,6 +121,11 @@ export async function validateSession(sessionToken: string): Promise<User | null
       description: row.role_desc || '',
       is_system: row.role_is_system ?? true,
       permissions: Array.isArray(row.role_permissions) ? row.role_permissions : [],
+      allowed_classifications: Array.isArray(row.role_allowed_classifications)
+        ? row.role_allowed_classifications
+        : (typeof row.role_allowed_classifications === 'string'
+            ? JSON.parse(row.role_allowed_classifications || '[]')
+            : (row.role_id === 'admin' ? ['Publik', 'Internal', 'Rahasia', 'Sangat Rahasia'] : ['Publik', 'Internal'])),
     },
   };
 }
