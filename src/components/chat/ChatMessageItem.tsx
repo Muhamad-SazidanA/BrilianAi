@@ -19,7 +19,9 @@ import {
   Pencil,
 } from 'lucide-react';
 import { ChatMessage, ChatSource } from '@/types/chat';
+import { DashboardData } from '@/types/dashboard';
 import MarkdownContent from '@/components/ui/MarkdownContent';
+import { BuildDashboardButton, AiDashboardPreview } from '@/components/chat/AiDashboardPreview';
 import { useLanguage } from '@/context/LanguageContext';
 import { toast } from 'sonner';
 
@@ -49,6 +51,17 @@ export default function ChatMessageItem({
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(message.text);
   const [isPromptHovered, setIsPromptHovered] = useState(false);
+
+  // Dashboard state
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [dashboardId, setDashboardId] = useState<string | null>(null);
+  const [showDashboard, setShowDashboard] = useState(false);
+
+  const handleDashboardReady = (data: DashboardData, id: string) => {
+    setDashboardData(data);
+    setDashboardId(id);
+    setShowDashboard(true);
+  };
 
   React.useEffect(() => {
     setEditText(message.text);
@@ -668,6 +681,31 @@ export default function ChatMessageItem({
               >
                 <ThumbsDown size={13} />
               </button>
+
+              {/* 6. Buat Dashboard — convert AI answer to interactive dashboard */}
+              {!message.isError && (
+                <>
+                  {/* Separator */}
+                  <div style={{ width: '1px', height: '14px', background: 'var(--border-default)', margin: '0 2px' }} />
+                  {showDashboard && dashboardData && dashboardId ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowDashboard(false)}
+                      className="db-build-btn db-build-btn-active"
+                      title={language === 'en' ? 'Hide dashboard' : 'Sembunyikan dashboard'}
+                    >
+                      <span>{language === 'en' ? 'Hide Dashboard' : 'Sembunyikan'}</span>
+                    </button>
+                  ) : (
+                    <BuildDashboardButton
+                      messageId={message.id}
+                      answerText={activeAiText}
+                      queryText={undefined}
+                      onDashboardReady={handleDashboardReady}
+                    />
+                  )}
+                </>
+              )}
             </div>
 
             {/* Negative Feedback Sub-Panel */}
@@ -797,6 +835,24 @@ export default function ChatMessageItem({
               </div>
             )}
           </div>
+
+          {/* ── Inline Dashboard Preview ── */}
+          {showDashboard && dashboardData && dashboardId && (
+            <div
+              style={{
+                marginTop: '12px',
+                width: '100%',
+                animation: 'fadeIn 0.3s ease',
+              }}
+            >
+              <AiDashboardPreview
+                data={dashboardData}
+                dashboardId={dashboardId}
+                onClose={() => setShowDashboard(false)}
+                compact={true}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -39,6 +39,12 @@ services:
       - brilian_internal
 
   ollama:
+    # Service Ollama dikonfigurasi dengan profile 'local-ai'.
+    # Default 'docker compose up -d' hanya menjalankan postgres, redis, dan app (hemat RAM VPS & memakai Cloud API).
+    # Untuk menjalankan Ollama di kemudian hari: 'docker compose --profile local-ai up -d'
+    profiles:
+      - local-ai
+      - ollama
     image: ${OLLAMA_IMAGE:-ollama/ollama:latest}
     container_name: ${OLLAMA_CONTAINER_NAME:-brilian_ollama}
     restart: unless-stopped

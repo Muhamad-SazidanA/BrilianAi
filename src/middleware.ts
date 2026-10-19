@@ -21,7 +21,9 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/favicon') ||
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/api/public') ||
+    pathname.startsWith('/api/dashboard') ||
     pathname.startsWith('/share') ||
+    pathname.startsWith('/dashboard') ||
     /\.(.*)$/.test(pathname)
   ) {
     return NextResponse.next();
