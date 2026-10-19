@@ -124,20 +124,38 @@ export default function DocumentStudioPage() {
   if (!isLoading && !batch) {
     return (
       <AppShell requiredPermission="documents:read">
-        <div className="max-w-md mx-auto my-20 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 text-center shadow-lg flex flex-col items-center">
-          <div className="w-14 h-14 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-900/60 text-amber-600 flex items-center justify-center mb-4">
+        <div
+          className="ui-card"
+          style={{
+            maxWidth: '520px',
+            margin: '5rem auto',
+            padding: '2.5rem 2rem',
+            textAlign: 'center',
+            borderRadius: 'var(--radius-xl)',
+          }}
+        >
+          <div
+            style={{
+              width: '50px',
+              height: '50px',
+              borderRadius: '50%',
+              backgroundColor: 'var(--bg-subtle)',
+              color: 'var(--text-secondary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1.25rem',
+            }}
+          >
             <Lock size={24} />
           </div>
-          <h2 className="text-base font-bold text-slate-900 dark:text-white mb-2">
+          <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
             Dokumen Tidak Ditemukan atau Akses Dibatasi
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
+          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '20px', marginBottom: '1.75rem' }}>
             Dokumen ini tidak tersedia atau memiliki klasifikasi kerahasiaan / divisi di luar izin akun Anda.
           </p>
-          <Link
-            href="/documents"
-            className="inline-flex items-center justify-center px-5 py-2.5 rounded-full text-xs font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-sm transition-all"
-          >
+          <Link href="/documents" className="btn btn-primary btn-md">
             Kembali ke Knowledge Base
           </Link>
         </div>
@@ -151,71 +169,63 @@ export default function DocumentStudioPage() {
       title={batch ? `Studio: ${batch.original_filename}` : t('studio.title')}
       subtitle={t('studio.subtitle')}
     >
-      <div className="flex flex-col gap-5">
-        {/* Breadcrumb Back Link */}
-        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-          <Link
-            href="/documents"
-            className="inline-flex items-center gap-1 font-semibold text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-          >
-            <ArrowLeft size={13} />
-            <span>Basis Pengetahuan</span>
-          </Link>
-          <span>/</span>
-          <span className="text-slate-400">Document Studio</span>
-          <span>/</span>
-          <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-sm">
-            {batch?.original_filename || 'Dokumen'}
-          </span>
-        </div>
-
-        {/* Modern Document Header Card */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        {/* Document Header Card */}
         {batch && (
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
-            <div className="flex items-start md:items-center justify-between gap-4 flex-wrap">
-              {/* Document Info Left */}
-              <div className="flex items-start md:items-center gap-3.5 min-w-0">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 flex-shrink-0">
-                  <FileText size={22} />
+          <div className="ui-card" style={{ padding: '1.25rem 1.75rem', borderRadius: 'var(--radius-xl)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div
+                  style={{
+                    width: '44px',
+                    height: '44px',
+                    borderRadius: 'var(--radius-md)',
+                    backgroundColor: 'var(--color-primary-subtle)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'var(--color-primary)',
+                    boxShadow: 'var(--shadow-xs)',
+                  }}
+                >
+                  <FileText size={24} />
                 </div>
-                <div className="min-w-0">
-                  <h2 className="text-base md:text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight truncate">
+                <div>
+                  <h2 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
                     {batch.original_filename}
                   </h2>
-                  <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mt-1.5 flex-wrap">
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700">
-                      {batch.page_count} {t('studio.pages')}
-                    </span>
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-medium bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200/70 dark:border-blue-800">
-                      {batch.chunk_count} {t('studio.chunks')}
-                    </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '5px', flexWrap: 'wrap' }}>
+                    <span className="badge badge-neutral font-mono">{batch.page_count} {t('studio.pages')}</span>
+                    <span className="badge badge-accent font-mono">{batch.chunk_count} {t('studio.chunks')}</span>
                     <span
-                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                      className={`badge ${
                         batch.classification === 'Publik'
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
+                          ? 'badge-success'
                           : batch.classification === 'Rahasia'
-                          ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
+                          ? 'badge-warning'
                           : batch.classification === 'Sangat Rahasia'
-                          ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800'
-                          : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800'
+                          ? 'badge-danger'
+                          : 'badge-neutral'
                       }`}
+                      style={{ fontSize: '11px', fontWeight: 600 }}
                     >
                       {batch.classification || 'Internal'}
                     </span>
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700">
+                    <span className="badge badge-neutral" style={{ fontSize: '11px' }}>
                       {batch.division_id || 'General'}
                     </span>
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700">
+                    <span className="badge badge-neutral font-mono" style={{ fontSize: '11px' }}>
                       v{batch.version || '1.0'}
                     </span>
                     <span
-                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                      className={`badge ${
                         batch.status === 'Aktif'
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
+                          ? 'badge-success'
                           : batch.status === 'Review'
-                          ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
-                          : 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+                          ? 'badge-warning'
+                          : 'badge-neutral'
                       }`}
+                      style={{ fontSize: '11px', fontWeight: 600 }}
                     >
                       {batch.status || (batch.is_active_knowledge ? 'Aktif' : 'Draft')}
                     </span>
@@ -223,11 +233,11 @@ export default function DocumentStudioPage() {
                 </div>
               </div>
 
-              {/* Status & Control Actions Right */}
-              <div className="flex items-center gap-3 flex-wrap">
-                {/* Curation Badge */}
-                <div className="flex flex-col gap-1 items-start md:items-end">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+              {/* Curation & Knowledge Base Status & Action Buttons */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                {/* Curation Status Badge */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     Status Kurasi
                   </span>
                   {(() => {
@@ -240,8 +250,19 @@ export default function DocumentStudioPage() {
 
                     if (is100Percent) {
                       return (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800">
-                          <CheckCircle2 size={12} className="text-emerald-600" />
+                        <span
+                          className="badge badge-success"
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: '11.5px',
+                            fontWeight: 600,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                          }}
+                          title={`Seluruh ${total} raw chunks telah selesai dikurasi menjadi ${insights.length} insight.`}
+                        >
+                          <CheckCircle2 size={12} />
                           <span>100% Terkurasi ({insights.length} Insight)</span>
                         </span>
                       );
@@ -250,65 +271,105 @@ export default function DocumentStudioPage() {
                     if (processedCount > 0) {
                       const pct = Math.round((processedCount / total) * 100);
                       return (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800">
-                          <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                        <span
+                          className="badge badge-warning"
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: '11.5px',
+                            fontWeight: 600,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                          }}
+                        >
                           <span>{pct}% ({insights.length} Insight)</span>
                         </span>
                       );
                     }
 
                     return (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                      <span
+                        className="badge"
+                        style={{
+                          padding: '4px 10px',
+                          fontSize: '11.5px',
+                          fontWeight: 600,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          backgroundColor: 'var(--bg-subtle)',
+                          color: 'var(--text-muted)',
+                          border: '1px solid var(--border-default)',
+                        }}
+                      >
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--color-warning)' }} />
                         <span>Belum Dikurasi</span>
                       </span>
                     );
                   })()}
                 </div>
 
-                <div className="w-[1px] h-8 bg-slate-200 dark:bg-slate-800 hidden sm:block" />
+                {/* Vertical Divider */}
+                <div style={{ width: '1px', height: '32px', backgroundColor: 'var(--border-default)' }} />
 
-                {/* Chat Activation Status & Toggle */}
-                <div className="flex flex-col gap-1 items-start md:items-end">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                    RAG Knowledge Base
-                  </span>
-                  {hasPermission('documents:toggle_active') ? (
-                    <button
-                      type="button"
-                      onClick={handleToggleActive}
-                      className={`inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer border ${
-                        batch.is_active_knowledge
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 group'
-                          : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
-                      }`}
-                      title={batch.is_active_knowledge ? 'Klik untuk menonaktifkan dokumen dari pencarian AI' : 'Klik untuk mengaktifkan dokumen ke pencarian AI'}
-                    >
+                {/* AI Knowledge Base Status and Action Button */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {batch.is_active_knowledge ? (
                       <span
-                        className={`w-2 h-2 rounded-full ${
-                          batch.is_active_knowledge
-                            ? 'bg-emerald-500 shadow-sm shadow-emerald-400 group-hover:bg-rose-500'
-                            : 'bg-slate-400'
-                        }`}
-                      />
-                      <span>
-                        {batch.is_active_knowledge ? 'Aktif di Chat' : 'Standby (Nonaktif)'}
+                        style={{
+                          fontSize: '11.5px',
+                          fontWeight: 700,
+                          color: 'var(--color-success)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                        }}
+                      >
+                        <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: 'var(--color-success)', boxShadow: '0 0 6px var(--color-success)' }} />
+                        STATUS: AKTIF DI CHAT
                       </span>
-                      <span className="text-[10.5px] font-normal opacity-70 group-hover:opacity-100">
-                        {batch.is_active_knowledge ? '• Ubah' : '• Aktifkan'}
+                    ) : (
+                      <span
+                        style={{
+                          fontSize: '11.5px',
+                          fontWeight: 600,
+                          color: 'var(--text-muted)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                        }}
+                      >
+                        <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: 'var(--border-default)' }} />
+                        STATUS: STANDBY (NON-AKTIF)
                       </span>
-                    </button>
-                  ) : (
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
-                        batch.is_active_knowledge
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
-                          : 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
-                      }`}
+                    )}
+                  </div>
+
+                  {hasPermission('documents:toggle_active') && (
+                    <button
+                      onClick={handleToggleActive}
+                      className={`btn btn-xs ${batch.is_active_knowledge ? 'btn-ghost-danger' : 'btn-outline'}`}
+                      style={{
+                        padding: '3px 10px',
+                        fontSize: '11.5px',
+                        borderRadius: 'var(--radius-xs)',
+                        fontWeight: 600,
+                      }}
+                      title="Klik untuk mengubah status dokumen dalam basis pencarian RAG Chat"
                     >
-                      <span className={`w-2 h-2 rounded-full ${batch.is_active_knowledge ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                      <span>{batch.is_active_knowledge ? 'Aktif di Chat' : 'Standby'}</span>
-                    </span>
+                      {batch.is_active_knowledge ? (
+                        <>
+                          <XCircle size={12} />
+                          <span>Nonaktifkan dari Chat</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 size={12} />
+                          <span>Aktifkan untuk Chat</span>
+                        </>
+                      )}
+                    </button>
                   )}
                 </div>
               </div>
@@ -316,75 +377,49 @@ export default function DocumentStudioPage() {
           </div>
         )}
 
-        {/* Modern Segmented Pill Tabs Navigation */}
-        <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-800 w-fit max-w-full overflow-x-auto shadow-xs">
+        {/* Tab Navigation (Modern Brilian.Ai Pill Tabs) */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            borderBottom: '1px solid var(--border-default)',
+            paddingBottom: '2px',
+          }}
+        >
           <button
-            type="button"
             onClick={() => setActiveTab('insights')}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-              activeTab === 'insights'
-                ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/80 dark:border-slate-700 font-bold'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/50'
-            }`}
+            className={`btn btn-sm ${activeTab === 'insights' ? 'btn-primary' : 'btn-ghost'}`}
+            style={{ borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0', padding: '8px 16px' }}
           >
-            <BookOpen size={14} />
-            <span>{t('studio.tab_curation')}</span>
-            <span
-              className={`px-1.5 py-0.2 rounded-full text-[10.5px] font-mono ${
-                activeTab === 'insights'
-                  ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
-                  : 'bg-slate-200/70 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
-              }`}
-            >
-              {insights.length}
-            </span>
+            <BookOpen size={15} />
+            <span>{t('studio.tab_curation')} ({insights.length})</span>
           </button>
 
           <button
-            type="button"
             onClick={() => setActiveTab('chunks')}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-              activeTab === 'chunks'
-                ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/80 dark:border-slate-700 font-bold'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/50'
-            }`}
+            className={`btn btn-sm ${activeTab === 'chunks' ? 'btn-primary' : 'btn-ghost'}`}
+            style={{ borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0', padding: '8px 16px' }}
           >
-            <Layers size={14} />
-            <span>{t('studio.tab_chunks')}</span>
-            <span
-              className={`px-1.5 py-0.2 rounded-full text-[10.5px] font-mono ${
-                activeTab === 'chunks'
-                  ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
-                  : 'bg-slate-200/70 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
-              }`}
-            >
-              {chunks.length}
-            </span>
+            <Layers size={15} />
+            <span>{t('studio.tab_chunks')} ({chunks.length})</span>
           </button>
 
           <button
-            type="button"
             onClick={() => setActiveTab('metadata')}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-              activeTab === 'metadata'
-                ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/80 dark:border-slate-700 font-bold'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/50'
-            }`}
+            className={`btn btn-sm ${activeTab === 'metadata' ? 'btn-primary' : 'btn-ghost'}`}
+            style={{ borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0', padding: '8px 16px' }}
           >
-            <Info size={14} />
+            <Info size={15} />
             <span>{t('studio.tab_metadata')}</span>
           </button>
 
           <button
-            type="button"
             onClick={() => setActiveTab('grants')}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-              activeTab === 'grants'
-                ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/80 dark:border-slate-700 font-bold'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/50'
-            }`}
+            className={`btn btn-sm ${activeTab === 'grants' ? 'btn-primary' : 'btn-ghost'}`}
+            style={{ borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0', padding: '8px 16px' }}
           >
-            <Users size={14} />
+            <Users size={15} />
             <span>Akses Pengguna</span>
           </button>
         </div>

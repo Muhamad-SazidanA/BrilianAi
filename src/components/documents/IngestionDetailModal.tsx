@@ -161,122 +161,167 @@ export default function IngestionDetailModal() {
 
   return (
     <div
-      className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-950/70 backdrop-blur-md p-4 animate-in fade-in duration-200"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
+        backdropFilter: 'blur(6px)',
+        WebkitBackdropFilter: 'blur(6px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 99999,
+        padding: '1rem',
+      }}
       onClick={handleMinimizeToBackground}
     >
       <div
-        className="w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
+        className="ui-card"
         onClick={(e) => e.stopPropagation()}
         style={{
-          boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1) inset',
+          width: '100%',
+          maxWidth: '640px',
+          maxHeight: '90vh',
+          backgroundColor: 'var(--bg-card, #ffffff)',
+          border: '1px solid var(--border-default, #e2e8f0)',
+          borderRadius: '16px',
+          boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.4)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
         {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/70 dark:bg-slate-800/40">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 flex-shrink-0">
-              <Sparkles className="w-5 h-5" />
+        <div
+          style={{
+            padding: '14px 20px',
+            borderBottom: '1px solid var(--border-default, #e2e8f0)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: 'var(--bg-subtle, #f8fafc)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+            <div
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, #2563eb, #4f46e5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ffffff',
+                flexShrink: 0,
+              }}
+            >
+              <Sparkles size={18} />
             </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h2 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary, #0f172a)', margin: 0 }}>
                   {language === 'en' ? 'AI Vector Ingestion Pipeline' : 'Visualizer Pipeline Vektor AI'}
                 </h2>
                 <span
-                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                    isCompleted
-                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400'
-                      : isError
-                      ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400'
-                      : 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 animate-pulse'
-                  }`}
+                  className={`badge ${isCompleted ? 'badge-success' : isError ? 'badge-danger' : 'badge-accent'}`}
+                  style={{ fontSize: '10px', textTransform: 'uppercase', padding: '2px 8px' }}
                 >
                   {activeTask.status}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 truncate flex items-center gap-2">
-                <span className="font-medium text-slate-700 dark:text-slate-300">
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary, #64748b)', margin: '2px 0 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary, #0f172a)' }}>
                   {activeTask.fileName}
                 </span>
                 <span>•</span>
-                <span className="font-mono text-[11px]">{formatFileSize(activeTask.fileSize)}</span>
+                <span style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: '11px' }}>
+                  {formatFileSize(activeTask.fileSize)}
+                </span>
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <button
               type="button"
               onClick={handleMinimizeToBackground}
-              title={
-                language === 'en'
-                  ? 'Minimize and continue in background'
-                  : 'Lanjutkan di latar belakang'
-              }
-              className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+              title={language === 'en' ? 'Minimize and continue in background' : 'Lanjutkan di latar belakang'}
+              className="btn btn-ghost btn-xs"
+              style={{ padding: '6px', borderRadius: '8px' }}
             >
-              <Minimize2 className="w-4 h-4" />
+              <Minimize2 size={15} />
             </button>
             <button
               type="button"
               onClick={closeDetail}
               title={language === 'en' ? 'Close view' : 'Tutup tampilan'}
-              className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+              className="btn btn-ghost btn-xs"
+              style={{ padding: '6px', borderRadius: '8px' }}
             >
-              <X className="w-4 h-4" />
+              <X size={15} />
             </button>
           </div>
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 overflow-y-auto space-y-6 flex-1">
+        <div style={{ padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '18px', flex: 1 }}>
           {/* Main Progress Bar & Metrics */}
-          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+          <div
+            style={{
+              padding: '14px 16px',
+              borderRadius: '12px',
+              backgroundColor: 'var(--bg-subtle, #f8fafc)',
+              border: '1px solid var(--border-default, #e2e8f0)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary, #0f172a)' }}>
                 {activeTask.message}
               </span>
-              <span className="text-sm font-mono font-bold text-blue-600 dark:text-blue-400">
+              <span style={{ fontSize: '14px', fontFamily: 'var(--font-mono, monospace)', fontWeight: 700, color: '#2563eb' }}>
                 {activeTask.progressPercent}%
               </span>
             </div>
 
-            <div className="w-full bg-slate-200 dark:bg-slate-700/80 rounded-full h-2.5 overflow-hidden p-0.5">
+            <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--border-default, #e2e8f0)', borderRadius: '9999px', overflow: 'hidden' }}>
               <div
-                className={`h-full transition-all duration-500 rounded-full ${
-                  isCompleted
-                    ? 'bg-emerald-500'
-                    : isError
-                    ? 'bg-rose-500'
-                    : 'bg-gradient-to-r from-blue-600 via-indigo-500 to-sky-400 shadow-sm'
-                }`}
-                style={{ width: `${Math.min(100, Math.max(5, activeTask.progressPercent))}%` }}
+                style={{
+                  height: '100%',
+                  width: `${Math.min(100, Math.max(5, activeTask.progressPercent))}%`,
+                  borderRadius: '9999px',
+                  backgroundColor: isCompleted ? '#10b981' : isError ? '#ef4444' : '#2563eb',
+                  transition: 'width 0.4s ease',
+                }}
               />
             </div>
 
             {/* Quick Metrics Badges */}
-            <div className="grid grid-cols-3 gap-2 pt-1 text-center">
-              <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
-                <span className="text-[10px] text-slate-400 block font-medium uppercase tracking-wider">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', paddingTop: '4px', textAlign: 'center' }}>
+              <div style={{ padding: '6px 8px', borderRadius: '8px', backgroundColor: 'var(--bg-card, #ffffff)', border: '1px solid var(--border-default, #e2e8f0)' }}>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted, #94a3b8)', display: 'block', fontWeight: 600, textTransform: 'uppercase' }}>
                   {language === 'en' ? 'Pages' : 'Halaman'}
                 </span>
-                <span className="text-xs font-bold font-mono text-slate-800 dark:text-slate-200">
+                <span style={{ fontSize: '12px', fontWeight: 700, fontFamily: 'var(--font-mono, monospace)', color: 'var(--text-primary, #0f172a)' }}>
                   {activeTask.totalPages || '-'}
                 </span>
               </div>
-              <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
-                <span className="text-[10px] text-slate-400 block font-medium uppercase tracking-wider">
+              <div style={{ padding: '6px 8px', borderRadius: '8px', backgroundColor: 'var(--bg-card, #ffffff)', border: '1px solid var(--border-default, #e2e8f0)' }}>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted, #94a3b8)', display: 'block', fontWeight: 600, textTransform: 'uppercase' }}>
                   {language === 'en' ? 'Chunks' : 'Fragmen Teks'}
                 </span>
-                <span className="text-xs font-bold font-mono text-slate-800 dark:text-slate-200">
+                <span style={{ fontSize: '12px', fontWeight: 700, fontFamily: 'var(--font-mono, monospace)', color: 'var(--text-primary, #0f172a)' }}>
                   {activeTask.totalChunks || '-'}
                 </span>
               </div>
-              <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
-                <span className="text-[10px] text-slate-400 block font-medium uppercase tracking-wider">
+              <div style={{ padding: '6px 8px', borderRadius: '8px', backgroundColor: 'var(--bg-card, #ffffff)', border: '1px solid var(--border-default, #e2e8f0)' }}>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted, #94a3b8)', display: 'block', fontWeight: 600, textTransform: 'uppercase' }}>
                   {language === 'en' ? 'Vectors' : 'Dimensi Vektor'}
                 </span>
-                <span className="text-xs font-bold font-mono text-blue-600 dark:text-blue-400">
+                <span style={{ fontSize: '12px', fontWeight: 700, fontFamily: 'var(--font-mono, monospace)', color: '#2563eb' }}>
                   1024-dim
                 </span>
               </div>
@@ -284,65 +329,62 @@ export default function IngestionDetailModal() {
           </div>
 
           {/* 4-Stage Stepper Pipeline */}
-          <div className="space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <h3 style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted, #94a3b8)', margin: 0 }}>
               {language === 'en' ? 'Ingestion Stages' : 'Tahapan Pipeline Terintegrasi'}
             </h3>
 
-            <div className="space-y-2.5">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {stages.map((stage) => {
                 const Icon = stage.icon;
                 const isStageComplete = isCompleted || currentStageNum > stage.num;
                 const isStageActive = !isCompleted && !isError && currentStageNum === stage.num;
-                const isStagePending = !isCompleted && currentStageNum < stage.num;
 
                 return (
                   <div
                     key={stage.num}
-                    className={`p-3.5 rounded-2xl border transition-all duration-200 flex items-start gap-3.5 ${
-                      isStageComplete
-                        ? 'bg-emerald-50/30 border-emerald-200 dark:bg-emerald-950/10 dark:border-emerald-900/50'
-                        : isStageActive
-                        ? 'bg-blue-50/50 border-blue-300 dark:bg-blue-950/30 dark:border-blue-700/60 shadow-sm'
-                        : 'bg-slate-50/50 border-slate-200/60 dark:bg-slate-900/40 dark:border-slate-800 opacity-60'
-                    }`}
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: '10px',
+                      border: `1px solid ${isStageActive ? 'var(--color-primary, #2563eb)' : isStageComplete ? '#a7f3d0' : 'var(--border-default, #e2e8f0)'}`,
+                      backgroundColor: isStageActive ? 'var(--color-primary-subtle, #eff6ff)' : isStageComplete ? '#ecfdf5' : 'transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                    }}
                   >
                     <div
-                      className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
-                        isStageComplete
-                          ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/60 dark:text-emerald-300'
-                          : isStageActive
-                          ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
-                          : 'bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
-                      }`}
+                      style={{
+                        width: '30px',
+                        height: '30px',
+                        borderRadius: '8px',
+                        backgroundColor: isStageComplete ? '#10b981' : isStageActive ? '#2563eb' : 'var(--bg-muted, #e2e8f0)',
+                        color: isStageComplete || isStageActive ? '#ffffff' : 'var(--text-secondary, #64748b)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
                     >
                       {isStageComplete ? (
-                        <Check className="w-4 h-4 stroke-[3]" />
+                        <Check size={16} />
                       ) : isStageActive ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <Loader2 size={16} className="animate-spin" />
                       ) : (
-                        <Icon className="w-4 h-4" />
+                        <Icon size={16} />
                       )}
                     </div>
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <span
-                          className={`text-xs font-bold ${
-                            isStageActive
-                              ? 'text-blue-700 dark:text-blue-300'
-                              : isStageComplete
-                              ? 'text-emerald-800 dark:text-emerald-300'
-                              : 'text-slate-700 dark:text-slate-300'
-                          }`}
-                        >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                        <span style={{ fontSize: '12.5px', fontWeight: 650, color: 'var(--text-primary, #0f172a)' }}>
                           {stage.title}
                         </span>
-                        <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                        <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono, monospace)', color: 'var(--text-secondary, #64748b)' }}>
                           {stage.detail}
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+                      <p style={{ fontSize: '11.5px', color: 'var(--text-secondary, #64748b)', margin: '2px 0 0' }}>
                         {stage.desc}
                       </p>
                     </div>
@@ -353,39 +395,54 @@ export default function IngestionDetailModal() {
           </div>
 
           {/* Terminal / Live Output Stream */}
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
-              <Terminal className="w-3.5 h-3.5" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary, #64748b)' }}>
+              <Terminal size={14} />
               <span>{language === 'en' ? 'Pipeline Telemetry Stream' : 'Live Telemetri Log'}</span>
             </div>
 
-            <div className="p-3 bg-slate-950 text-emerald-400 font-mono text-[11px] rounded-xl border border-slate-800 space-y-1 max-h-28 overflow-y-auto shadow-inner">
-              <p className="text-slate-500">
+            <div
+              style={{
+                padding: '10px 14px',
+                backgroundColor: '#0f172a',
+                color: '#34d399',
+                fontFamily: 'var(--font-mono, monospace)',
+                fontSize: '11px',
+                borderRadius: '8px',
+                border: '1px solid #1e293b',
+                maxHeight: '110px',
+                overflowY: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px',
+              }}
+            >
+              <p style={{ margin: 0, color: '#64748b' }}>
                 [SYS] Target Document: {activeTask.fileName} ({formatFileSize(activeTask.fileSize)})
               </p>
-              <p className="text-slate-500">
+              <p style={{ margin: 0, color: '#64748b' }}>
                 [SYS] Task Client ID: {activeTask.id}
               </p>
-              <p className="text-blue-400">
+              <p style={{ margin: 0, color: '#60a5fa' }}>
                 [STATUS] {activeTask.message} ({activeTask.progressPercent}%)
               </p>
               {activeTask.totalChunks && (
-                <p className="text-purple-400">
+                <p style={{ margin: 0, color: '#c084fc' }}>
                   [CHUNKS] Sliding-Window: {activeTask.totalChunks} chunks processed
                 </p>
               )}
               {activeTask.processedChunks && (
-                <p className="text-amber-400">
+                <p style={{ margin: 0, color: '#fbbf24' }}>
                   [VECTOR] Embeddings generated: {activeTask.processedChunks} / {activeTask.totalChunks}
                 </p>
               )}
               {isCompleted && (
-                <p className="text-emerald-300 font-bold">
+                <p style={{ margin: 0, color: '#34d399', fontWeight: 700 }}>
                   [SUCCESS] Vector embeddings committed to PostgreSQL pgvector knowledge base.
                 </p>
               )}
               {isError && (
-                <p className="text-rose-400 font-bold">
+                <p style={{ margin: 0, color: '#f87171', fontWeight: 700 }}>
                   [ERROR] {activeTask.error || activeTask.message}
                 </p>
               )}
@@ -395,23 +452,30 @@ export default function IngestionDetailModal() {
         </div>
 
         {/* Modal Footer Actions */}
-        <div className="px-6 py-3.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 flex items-center justify-between">
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            {language === 'en'
-              ? 'Safe to navigate or refresh'
-              : 'Aman berpindah halaman atau tab'}
+        <div
+          style={{
+            padding: '12px 20px',
+            borderTop: '1px solid var(--border-default, #e2e8f0)',
+            backgroundColor: 'var(--bg-subtle, #f8fafc)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <p style={{ fontSize: '11.5px', color: 'var(--text-secondary, #64748b)', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#10b981' }} />
+            {language === 'en' ? 'Safe to navigate or refresh' : 'Aman berpindah halaman atau tab'}
           </p>
 
-          <div className="flex items-center gap-2">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {isProcessing && (
               <button
                 type="button"
                 onClick={handleMinimizeToBackground}
-                className="px-4 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm transition-colors flex items-center gap-1.5"
+                className="btn btn-outline btn-sm"
               >
-                <Minimize2 className="w-3.5 h-3.5" />
-                {language === 'en' ? 'Run in Background' : 'Lanjutkan di Latar Belakang'}
+                <Minimize2 size={13} />
+                <span>{language === 'en' ? 'Run in Background' : 'Lanjutkan di Latar Belakang'}</span>
               </button>
             )}
 
@@ -419,10 +483,10 @@ export default function IngestionDetailModal() {
               <button
                 type="button"
                 onClick={closeDetail}
-                className="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/20 transition-colors flex items-center gap-1.5"
+                className="btn btn-primary btn-sm"
               >
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                {language === 'en' ? 'Done' : 'Selesai'}
+                <CheckCircle2 size={13} />
+                <span>{language === 'en' ? 'Done' : 'Selesai'}</span>
               </button>
             )}
 
@@ -430,7 +494,7 @@ export default function IngestionDetailModal() {
               <button
                 type="button"
                 onClick={closeDetail}
-                className="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white transition-colors"
+                className="btn btn-outline btn-sm"
               >
                 {language === 'en' ? 'Close' : 'Tutup'}
               </button>

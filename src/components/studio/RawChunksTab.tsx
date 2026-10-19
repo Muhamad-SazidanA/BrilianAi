@@ -39,35 +39,60 @@ export default function RawChunksTab({
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       {/* Uncurated Notification Banner */}
       {!isLoading && curatedCount === 0 && chunks.length > 0 && (
-        <div className="bg-gradient-to-r from-blue-50/70 to-indigo-50/50 dark:from-blue-950/30 dark:to-indigo-950/20 border border-blue-200/80 dark:border-blue-900/50 rounded-2xl p-4 md:p-5 flex items-center justify-between gap-4 flex-wrap shadow-xs">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-blue-100 dark:bg-blue-900/60 text-blue-600 flex items-center justify-center flex-shrink-0">
-              <Sparkles size={18} className="animate-pulse" />
+        <div
+          className="ui-card"
+          style={{
+            padding: '1.25rem 1.5rem',
+            background: 'linear-gradient(135deg, var(--bg-card) 0%, var(--bg-subtle) 100%)',
+            border: '1px solid var(--color-primary-subtle)',
+            borderRadius: 'var(--radius-lg)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '1rem',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                backgroundColor: 'var(--color-primary-subtle)',
+                color: 'var(--color-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <Sparkles size={20} />
             </div>
             <div>
-              <h4 className="text-xs md:text-sm font-bold text-slate-900 dark:text-slate-100">
+              <h4 style={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--text-primary)' }}>
                 {language === 'en'
                   ? 'Document is not yet curated'
                   : 'Dokumen ini belum memiliki kurasi insight'}
               </h4>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                 {language === 'en'
                   ? `Extract key insights from ${chunks.length} raw chunks into structured knowledge cards with real-time 1-100% progress.`
-                  : `Ekstrak intisari dari ${chunks.length} raw chunk menjadi kartu insight terstruktur dengan progres 1-100%.`}
+                  : `Ekstrak intisari dari ${chunks.length} raw chunk menjadi kartu insight terstruktur dengan loading persentase 1-100%.`}
               </p>
             </div>
           </div>
 
           {onStartCuration && (
             <button
-              type="button"
               onClick={onStartCuration}
-              className="h-8 px-4 rounded-full text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-sm shadow-blue-500/25 transition-all inline-flex items-center gap-1.5 cursor-pointer"
+              className="btn btn-primary btn-sm"
+              style={{ padding: '8px 16px', fontWeight: 600 }}
             >
-              <Sparkles size={13} />
+              <Sparkles size={14} />
               <span>{language === 'en' ? 'Start AI Curation' : 'Mulai Kurasi AI'}</span>
               <ArrowRight size={13} />
             </button>
@@ -76,28 +101,30 @@ export default function RawChunksTab({
       )}
 
       {/* Search Header */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 md:p-5 shadow-sm">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
+      <div className="ui-card" style={{ padding: '1.25rem 1.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
           <div>
-            <h3 className="text-sm md:text-base font-bold text-slate-900 dark:text-slate-100">
+            <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
               Raw Chunks ({chunks.length})
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
               {t('chunks.subtitle')}
             </p>
           </div>
 
-          <div className="relative w-full sm:w-64">
+          <div style={{ position: 'relative', width: '280px' }}>
             <Search
-              size={14}
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+              size={15}
+              color="var(--text-muted)"
+              style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
             />
             <input
               type="text"
               placeholder={t('chunks.search_placeholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full h-8 pl-9 pr-3 rounded-full text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 outline-none focus:border-blue-500 focus:bg-white transition-colors"
+              className="input-text"
+              style={{ paddingLeft: '36px', fontSize: '13px' }}
             />
           </div>
         </div>
@@ -105,19 +132,19 @@ export default function RawChunksTab({
 
       {/* Chunks List */}
       {isLoading ? (
-        <div className="p-12 text-center text-slate-500">
-          <div className="w-6 h-6 border-2 border-slate-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-2.5" />
-          <p className="text-xs">{t('chunks.loading')}</p>
+        <div style={{ padding: '3.5rem 0', textAlign: 'center', color: 'var(--text-secondary)' }}>
+          <div className="animate-spin" style={{ width: '26px', height: '26px', border: '2px solid var(--border-default)', borderTopColor: 'var(--color-primary)', borderRadius: '50%', margin: '0 auto 10px' }} />
+          <p style={{ fontSize: '13px' }}>{t('chunks.loading')}</p>
         </div>
       ) : filteredChunks.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-12 text-center shadow-sm">
-          <Layers size={36} strokeWidth={1.5} className="text-slate-300 mx-auto mb-2.5" />
-          <p className="font-bold text-sm text-slate-800 dark:text-slate-200">
+        <div className="ui-card" style={{ padding: '3.5rem 0', textAlign: 'center', color: 'var(--text-secondary)' }}>
+          <Layers size={38} strokeWidth={1.25} color="var(--text-muted)" style={{ margin: '0 auto 10px' }} />
+          <p style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary)' }}>
             {search ? t('chunks.empty_search') : t('chunks.empty')}
           </p>
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {filteredChunks.map((chunk) => {
             const pageLabel =
               chunk.source_page_start === chunk.source_page_end
@@ -127,36 +154,28 @@ export default function RawChunksTab({
             const isCopied = copiedId === chunk.id;
 
             return (
-              <div
-                key={chunk.id}
-                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 md:p-5 shadow-sm hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
-              >
+              <div key={chunk.id} className="ui-card" style={{ padding: '1.25rem' }}>
                 {/* Chunk Header */}
-                <div className="flex items-center justify-between gap-3 mb-2.5 flex-wrap">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200/80">
-                      Chunk #{chunk.chunk_index}
-                    </span>
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60">
-                      {pageLabel}
-                    </span>
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono text-slate-500 bg-slate-50 dark:bg-slate-800/60">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span className="badge badge-accent">Chunk #{chunk.chunk_index}</span>
+                    <span className="badge badge-neutral">{pageLabel}</span>
+                    <span className="badge badge-neutral" style={{ fontSize: '11px' }}>
                       {chunk.content.length} {t('chunks.chars')}
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-mono bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200/60">
-                      Vector 1024-dim
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span className="badge badge-neutral font-mono" style={{ fontSize: '11px' }}>
+                      Dense Vector (1024-dim)
                     </span>
                     <button
-                      type="button"
                       onClick={() => handleCopy(chunk.id, chunk.content)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                      className="btn btn-ghost btn-sm"
                       title={t('chunks.copy')}
                     >
-                      {isCopied ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
-                      <span className="text-[11px]">{isCopied ? t('chunks.copied') : t('chunks.copy')}</span>
+                      {isCopied ? <Check size={14} color="var(--color-success)" /> : <Copy size={14} />}
+                      <span style={{ fontSize: '12px' }}>{isCopied ? t('chunks.copied') : t('chunks.copy')}</span>
                     </button>
                   </div>
                 </div>
