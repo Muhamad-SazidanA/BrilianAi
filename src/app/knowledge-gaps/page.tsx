@@ -180,14 +180,7 @@ export default function KnowledgeGapsPage() {
 
   return (
     <AppShell requiredPermission="documents:read">
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1.25rem',
-          padding: '0 0.25rem 3.5rem',
-        }}
-      >
+      <div className="enterprise-page-container">
         {/* Enterprise Page Header */}
         <EnterprisePageHeader
           title={language === 'en' ? 'Knowledge Gaps' : 'Kesenjangan Pengetahuan'}
@@ -201,95 +194,78 @@ export default function KnowledgeGapsPage() {
           isLoading={isLoading}
         />
 
-        {/* 4 Pure Enterprise Metric Cards (Sticky Freeze below Header) */}
+        {/* 4 Pure Enterprise Metric Cards */}
         <div
           ref={statsRef}
           style={{
-            position: 'sticky',
-            top: 'var(--header-height, 48px)',
-            zIndex: 30,
-            backgroundColor: 'var(--bg-app)',
-            paddingTop: '6px',
-            paddingBottom: '8px',
-            borderBottom: '1px solid var(--border-default)',
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)',
-            boxShadow: '0 2px 4px rgba(15, 23, 42, 0.03)',
-            boxSizing: 'border-box',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: '10px',
+            flexShrink: 0,
           }}
         >
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
-              gap: '0.85rem',
-            }}
-          >
-            <DashboardMetricCard
-              title={language === 'en' ? 'Open Gaps' : 'Kesenjangan Terbuka'}
-              value={`${stats.open} Isu`}
-              badge="Open"
-              badgeType="neutral"
-              statusDot="live"
-              footerText={language === 'en' ? 'Requires new SOP reference' : 'Memerlukan dokumen SOP baru'}
-              isLoading={isLoading}
-              onClick={() => setStatusFilter('open')}
-            />
+          <DashboardMetricCard
+            title={language === 'en' ? 'Open Gaps' : 'Kesenjangan Terbuka'}
+            value={`${stats.open} Isu`}
+            badge="Open"
+            badgeType="neutral"
+            statusDot="live"
+            footerText={language === 'en' ? 'Requires new SOP reference' : 'Memerlukan dokumen SOP baru'}
+            isLoading={isLoading}
+            onClick={() => setStatusFilter('open')}
+          />
 
-            <DashboardMetricCard
-              title={language === 'en' ? 'In Progress' : 'Sedang Ditangani'}
-              value={`${stats.inProgress} Proses`}
-              badge="In Progress"
-              badgeType="neutral"
-              statusDot="blue"
-              footerText={language === 'en' ? 'Under SME curation' : 'Dalam proses kurasi tim SME'}
-              isLoading={isLoading}
-              onClick={() => setStatusFilter('in_progress')}
-            />
+          <DashboardMetricCard
+            title={language === 'en' ? 'In Progress' : 'Sedang Ditangani'}
+            value={`${stats.inProgress} Proses`}
+            badge="In Progress"
+            badgeType="neutral"
+            statusDot="blue"
+            footerText={language === 'en' ? 'Under SME curation' : 'Dalam proses kurasi tim SME'}
+            isLoading={isLoading}
+            onClick={() => setStatusFilter('in_progress')}
+          />
 
-            <DashboardMetricCard
-              title={language === 'en' ? 'Resolved' : 'Telah Diselesaikan'}
-              value={`${stats.resolved} Selesai`}
-              badge="Resolved"
-              badgeType="neutral"
-              footerText={language === 'en' ? 'SOP indexed to RAG' : 'Dokumen rujukan terunggah'}
-              isLoading={isLoading}
-              onClick={() => setStatusFilter('resolved')}
-            />
+          <DashboardMetricCard
+            title={language === 'en' ? 'Resolved' : 'Telah Diselesaikan'}
+            value={`${stats.resolved} Selesai`}
+            badge="Resolved"
+            badgeType="neutral"
+            footerText={language === 'en' ? 'SOP indexed to RAG' : 'Dokumen rujukan terunggah'}
+            isLoading={isLoading}
+            onClick={() => setStatusFilter('resolved')}
+          />
 
-            <DashboardMetricCard
-              title={language === 'en' ? 'Total Gaps' : 'Total Kesenjangan'}
-              value={`${stats.total} Total`}
-              badge="KMS Total"
-              badgeType="neutral"
-              footerText={language === 'en' ? 'Accumulated queries' : 'Akumulasi query pengguna'}
-              isLoading={isLoading}
-              onClick={() => setStatusFilter('all')}
-            />
-          </div>
+          <DashboardMetricCard
+            title={language === 'en' ? 'Total Gaps' : 'Total Kesenjangan'}
+            value={`${stats.total} Total`}
+            badge="KMS Total"
+            badgeType="neutral"
+            footerText={language === 'en' ? 'Accumulated queries' : 'Akumulasi query pengguna'}
+            isLoading={isLoading}
+            onClick={() => setStatusFilter('all')}
+          />
         </div>
 
         {/* ── Unified Knowledge Gaps Stream Card (Linear / Vercel style) ── */}
         <div
           className="enterprise-card"
           style={{
+            flex: 1,
+            minHeight: 0,
             display: 'flex',
             flexDirection: 'column',
-            minHeight: '380px',
-            overflow: 'visible',
+            overflow: 'hidden',
           }}
         >
-          {/* Unified Header Controls (Sticky Freeze Header below 4 Stats Cards) */}
+          {/* Unified Header Controls */}
           <div
             className="enterprise-card-header"
             style={{
+              flexShrink: 0,
               flexWrap: 'wrap',
               gap: '8px',
-              position: 'sticky',
-              top: `${48 + statsHeight - 1}px`,
-              zIndex: 20,
               backgroundColor: 'var(--bg-card, #ffffff)',
-              boxShadow: '0 2px 4px rgba(15, 23, 42, 0.04)',
               borderBottom: '1px solid var(--border-default, #e2e8f0)',
             }}
           >
@@ -464,8 +440,9 @@ export default function KnowledgeGapsPage() {
             className="enterprise-table-wrapper"
             style={{
               flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
+              minHeight: 0,
+              overflowY: 'auto',
+              overflowX: 'auto',
             }}
           >
             {isLoading ? (

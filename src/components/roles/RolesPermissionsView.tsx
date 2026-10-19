@@ -412,14 +412,7 @@ export default function RolesPermissionsView() {
   const totalSelected = selectedPerms.length;
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '1.25rem',
-        padding: '0 0.25rem 3.5rem',
-      }}
-    >
+    <div className="enterprise-page-container">
       {/* ── Enterprise Page Header ── */}
       <EnterprisePageHeader
         title={language === 'en' ? 'Roles & Permissions (RBAC)' : 'Role & Hak Akses (RBAC)'}
@@ -461,30 +454,16 @@ export default function RolesPermissionsView() {
         }
       />
 
-      {/* ── 4 Pure Enterprise Metric Cards (Sticky Freeze below Header) ── */}
+      {/* ── 4 Pure Enterprise Metric Cards ── */}
       <div
         ref={statsRef}
         style={{
-          position: 'sticky',
-          top: 'var(--header-height, 48px)',
-          zIndex: 30,
-          backgroundColor: 'var(--bg-app)',
-          paddingTop: '6px',
-          paddingBottom: '8px',
-          borderBottom: '1px solid var(--border-default)',
-          backdropFilter: 'blur(10px)',
-          WebkitBackdropFilter: 'blur(10px)',
-          boxShadow: '0 2px 4px rgba(15, 23, 42, 0.03)',
-          boxSizing: 'border-box',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: '10px',
+          flexShrink: 0,
         }}
       >
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
-            gap: '0.85rem',
-          }}
-        >
           <DashboardMetricCard
             title={language === 'en' ? 'Total Roles' : 'Total Role'}
             value={`${roles.length} Role`}
@@ -522,31 +501,28 @@ export default function RolesPermissionsView() {
             footerText={language === 'en' ? 'Granular action privileges' : 'Izin fungsional modular'}
             isLoading={isLoading}
           />
-        </div>
       </div>
 
       {/* ── Main Stream Card (Linear / Vercel Enterprise Style) ── */}
       <div
         className="enterprise-card"
         style={{
+          flex: 1,
+          minHeight: 0,
           display: 'flex',
           flexDirection: 'column',
-          minHeight: '400px',
-          overflow: 'visible',
+          overflow: 'hidden',
         }}
       >
-        {/* Sticky Freeze Header below 4 Stats Cards */}
+        {/* Card Header Controls */}
         <div
           ref={cardHeaderRef}
           className="enterprise-card-header"
           style={{
+            flexShrink: 0,
             flexWrap: 'wrap',
             gap: '8px',
-            position: 'sticky',
-            top: `${48 + statsHeight - 1}px`,
-            zIndex: 25,
             backgroundColor: 'var(--bg-card, #ffffff)',
-            boxShadow: '0 2px 4px rgba(15, 23, 42, 0.04)',
             borderBottom: '1px solid var(--border-default, #e2e8f0)',
           }}
         >
@@ -602,7 +578,7 @@ export default function RolesPermissionsView() {
 
         {/* ── Table Content ── */}
         <div className="enterprise-table-wrapper">
-          <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '12.5px' }}>
+          <table style={{ width: '100%', minWidth: '720px', borderCollapse: 'separate', borderSpacing: 0, fontSize: '12.5px' }}>
             <thead>
               <tr>
                 {[
@@ -615,8 +591,8 @@ export default function RolesPermissionsView() {
                     key={col.label}
                     style={{
                       position: 'sticky',
-                      top: `${tableHeaderStickyTop}px`,
-                      zIndex: 20,
+                      top: 0,
+                      zIndex: 10,
                       backgroundColor: 'var(--bg-subtle, #f8fafc)',
                       padding: '8px 14px',
                       fontWeight: 600,

@@ -78,6 +78,7 @@ export default function EnterprisePageHeader({
         paddingBottom: '2px',
         minWidth: 0,
         width: '100%',
+        flexShrink: 0,
       }}
     >
       {/* ── Left: Page Title & Subtitle (Auto-truncates on narrow viewports) ── */}

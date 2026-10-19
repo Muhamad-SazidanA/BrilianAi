@@ -500,14 +500,7 @@ export default function UsersManagementView() {
   };
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '1.25rem',
-        padding: '0 0.25rem 3.5rem',
-      }}
-    >
+    <div className="enterprise-page-container">
       {/* ── Enterprise Page Header ── */}
       <EnterprisePageHeader
         title={language === 'en' ? 'User Management' : 'Kelola Pengguna'}
@@ -549,30 +542,16 @@ export default function UsersManagementView() {
         }
       />
 
-      {/* ── 4 Pure Enterprise Metric Cards (Sticky Freeze below Header) ── */}
+      {/* ── 4 Pure Enterprise Metric Cards ── */}
       <div
         ref={statsRef}
         style={{
-          position: 'sticky',
-          top: 'var(--header-height, 48px)',
-          zIndex: 30,
-          backgroundColor: 'var(--bg-app)',
-          paddingTop: '6px',
-          paddingBottom: '8px',
-          borderBottom: '1px solid var(--border-default)',
-          backdropFilter: 'blur(10px)',
-          WebkitBackdropFilter: 'blur(10px)',
-          boxShadow: '0 2px 4px rgba(15, 23, 42, 0.03)',
-          boxSizing: 'border-box',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: '10px',
+          flexShrink: 0,
         }}
       >
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
-            gap: '0.85rem',
-          }}
-        >
           <DashboardMetricCard
             title={language === 'en' ? 'Total Users' : 'Total Pengguna'}
             value={`${users.length} User`}
@@ -621,14 +600,13 @@ export default function UsersManagementView() {
             footerText={language === 'en' ? 'Defined RBAC matrix' : 'Hierarki hak akses terdefinisi'}
             isLoading={isLoading}
           />
-        </div>
       </div>
 
       {/* ── Pending Users Action Callout Banner (if pending users exist) ── */}
       {pendingUsers.length > 0 && statusFilter !== 'pending_approval' && (
         <div
           style={{
-            padding: '10px 14px',
+            padding: '8px 12px',
             borderRadius: '8px',
             backgroundColor: '#fffbeb',
             border: '1px solid #fde68a',
@@ -637,6 +615,7 @@ export default function UsersManagementView() {
             justifyContent: 'space-between',
             gap: '12px',
             flexWrap: 'wrap',
+            flexShrink: 0,
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -678,24 +657,22 @@ export default function UsersManagementView() {
       <div
         className="enterprise-card"
         style={{
+          flex: 1,
+          minHeight: 0,
           display: 'flex',
           flexDirection: 'column',
-          minHeight: '400px',
-          overflow: 'visible',
+          overflow: 'hidden',
         }}
       >
-        {/* Sticky Freeze Header below 4 Stats Cards */}
+        {/* Card Header Controls */}
         <div
           ref={cardHeaderRef}
           className="enterprise-card-header"
           style={{
+            flexShrink: 0,
             flexWrap: 'wrap',
             gap: '8px',
-            position: 'sticky',
-            top: `${48 + statsHeight - 1}px`,
-            zIndex: 25,
             backgroundColor: 'var(--bg-card, #ffffff)',
-            boxShadow: '0 2px 4px rgba(15, 23, 42, 0.04)',
             borderBottom: '1px solid var(--border-default, #e2e8f0)',
           }}
         >
@@ -828,7 +805,7 @@ export default function UsersManagementView() {
 
         {/* ── Table Content ── */}
         <div className="enterprise-table-wrapper">
-          <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '12.5px' }}>
+          <table style={{ width: '100%', minWidth: '940px', borderCollapse: 'separate', borderSpacing: 0, fontSize: '12.5px' }}>
             <thead>
               <tr>
                 {['Pengguna', 'Username', 'Role Akses', 'Departemen', 'Pertanyaan AI', 'Login Terakhir', 'Status', 'Aksi'].map((h, idx) => (
@@ -836,8 +813,8 @@ export default function UsersManagementView() {
                     key={h}
                     style={{
                       position: 'sticky',
-                      top: `${tableHeaderStickyTop}px`,
-                      zIndex: 20,
+                      top: 0,
+                      zIndex: 10,
                       backgroundColor: 'var(--bg-subtle, #f8fafc)',
                       padding: '8px 14px',
                       fontWeight: 600,

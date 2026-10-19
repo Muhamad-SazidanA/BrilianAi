@@ -98,23 +98,21 @@ export default function DocumentTable({
       <div
         className="enterprise-card"
         style={{
+          flex: 1,
+          minHeight: 0,
           display: 'flex',
           flexDirection: 'column',
-          minHeight: '380px',
-          overflow: 'visible',
+          overflow: 'hidden',
         }}
       >
-        {/* ── Unified Header Controls (Sticky Freeze Header below 4 Stats Cards) ── */}
+        {/* ── Unified Header Controls ── */}
         <div
           className="enterprise-card-header"
           style={{
+            flexShrink: 0,
             flexWrap: 'wrap',
             gap: '8px',
-            position: 'sticky',
-            top: stickyTop ? `${stickyTop}px` : '157px',
-            zIndex: 20,
             backgroundColor: 'var(--bg-card, #ffffff)',
-            boxShadow: '0 2px 4px rgba(15, 23, 42, 0.04)',
             borderBottom: '1px solid var(--border-default, #e2e8f0)',
           }}
         >
@@ -289,8 +287,9 @@ export default function DocumentTable({
           className="enterprise-table-wrapper"
           style={{
             flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
+            minHeight: 0,
+            overflowY: 'auto',
+            overflowX: 'auto',
           }}
         >
           {isLoading ? (

@@ -178,14 +178,7 @@ function DocumentsContent() {
 
   return (
     <AppShell requiredPermission="documents:read">
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1.25rem',
-          padding: '0 0.25rem 3.5rem',
-        }}
-      >
+      <div className="enterprise-page-container">
         {/* Enterprise Page Header */}
         <EnterprisePageHeader
           title={language === 'en' ? 'Knowledge Base' : 'Basis Pengetahuan'}
@@ -239,7 +232,7 @@ function DocumentsContent() {
         />
 
         {/* Document Stats Cards (Pure 4-card enterprise metrics) */}
-        <DocumentStatsCards batches={batches} isLoading={isLoading} containerRef={statsRef} />
+        <DocumentStatsCards batches={batches} isLoading={isLoading} />
 
         {/* Document Table with High-Density Controls & Shimmer Skeleton */}
         <DocumentTable
@@ -251,7 +244,6 @@ function DocumentsContent() {
           onToggleActive={handleToggleActive}
           onActivateAll={handleActivateAll}
           onUpload={() => setIsUploadOpen(true)}
-          stickyTop={48 + statsHeight - 1}
         />
       </div>
 
