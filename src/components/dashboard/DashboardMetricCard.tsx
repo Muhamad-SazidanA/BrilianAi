@@ -47,7 +47,7 @@ export default function DashboardMetricCard({
           {statusDot === 'blue' && <span className="pulse-dot-blue" />}
           <span
             style={{
-              fontSize: '12px',
+              fontSize: '11.5px',
               fontWeight: 500,
               color: 'var(--text-secondary, #64748b)',
               whiteSpace: 'nowrap',
@@ -68,14 +68,14 @@ export default function DashboardMetricCard({
       </div>
 
       {/* ── 2. Middle Row: Main Metric Value (NEVER WRAPS TO 2 LINES) ── */}
-      <div style={{ margin: '8px 0 6px', display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+      <div style={{ margin: '6px 0 5px', display: 'flex', alignItems: 'baseline', gap: '6px' }}>
         {isLoading ? (
-          <span className="skeleton-shimmer" style={{ width: '80px', height: '22px', borderRadius: '4px' }} />
+          <span className="skeleton-shimmer" style={{ width: '80px', height: '20px', borderRadius: '4px' }} />
         ) : (
           <span
             style={{
-              fontSize: '20px',
-              fontWeight: 700,
+              fontSize: '18px',
+              fontWeight: 600,
               color: 'var(--text-primary, #0f172a)',
               lineHeight: 1.15,
               letterSpacing: '-0.02em',

@@ -347,8 +347,8 @@ export default function MarkdownContent({
                   style={{
                     width: '100%',
                     borderCollapse: 'collapse',
-                    fontSize: compact ? '12px' : '13px',
-                    lineHeight: '18px',
+                    fontSize: compact ? '11px' : '11.5px',
+                    lineHeight: '16px',
                     textAlign: 'left',
                   }}
                 >
@@ -368,10 +368,11 @@ export default function MarkdownContent({
                           <th
                             key={hIdx}
                             style={{
-                              padding: compact ? '6px 10px' : '8px 12px',
-                              fontWeight: 700,
+                              padding: compact ? '5px 8px' : '6px 10px',
+                              fontWeight: 600,
                               color: 'var(--text-primary)',
                               textAlign: align,
+                              verticalAlign: 'middle',
                               whiteSpace: 'nowrap',
                               borderBottom: '1px solid var(--border-default)',
                               backgroundColor: 'var(--bg-subtle)',
@@ -413,6 +414,7 @@ export default function MarkdownContent({
                                   padding: compact ? '6px 10px' : '7px 12px',
                                   color: 'var(--text-secondary)',
                                   textAlign: cellAlign,
+                                  verticalAlign: 'middle',
                                   whiteSpace: 'nowrap',
                                   fontVariantNumeric: isNumericLike(cell) ? 'tabular-nums' : undefined,
                                 }}
@@ -461,13 +463,13 @@ export default function MarkdownContent({
               style={{
                 paddingLeft: '1.25rem',
                 margin: 0,
-                fontSize: compact ? '12.5px' : '13.5px',
-                lineHeight: compact ? '20px' : '22px',
+                fontSize: compact ? '12px' : '12.5px',
+                lineHeight: compact ? '19px' : '20px',
                 color: 'var(--text-secondary)',
               }}
             >
               {block.items.map((it, itIdx) => (
-                <li key={itIdx} style={{ marginBottom: '3px' }}>
+                <li key={itIdx} style={{ marginBottom: '2px' }}>
                   {renderInline(it)}
                 </li>
               ))}
@@ -482,13 +484,13 @@ export default function MarkdownContent({
               style={{
                 paddingLeft: '1.25rem',
                 margin: 0,
-                fontSize: compact ? '12.5px' : '13.5px',
-                lineHeight: compact ? '20px' : '22px',
+                fontSize: compact ? '12px' : '12.5px',
+                lineHeight: compact ? '19px' : '20px',
                 color: 'var(--text-secondary)',
               }}
             >
               {block.items.map((it, itIdx) => (
-                <li key={itIdx} style={{ marginBottom: '3px' }}>
+                <li key={itIdx} style={{ marginBottom: '2px' }}>
                   {renderInline(it)}
                 </li>
               ))}
@@ -501,8 +503,9 @@ export default function MarkdownContent({
             <h4
               key={bIdx}
               style={{
-                fontSize: compact ? '13.5px' : '14.5px',
-                fontWeight: 700,
+                fontSize: compact ? '12.5px' : '13.5px',
+                fontWeight: 600,
+                letterSpacing: '-0.01em',
                 color: 'var(--text-primary)',
                 marginTop: '4px',
                 marginBottom: '2px',
@@ -518,9 +521,10 @@ export default function MarkdownContent({
           <p
             key={bIdx}
             style={{
-              fontSize: compact ? '13px' : '14px',
+              fontSize: compact ? '12px' : '12.5px',
               color: 'var(--text-secondary)',
-              lineHeight: compact ? '21px' : '23px',
+              lineHeight: compact ? '19px' : '20px',
+              letterSpacing: '-0.005em',
               margin: 0,
               whiteSpace: 'pre-line',
             }}

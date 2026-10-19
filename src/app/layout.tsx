@@ -1,22 +1,23 @@
 import type { Metadata } from 'next';
-import { Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
+import localFont from 'next/font/local';
 import './globals.css';
 import { LanguageProvider } from '@/context/LanguageContext';
 import { UserSessionProvider } from '@/context/UserSessionContext';
 import { SidebarProvider } from '@/context/SidebarContext';
+import { IngestionProvider } from '@/context/IngestionContext';
+import IngestionDock from '@/components/documents/IngestionDock';
+import IngestionDetailModal from '@/components/documents/IngestionDetailModal';
 import ToastProvider from '@/components/providers/ToastProvider';
 
-const plusJakarta = Plus_Jakarta_Sans({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700', '800'],
-  variable: '--font-sans',
+const geistSans = localFont({
+  src: './fonts/Geist-Variable.woff2',
+  variable: '--font-geist-sans',
   display: 'swap',
 });
 
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  variable: '--font-mono',
+const geistMono = localFont({
+  src: './fonts/GeistMono-Variable.woff2',
+  variable: '--font-geist-mono',
   display: 'swap',
 });
 
@@ -39,7 +40,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="id" className={`${plusJakarta.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
+    <html lang="id" className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -55,12 +56,16 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={plusJakarta.className} suppressHydrationWarning>
+      <body className={geistSans.className} suppressHydrationWarning>
         <LanguageProvider>
           <UserSessionProvider>
             <SidebarProvider>
-              {children}
-              <ToastProvider />
+              <IngestionProvider>
+                {children}
+                <IngestionDock />
+                <IngestionDetailModal />
+                <ToastProvider />
+              </IngestionProvider>
             </SidebarProvider>
           </UserSessionProvider>
         </LanguageProvider>

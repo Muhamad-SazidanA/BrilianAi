@@ -10,8 +10,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useUserSession } from '@/context/UserSessionContext';
 import { toast } from 'sonner';
 import UserAvatar from '@/components/ui/UserAvatar';
-import EnterprisePageHeader from '@/components/layout/EnterprisePageHeader';
-import DashboardMetricCard from '@/components/dashboard/DashboardMetricCard';
+
 import EnterprisePagination from '@/components/ui/EnterprisePagination';
 import EnterpriseSelect, { EnterpriseSelectOption } from '@/components/ui/EnterpriseSelect';
 
@@ -87,21 +86,22 @@ const INP: React.CSSProperties = {
 function StatusBadge({ status }: { status: 'active' | 'inactive' | 'pending_approval' }) {
   if (status === 'pending_approval') {
     return (
-      <span className="status-pill-warning">
-        <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: '#f59e0b' }} />
+      <span className="status-pill-warning" style={{ whiteSpace: 'nowrap' }}>
+        <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: '#f59e0b', flexShrink: 0 }} />
         Menunggu Approval
       </span>
     );
   }
   const ok = status === 'active';
   return (
-    <span className={ok ? 'status-pill-success' : 'status-pill-neutral'}>
+    <span className={ok ? 'status-pill-success' : 'status-pill-neutral'} style={{ whiteSpace: 'nowrap' }}>
       <span
         style={{
           width: '5px',
           height: '5px',
           borderRadius: '50%',
           backgroundColor: ok ? 'var(--color-success, #10b981)' : 'var(--text-muted)',
+          flexShrink: 0,
         }}
       />
       {ok ? 'Aktif' : 'Nonaktif'}
@@ -202,35 +202,6 @@ export default function UsersManagementView() {
   const [pageSize, setPageSize] = useState(10);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const statsRef = useRef<HTMLDivElement>(null);
-  const cardHeaderRef = useRef<HTMLDivElement>(null);
-  const [statsHeight, setStatsHeight] = useState(110);
-  const [cardHeaderHeight, setCardHeaderHeight] = useState(42);
-
-  // Dynamic sticky measurement for 4 stats cards & card header
-  useEffect(() => {
-    const updateHeights = () => {
-      if (statsRef.current) {
-        const h = Math.round(statsRef.current.getBoundingClientRect().height);
-        if (h > 0) setStatsHeight(h);
-      }
-      if (cardHeaderRef.current) {
-        const ch = Math.round(cardHeaderRef.current.getBoundingClientRect().height);
-        if (ch > 0) setCardHeaderHeight(ch);
-      }
-    };
-    updateHeights();
-    const observer = new ResizeObserver(updateHeights);
-    if (statsRef.current) observer.observe(statsRef.current);
-    if (cardHeaderRef.current) observer.observe(cardHeaderRef.current);
-    window.addEventListener('resize', updateHeights);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', updateHeights);
-    };
-  }, [users, statusFilter]);
-
-  const tableHeaderStickyTop = 48 + statsHeight - 1 + cardHeaderHeight - 1;
 
   // Keyboard shortcut Ctrl+K and /
   useEffect(() => {
@@ -501,106 +472,7 @@ export default function UsersManagementView() {
 
   return (
     <div className="enterprise-page-container">
-      {/* ── Enterprise Page Header ── */}
-      <EnterprisePageHeader
-        title={language === 'en' ? 'User Management' : 'Kelola Pengguna'}
-        subtitle={
-          language === 'en'
-            ? 'Manage accounts, access privileges, departmental roles, and operational activity.'
-            : 'Kelola akun pengguna, peran akses (RBAC), departemen, dan pantau keaktifan tanya-jawab AI.'
-        }
-        syncTime={syncTime}
-        onRefresh={fetchUsers}
-        isLoading={isLoading}
-        actions={
-          canManage ? (
-            <button
-              type="button"
-              onClick={openCreate}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                height: '28px',
-                padding: '0 12px',
-                fontSize: '11.5px',
-                fontWeight: 500,
-                letterSpacing: '-0.01em',
-                color: '#FFFFFF',
-                backgroundColor: '#2563EB',
-                border: '1px solid #1D4ED8',
-                borderRadius: '9999px',
-                cursor: 'pointer',
-                boxShadow: '0 1px 2px rgba(37, 99, 235, 0.15)',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              <Plus size={12} strokeWidth={2.4} />
-              <span>{language === 'en' ? 'New User' : 'User Baru'}</span>
-            </button>
-          ) : null
-        }
-      />
 
-      {/* ── 4 Pure Enterprise Metric Cards ── */}
-      <div
-        ref={statsRef}
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: '10px',
-          flexShrink: 0,
-        }}
-      >
-          <DashboardMetricCard
-            title={language === 'en' ? 'Total Users' : 'Total Pengguna'}
-            value={`${users.length} User`}
-            badge="RBAC"
-            badgeType="neutral"
-            footerText={language === 'en' ? 'Registered accounts' : 'Akun terdaftar dalam KMS'}
-            isLoading={isLoading}
-            onClick={() => setStatusFilter('all')}
-          />
-
-          <DashboardMetricCard
-            title={language === 'en' ? 'Active Users' : 'Pengguna Aktif'}
-            value={`${activeUsers.length} Aktif`}
-            badge="Active"
-            badgeType="neutral"
-            statusDot="live"
-            footerText={language === 'en' ? 'Full access enabled' : 'Akses operasional normal'}
-            isLoading={isLoading}
-            onClick={() => setStatusFilter('active')}
-          />
-
-          <DashboardMetricCard
-            title={language === 'en' ? 'Pending Approval' : 'Menunggu Approval'}
-            value={`${pendingUsers.length} Antrean`}
-            badge={pendingUsers.length > 0 ? 'Pending' : 'Clear'}
-            badgeType={pendingUsers.length > 0 ? 'warning' : 'neutral'}
-            statusDot={pendingUsers.length > 0 ? 'blue' : 'none'}
-            footerText={
-              pendingUsers.length > 0
-                ? language === 'en'
-                  ? 'Awaiting role assignment'
-                  : 'Menunggu penugasan peran'
-                : language === 'en'
-                ? 'All accounts processed'
-                : 'Semua akun telah diproses'
-            }
-            isLoading={isLoading}
-            onClick={() => setStatusFilter('pending_approval')}
-          />
-
-          <DashboardMetricCard
-            title={language === 'en' ? 'System Roles' : 'Peran Akses'}
-            value={`${roles.length} Role`}
-            badge="Security"
-            badgeType="neutral"
-            footerText={language === 'en' ? 'Defined RBAC matrix' : 'Hierarki hak akses terdefinisi'}
-            isLoading={isLoading}
-          />
-      </div>
 
       {/* ── Pending Users Action Callout Banner (if pending users exist) ── */}
       {pendingUsers.length > 0 && statusFilter !== 'pending_approval' && (
@@ -666,7 +538,6 @@ export default function UsersManagementView() {
       >
         {/* Card Header Controls */}
         <div
-          ref={cardHeaderRef}
           className="enterprise-card-header"
           style={{
             flexShrink: 0,
@@ -676,15 +547,15 @@ export default function UsersManagementView() {
             borderBottom: '1px solid var(--border-default, #e2e8f0)',
           }}
         >
-          {/* Left: Title + Inline Segmented Switcher */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                {language === 'en' ? 'User Directory' : 'Daftar Pengguna'}
-              </span>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                · {filtered.length} user
-              </span>
+          {/* Left: Page Title + Status Switcher */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontSize: '13.5px', fontWeight: 600, letterSpacing: '-0.015em', color: 'var(--text-primary)', lineHeight: 1.25 }}>
+                {language === 'en' ? 'User Management' : 'Kelola Pengguna'}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '1px' }}>
+                {filtered.length} {language === 'en' ? 'accounts' : 'akun'}
+              </div>
             </div>
 
             {/* Segmented Status Switcher (Smooth Pill Style) */}
@@ -763,7 +634,7 @@ export default function UsersManagementView() {
             </div>
           </div>
 
-          {/* Right: Search Box with Smooth Pill & Ctrl+K */}
+          {/* Right: Search + New User */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div
               style={{
@@ -774,7 +645,7 @@ export default function UsersManagementView() {
                 borderRadius: '9999px',
                 padding: '0 8px 0 10px',
                 height: '26px',
-                width: '230px',
+                width: '220px',
                 gap: '6px',
               }}
             >
@@ -796,21 +667,60 @@ export default function UsersManagementView() {
                   minWidth: 0,
                 }}
               />
-              <kbd className="kbd-shortcut" style={{ fontSize: '9px', padding: '1px 4px' }}>
-                Ctrl K
-              </kbd>
+              {searchQuery && (
+                <button type="button" onClick={() => setSearchQuery('')} style={{ display: 'flex', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)', padding: 0 }}>
+                  <X size={11} />
+                </button>
+              )}
             </div>
+            {canManage && (
+              <button
+                type="button"
+                onClick={openCreate}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  height: '26px',
+                  padding: '0 11px',
+                  fontSize: '11.5px',
+                  fontWeight: 500,
+                  letterSpacing: '-0.01em',
+                  color: '#ffffff',
+                  backgroundColor: '#0f172a',
+                  border: '1px solid #0f172a',
+                  borderRadius: '9999px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1e293b'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#0f172a'; }}
+              >
+                <Plus size={11} strokeWidth={2.4} />
+                <span>{language === 'en' ? 'New User' : 'User Baru'}</span>
+              </button>
+            )}
           </div>
         </div>
 
         {/* ── Table Content ── */}
         <div className="enterprise-table-wrapper">
-          <table style={{ width: '100%', minWidth: '940px', borderCollapse: 'separate', borderSpacing: 0, fontSize: '12.5px' }}>
+          <table style={{ width: '100%', minWidth: '1020px', borderCollapse: 'separate', borderSpacing: 0, fontSize: '12.5px' }}>
             <thead>
               <tr>
-                {['Pengguna', 'Username', 'Role Akses', 'Departemen', 'Pertanyaan AI', 'Login Terakhir', 'Status', 'Aksi'].map((h, idx) => (
+                {[
+                  { label: 'Pengguna', align: 'left', minWidth: '220px' },
+                  { label: 'Username', align: 'center', minWidth: '120px' },
+                  { label: 'Role Akses', align: 'center', minWidth: '200px' },
+                  { label: 'Departemen', align: 'center', minWidth: '180px' },
+                  { label: 'Pertanyaan AI', align: 'center', minWidth: '110px' },
+                  { label: 'Login Terakhir', align: 'center', minWidth: '130px' },
+                  { label: 'Status', align: 'center', minWidth: '100px' },
+                  { label: 'Aksi', align: 'center', minWidth: '140px' },
+                ].map((col) => (
                   <th
-                    key={h}
+                    key={col.label}
                     style={{
                       position: 'sticky',
                       top: 0,
@@ -821,13 +731,15 @@ export default function UsersManagementView() {
                       fontSize: '11px',
                       letterSpacing: '0.02em',
                       color: 'var(--text-secondary)',
-                      textAlign: idx === 7 ? 'right' : idx === 4 ? 'center' : 'left',
+                      textAlign: col.align as any,
+                      verticalAlign: 'middle',
                       whiteSpace: 'nowrap',
+                      minWidth: col.minWidth,
                       borderBottom: '1px solid var(--border-default, #e2e8f0)',
                       boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
                     }}
                   >
-                    {h}
+                    {col.label}
                   </th>
                 ))}
               </tr>
@@ -835,7 +747,7 @@ export default function UsersManagementView() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={8} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  <td colSpan={8} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-secondary)', verticalAlign: 'middle' }}>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
                       <Loader2 size={16} className="animate-spin" color="var(--color-primary, #2563eb)" />
                       <span>Memuat data pengguna...</span>
@@ -844,7 +756,7 @@ export default function UsersManagementView() {
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <td colSpan={8} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)', verticalAlign: 'middle' }}>
                     <p style={{ margin: 0, fontWeight: 600, color: 'var(--text-primary)', fontSize: '13px' }}>
                       {searchQuery ? 'Tidak ada pengguna yang cocok' : 'Belum ada pengguna'}
                     </p>
@@ -869,14 +781,14 @@ export default function UsersManagementView() {
                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
                       {/* Name & Email */}
-                      <td style={{ padding: '9px 14px' }}>
+                      <td style={{ padding: '9px 14px', textAlign: 'left', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <UserAvatar name={u.name} size={30} />
                           <div style={{ minWidth: 0 }}>
                             <div
                               style={{
-                                fontWeight: 600,
-                                fontSize: '12.5px',
+                                fontWeight: 500,
+                                fontSize: '13px',
                                 color: 'var(--text-primary)',
                                 whiteSpace: 'nowrap',
                                 overflow: 'hidden',
@@ -885,30 +797,31 @@ export default function UsersManagementView() {
                             >
                               {u.name}
                             </div>
-                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{u.email}</div>
+                            <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{u.email}</div>
                           </div>
                         </div>
                       </td>
 
                       {/* Username */}
-                      <td style={{ padding: '9px 14px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                      <td style={{ padding: '9px 14px', fontSize: '12px', color: 'var(--text-secondary)', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                         {u.email.split('@')[0]}
                       </td>
 
                       {/* Role */}
-                      <td style={{ padding: '9px 14px' }}>
+                      <td style={{ padding: '9px 14px', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                         <span
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '5px',
-                            padding: '2px 8px',
+                            padding: '2.5px 9px',
                             borderRadius: '9999px',
                             border: '1px solid var(--border-default, #e2e8f0)',
                             backgroundColor: 'var(--bg-subtle, #f8fafc)',
                             fontSize: '11.5px',
                             color: 'var(--text-primary)',
                             fontWeight: 500,
+                            whiteSpace: 'nowrap',
                           }}
                         >
                           <span
@@ -925,7 +838,7 @@ export default function UsersManagementView() {
                       </td>
 
                       {/* Department */}
-                      <td style={{ padding: '9px 14px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                      <td style={{ padding: '9px 14px', fontSize: '12px', color: 'var(--text-secondary)', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                         {u.department || '—'}
                       </td>
 
@@ -936,6 +849,8 @@ export default function UsersManagementView() {
                           fontSize: '12px',
                           color: 'var(--text-secondary)',
                           textAlign: 'center',
+                          verticalAlign: 'middle',
+                          whiteSpace: 'nowrap',
                           fontFamily: 'var(--font-mono, monospace)',
                         }}
                       >
@@ -943,7 +858,7 @@ export default function UsersManagementView() {
                       </td>
 
                       {/* Last Login */}
-                      <td style={{ padding: '9px 14px', fontSize: '11.5px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '9px 14px', fontSize: '11.5px', color: 'var(--text-secondary)', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                         {u.last_login_at
                           ? new Date(u.last_login_at).toLocaleString('id-ID', {
                               day: 'numeric',
@@ -955,13 +870,13 @@ export default function UsersManagementView() {
                       </td>
 
                       {/* Status */}
-                      <td style={{ padding: '9px 14px' }}>
+                      <td style={{ padding: '9px 14px', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                         <StatusBadge status={u.status} />
                       </td>
 
                       {/* Actions */}
-                      <td style={{ padding: '9px 14px', textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', justifyContent: 'flex-end' }}>
+                      <td style={{ padding: '9px 14px', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', justifyContent: 'center' }}>
                           {isPending && canManage ? (
                             <>
                               <button

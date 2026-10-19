@@ -35,9 +35,9 @@ export function ChatStarterView({
       <div style={{ textAlign: 'center', marginBottom: '1.25rem', maxWidth: '38rem' }}>
         <h1
           style={{
-            fontSize: 'clamp(20px, 3.2vw, 26px)',
-            fontWeight: 500,
-            letterSpacing: '-0.025em',
+            fontSize: 'clamp(17px, 2.2vw, 21px)',
+            fontWeight: 550,
+            letterSpacing: '-0.02em',
             color: 'var(--text-primary)',
             lineHeight: 1.25,
           }}

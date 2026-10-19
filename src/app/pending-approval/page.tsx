@@ -112,7 +112,7 @@ function PendingApprovalContent() {
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
-        fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+        fontFamily: "var(--font-sans)",
         userSelect: 'none',
         boxSizing: 'border-box',
         padding: '1rem',

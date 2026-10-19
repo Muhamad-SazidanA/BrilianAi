@@ -13,8 +13,6 @@ import {
   Loader2,
 } from 'lucide-react';
 import AppShell from '@/components/layout/AppShell';
-import EnterprisePageHeader from '@/components/layout/EnterprisePageHeader';
-import DashboardMetricCard from '@/components/dashboard/DashboardMetricCard';
 import EnterprisePagination from '@/components/ui/EnterprisePagination';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserSession } from '@/context/UserSessionContext';
@@ -55,28 +53,6 @@ export default function KnowledgeGapsPage() {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-
-  // Dynamic sticky measurement for 4 stats cards
-  const statsRef = useRef<HTMLDivElement>(null);
-  const [statsHeight, setStatsHeight] = useState(110);
-
-  useEffect(() => {
-    if (!statsRef.current) return;
-    const updateHeight = () => {
-      if (statsRef.current) {
-        const h = Math.round(statsRef.current.getBoundingClientRect().height);
-        if (h > 0) setStatsHeight(h);
-      }
-    };
-    updateHeight();
-    const observer = new ResizeObserver(updateHeight);
-    observer.observe(statsRef.current);
-    window.addEventListener('resize', updateHeight);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', updateHeight);
-    };
-  }, [gaps]);
 
   // Reset to page 1 on search or filter change
   useEffect(() => {
@@ -181,72 +157,6 @@ export default function KnowledgeGapsPage() {
   return (
     <AppShell requiredPermission="documents:read">
       <div className="enterprise-page-container">
-        {/* Enterprise Page Header */}
-        <EnterprisePageHeader
-          title={language === 'en' ? 'Knowledge Gaps' : 'Kesenjangan Pengetahuan'}
-          subtitle={
-            language === 'en'
-              ? 'Track unanswered queries and user feedback to enrich organizational KMS.'
-              : 'Lacak pertanyaan tanpa rujukan dan lengkapi repositori SOP organisasi.'
-          }
-          syncTime={syncTime}
-          onRefresh={fetchGaps}
-          isLoading={isLoading}
-        />
-
-        {/* 4 Pure Enterprise Metric Cards */}
-        <div
-          ref={statsRef}
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: '10px',
-            flexShrink: 0,
-          }}
-        >
-          <DashboardMetricCard
-            title={language === 'en' ? 'Open Gaps' : 'Kesenjangan Terbuka'}
-            value={`${stats.open} Isu`}
-            badge="Open"
-            badgeType="neutral"
-            statusDot="live"
-            footerText={language === 'en' ? 'Requires new SOP reference' : 'Memerlukan dokumen SOP baru'}
-            isLoading={isLoading}
-            onClick={() => setStatusFilter('open')}
-          />
-
-          <DashboardMetricCard
-            title={language === 'en' ? 'In Progress' : 'Sedang Ditangani'}
-            value={`${stats.inProgress} Proses`}
-            badge="In Progress"
-            badgeType="neutral"
-            statusDot="blue"
-            footerText={language === 'en' ? 'Under SME curation' : 'Dalam proses kurasi tim SME'}
-            isLoading={isLoading}
-            onClick={() => setStatusFilter('in_progress')}
-          />
-
-          <DashboardMetricCard
-            title={language === 'en' ? 'Resolved' : 'Telah Diselesaikan'}
-            value={`${stats.resolved} Selesai`}
-            badge="Resolved"
-            badgeType="neutral"
-            footerText={language === 'en' ? 'SOP indexed to RAG' : 'Dokumen rujukan terunggah'}
-            isLoading={isLoading}
-            onClick={() => setStatusFilter('resolved')}
-          />
-
-          <DashboardMetricCard
-            title={language === 'en' ? 'Total Gaps' : 'Total Kesenjangan'}
-            value={`${stats.total} Total`}
-            badge="KMS Total"
-            badgeType="neutral"
-            footerText={language === 'en' ? 'Accumulated queries' : 'Akumulasi query pengguna'}
-            isLoading={isLoading}
-            onClick={() => setStatusFilter('all')}
-          />
-        </div>
-
         {/* ── Unified Knowledge Gaps Stream Card (Linear / Vercel style) ── */}
         <div
           className="enterprise-card"
@@ -269,15 +179,15 @@ export default function KnowledgeGapsPage() {
               borderBottom: '1px solid var(--border-default, #e2e8f0)',
             }}
           >
-            {/* Left: Title + Inline Segmented Switcher */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                  {language === 'en' ? 'Unanswered Queries' : 'Pertanyaan Tanpa Rujukan'}
-                </span>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                  · {filteredGaps.length} isu
-                </span>
+            {/* Left: Page Title + Inline Segmented Switcher */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontSize: '13.5px', fontWeight: 600, letterSpacing: '-0.015em', color: 'var(--text-primary)', lineHeight: 1.25 }}>
+                  {language === 'en' ? 'Knowledge Gaps' : 'Kesenjangan Pengetahuan'}
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '1px' }}>
+                  {filteredGaps.length} {language === 'en' ? 'unanswered queries' : 'pertanyaan'}
+                </div>
               </div>
 
               {/* Segmented Status Switcher (Smooth Pill Style) */}
@@ -410,24 +320,41 @@ export default function KnowledgeGapsPage() {
                     minWidth: 0,
                   }}
                 />
-                <kbd
-                  className="kbd-shortcut"
-                  style={{
-                    fontSize: '9px',
-                    padding: '1px 5px',
-                    borderRadius: '9999px',
-                    flexShrink: 0,
-                  }}
-                >
-                  Ctrl K
-                </kbd>
+                {searchQuery ? (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    style={{
+                      display: 'flex',
+                      border: 'none',
+                      background: 'transparent',
+                      cursor: 'pointer',
+                      color: 'var(--text-muted)',
+                      padding: 0,
+                    }}
+                  >
+                    <X size={11} />
+                  </button>
+                ) : (
+                  <kbd
+                    className="kbd-shortcut"
+                    style={{
+                      fontSize: '9px',
+                      padding: '1px 5px',
+                      borderRadius: '9999px',
+                      flexShrink: 0,
+                    }}
+                  >
+                    Ctrl K
+                  </kbd>
+                )}
               </div>
 
               <button
                 onClick={fetchGaps}
                 disabled={isLoading}
                 className="btn btn-ghost btn-xs"
-                style={{ height: '26px', width: '26px', padding: 0 }}
+                style={{ height: '26px', width: '26px', padding: 0, borderRadius: '9999px' }}
                 title={language === 'en' ? 'Refresh' : 'Segarkan'}
               >
                 <RefreshCw size={12} className={isLoading ? 'animate-spin' : ''} color="var(--text-secondary)" />
@@ -514,8 +441,8 @@ export default function KnowledgeGapsPage() {
 
                     <span
                       style={{
-                        fontWeight: 600,
-                        fontSize: '12px',
+                        fontWeight: 500,
+                        fontSize: '13px',
                         color: 'var(--text-primary)',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
@@ -534,7 +461,7 @@ export default function KnowledgeGapsPage() {
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
-                        fontSize: '11px',
+                        fontSize: '11.5px',
                         color: 'var(--text-muted)',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',

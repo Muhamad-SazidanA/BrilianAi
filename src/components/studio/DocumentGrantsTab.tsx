@@ -191,12 +191,12 @@ export default function DocumentGrantsTab({ batchId }: DocumentGrantsTabProps) {
             <div className="enterprise-table-wrapper">
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border-default)', color: 'var(--text-secondary)' }}>
-                    <th style={{ padding: '8px 10px', fontWeight: 600 }}>Pengguna</th>
-                    <th style={{ padding: '8px 10px', fontWeight: 600 }}>Divisi & Peran</th>
-                    <th style={{ padding: '8px 10px', fontWeight: 600 }}>Tingkat Akses</th>
-                    <th style={{ padding: '8px 10px', fontWeight: 600 }}>Diberikan Oleh</th>
-                    <th style={{ padding: '8px 10px', fontWeight: 600, textAlign: 'right' }}>Aksi</th>
+                  <tr style={{ borderBottom: '1px solid var(--border-default)', color: 'var(--text-secondary)', backgroundColor: 'var(--bg-subtle, #f8fafc)' }}>
+                    <th style={{ padding: '8px 14px', fontWeight: 600, fontSize: '11px', letterSpacing: '0.02em', textAlign: 'left', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Pengguna</th>
+                    <th style={{ padding: '8px 14px', fontWeight: 600, fontSize: '11px', letterSpacing: '0.02em', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Divisi & Peran</th>
+                    <th style={{ padding: '8px 14px', fontWeight: 600, fontSize: '11px', letterSpacing: '0.02em', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Tingkat Akses</th>
+                    <th style={{ padding: '8px 14px', fontWeight: 600, fontSize: '11px', letterSpacing: '0.02em', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Diberikan Oleh</th>
+                    <th style={{ padding: '8px 14px', fontWeight: 600, fontSize: '11px', letterSpacing: '0.02em', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -208,31 +208,35 @@ export default function DocumentGrantsTab({ batchId }: DocumentGrantsTabProps) {
                         transition: 'background-color 0.15s ease',
                       }}
                     >
-                      <td style={{ padding: '10px 10px' }}>
-                        <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{grant.user_name}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{grant.user_email}</div>
+                      <td style={{ padding: '10px 10px', textAlign: 'left', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
+                          <div style={{ fontWeight: 500, fontSize: '13px', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{grant.user_name}</div>
+                          <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{grant.user_email}</div>
+                        </div>
                       </td>
-                      <td style={{ padding: '10px 10px' }}>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{grant.user_department || 'General'}</div>
-                        <span className="badge badge-neutral font-mono" style={{ fontSize: '10px', marginTop: '2px' }}>
-                          {grant.user_role_id}
-                        </span>
+                      <td style={{ padding: '10px 10px', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '12px', whiteSpace: 'nowrap' }}>{grant.user_department || 'General'}</span>
+                          <span className="badge badge-neutral font-mono" style={{ fontSize: '10px', whiteSpace: 'nowrap' }}>
+                            {grant.user_role_id}
+                          </span>
+                        </div>
                       </td>
-                      <td style={{ padding: '10px 10px' }}>
+                      <td style={{ padding: '10px 10px', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                         <span
                           className={`badge ${grant.access_level === 'editor' ? 'badge-accent' : 'badge-neutral'}`}
-                          style={{ fontSize: '11px', fontWeight: 600, textTransform: 'capitalize' }}
+                          style={{ fontSize: '11px', fontWeight: 600, textTransform: 'capitalize', display: 'inline-flex', whiteSpace: 'nowrap' }}
                         >
                           {grant.access_level === 'editor' ? 'Editor' : 'Viewer (Baca)'}
                         </span>
                       </td>
-                      <td style={{ padding: '10px 10px', fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                        <div>{grant.granted_by_name || 'Admin'}</div>
-                        <div style={{ fontSize: '10.5px' }}>
-                          {formatDateTime(grant.created_at, language, { dateStyle: 'short' })}
+                      <td style={{ padding: '10px 10px', fontSize: '11.5px', color: 'var(--text-muted)', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap' }}>
+                          <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{grant.granted_by_name || 'Admin'}</span>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>• {formatDateTime(grant.created_at, language, { dateStyle: 'short' })}</span>
                         </div>
                       </td>
-                      <td style={{ padding: '10px 10px', textAlign: 'right' }}>
+                      <td style={{ padding: '10px 10px', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                         <button
                           type="button"
                           onClick={() => handleRevoke(grant.user_id, grant.user_name)}

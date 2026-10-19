@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   CircleUser,
   Palette,
@@ -55,6 +56,30 @@ export default function NavUser({
   const activeEmail = currentUser?.email || user.email;
 
   const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // ── Collapsed User Hover Flyout State ──
+  const [isFlyoutHovered, setIsFlyoutHovered] = useState(false);
+  const [flyoutRect, setFlyoutRect] = useState<DOMRect | null>(null);
+  const flyoutTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const showUserFlyout = (e: React.MouseEvent<HTMLElement>) => {
+    if (!isCollapsed || isOpen) return;
+    if (flyoutTimeoutRef.current) clearTimeout(flyoutTimeoutRef.current);
+    const rect = e.currentTarget.getBoundingClientRect();
+    setFlyoutRect(rect);
+    setIsFlyoutHovered(true);
+  };
+
+  const scheduleHideUserFlyout = () => {
+    if (flyoutTimeoutRef.current) clearTimeout(flyoutTimeoutRef.current);
+    flyoutTimeoutRef.current = setTimeout(() => {
+      setIsFlyoutHovered(false);
+    }, 120);
+  };
+
+  const cancelHideUserFlyout = () => {
+    if (flyoutTimeoutRef.current) clearTimeout(flyoutTimeoutRef.current);
+  };
 
   // 1. Initialize and load saved theme preference (Default is ALWAYS light)
   useEffect(() => {
@@ -116,10 +141,13 @@ export default function NavUser({
       <button
         type="button"
         onClick={() => {
+          setIsFlyoutHovered(false);
           setIsOpen(!isOpen);
           setShowPreferencesSubmenu(false);
           setShowSwitchUserSubmenu(false);
         }}
+        onMouseEnter={showUserFlyout}
+        onMouseLeave={scheduleHideUserFlyout}
         style={{
           width: isCollapsed ? '36px' : '100%',
           height: isCollapsed ? '36px' : undefined,
@@ -139,7 +167,7 @@ export default function NavUser({
         }}
         className="hover:bg-slate-100 dark:hover:bg-slate-800"
         aria-expanded={isOpen}
-        title={isCollapsed ? `${activeName} (${activeEmail})` : undefined}
+        title={undefined}
       >
         {/* Avatar Circle (Enlarged to 32px when collapsed) */}
         <UserAvatar name={activeName} size={isCollapsed ? 32 : 20} />
@@ -150,8 +178,8 @@ export default function NavUser({
             <div style={{ flex: 1, minWidth: 0 }}>
               <div
                 style={{
-                  fontSize: '11px',
-                  fontWeight: 600,
+                  fontSize: '11.5px',
+                  fontWeight: 500,
                   color: 'var(--text-primary, #0F172A)',
                   lineHeight: '14px',
                   overflow: 'hidden',
@@ -212,8 +240,8 @@ export default function NavUser({
             <div style={{ minWidth: 0, flex: 1 }}>
               <div
                 style={{
-                  fontSize: '12.5px',
-                  fontWeight: 600,
+                  fontSize: '13px',
+                  fontWeight: 500,
                   color: 'var(--text-primary, #0F172A)',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
@@ -886,6 +914,100 @@ export default function NavUser({
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Collapsed User Profile Flyout Card (Portal) ── */}
+      {isCollapsed && isFlyoutHovered && !isOpen && flyoutRect && typeof document !== 'undefined' && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '12px',
+            left: flyoutRect.right - 2,
+            zIndex: 99999,
+            paddingLeft: '10px',
+            pointerEvents: 'auto',
+          }}
+          onMouseEnter={cancelHideUserFlyout}
+          onMouseLeave={scheduleHideUserFlyout}
+          onClick={() => {
+            setIsFlyoutHovered(false);
+            setIsOpen(true);
+          }}
+        >
+          <div
+            style={{
+              minWidth: '190px',
+              maxWidth: '240px',
+              backgroundColor: 'var(--bg-card, #ffffff)',
+              border: '1px solid var(--border-default, #e2e8f0)',
+              borderRadius: '10px',
+              padding: '9px 12px',
+              boxShadow: '0 12px 28px -4px rgba(15, 23, 42, 0.16), 0 4px 10px -2px rgba(15, 23, 42, 0.08)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '3px',
+              cursor: 'pointer',
+              animation: 'flyoutIn 0.14s cubic-bezier(0.16, 1, 0.3, 1)',
+              backdropFilter: 'blur(8px)',
+            }}
+            className="sidebar-flyout-popover"
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+              <span
+                style={{
+                  fontSize: '9px',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  color: 'var(--text-muted)',
+                  lineHeight: 1,
+                }}
+              >
+                {language === 'en' ? 'USER PROFILE' : 'PROFIL PENGGUNA'}
+              </span>
+              <span
+                className="badge badge-accent"
+                style={{ fontSize: '9px', padding: '0 5px', height: '14px', lineHeight: '14px', borderRadius: '9999px' }}
+              >
+                {currentUser?.role?.name || currentUser?.role_id || 'User'}
+              </span>
+            </div>
+            <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)', marginTop: '1px' }}>
+              {activeName}
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {activeEmail}
+            </div>
+            <div
+              style={{
+                marginTop: '5px',
+                paddingTop: '5px',
+                borderTop: '1px solid var(--border-subtle, #f1f5f9)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <span style={{ fontSize: '10px', color: 'var(--color-primary)', fontWeight: 500 }}>
+                {language === 'en' ? 'Click for settings' : 'Klik untuk menu akun'}
+              </span>
+              <span
+                style={{
+                  fontSize: '9.5px',
+                  padding: '1px 5px',
+                  borderRadius: '4px',
+                  backgroundColor: 'var(--bg-subtle, #f1f5f9)',
+                  border: '1px solid var(--border-default, #e2e8f0)',
+                  color: 'var(--text-muted)',
+                  fontFamily: 'var(--font-mono, monospace)',
+                }}
+              >
+                ↵ Buka
+              </span>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
     </div>

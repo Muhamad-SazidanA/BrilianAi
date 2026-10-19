@@ -85,8 +85,8 @@ export default function EnterprisePageHeader({
       <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', minWidth: 0, flex: '1 1 auto', overflow: 'hidden' }}>
         <h1
           style={{
-            fontSize: '18px',
-            fontWeight: 700,
+            fontSize: '15px',
+            fontWeight: 600,
             color: 'var(--text-primary)',
             margin: 0,
             letterSpacing: '-0.02em',
@@ -99,7 +99,7 @@ export default function EnterprisePageHeader({
         {subtitle && (
           <span
             style={{
-              fontSize: '12px',
+              fontSize: '11.5px',
               color: 'var(--text-muted)',
               whiteSpace: 'nowrap',
               overflow: 'hidden',

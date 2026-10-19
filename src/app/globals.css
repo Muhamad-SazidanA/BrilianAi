@@ -1,5 +1,6 @@
-  /* =====================================================
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap');
 
+/* =====================================================
    Brilian.Ai Design Tokens — Modern Clean Look
    Modern SaaS Palette: Slate-50 background, Crisp White Cards,
    Clean Royal Blue Primary Accent, Soft Borders & Rounded-xl
@@ -52,8 +53,8 @@
   --border-hover: #CBD5E1;
 
   /* Typography */
-  --font-sans: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
-  --font-mono: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  --font-sans: var(--font-geist-sans), 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: var(--font-geist-mono), 'Geist Mono', ui-monospace, SFMono-Regular, monospace;
 
   /* Radii */
   --radius-xs: 4px;
@@ -74,7 +75,7 @@
   --shadow-float: 0 20px 25px -5px rgba(15, 23, 42, 0.08);
 
   /* Layout Dimensions */
-  --sidebar-width: 224px;
+  --sidebar-width: 200px;
   --header-height: 48px;
 
   /* Backward compatibility aliases */
@@ -99,7 +100,9 @@
 }
 
 html {
-  font-size: 13.5px;
+  font-size: 14px;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 html, body {
@@ -111,8 +114,11 @@ html, body {
   font-family: var(--font-sans);
   font-size: 12.5px;
   line-height: 1.45;
+  letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11", "tnum";
 }
 
 a {
@@ -120,7 +126,7 @@ a {
   text-decoration: none;
 }
 
-button, input, textarea, select {
+button, input, textarea, select, table, th, td {
   font-family: inherit;
 }
 
@@ -216,25 +222,26 @@ code, pre, .font-mono {
 
 /* Base Headings - Slim & Clean */
 h1 {
-  font-size: 1.25rem;
-  font-weight: 700;
+  font-size: 1.15rem;
+  font-weight: 600;
   color: var(--text-primary);
   letter-spacing: -0.02em;
   line-height: 1.25;
 }
 
 h2 {
-  font-size: 1.1rem;
-  font-weight: 700;
+  font-size: 1.05rem;
+  font-weight: 600;
   color: var(--text-primary);
   letter-spacing: -0.015em;
   line-height: 1.25;
 }
 
 h3 {
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   font-weight: 600;
   color: var(--text-primary);
+  letter-spacing: -0.01em;
   line-height: 1.3;
 }
 
@@ -242,6 +249,7 @@ h4 {
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--text-primary);
+  letter-spacing: -0.005em;
   line-height: 1.3;
 }
 
@@ -346,8 +354,8 @@ html[data-sidebar-collapsed="true"] .app-main,
 .nav-link {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 3px 8px;
+  gap: 6px;
+  padding: 3px 6px;
   min-height: 28px;
   border-radius: 6px;
   color: var(--text-secondary);
@@ -853,6 +861,12 @@ thead::-webkit-scrollbar {
   scrollbar-width: none !important;
   -ms-overflow-style: none !important;
   box-sizing: border-box;
+}
+
+.enterprise-table-wrapper th,
+.enterprise-table-wrapper td {
+  vertical-align: middle;
+  white-space: nowrap;
 }
 
 @media (max-width: 768px) {
@@ -1521,9 +1535,10 @@ thead::-webkit-scrollbar {
 
 .shared-bubble {
   max-width: 82%;
-  padding: 14px 20px;
-  font-size: 15px;
-  line-height: 1.6;
+  padding: 10px 16px;
+  font-size: 13px;
+  line-height: 1.55;
+  letter-spacing: -0.01em;
 }
 
 .shared-bubble.user {
@@ -2167,6 +2182,7 @@ thead::-webkit-scrollbar {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
 }
 
 .status-pill-warning {
@@ -2180,6 +2196,7 @@ thead::-webkit-scrollbar {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
 }
 
 .status-pill-neutral {
@@ -2193,11 +2210,24 @@ thead::-webkit-scrollbar {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
 }
 
 @media (max-width: 900px) {
   .dashboard-trend-grid {
     grid-template-columns: 1fr !important;
+  }
+}
+
+/* Sidebar Collapsed Interactive Flyout Animation */
+@keyframes flyoutIn {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(-6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0) scale(1);
   }
 }
 

@@ -11,6 +11,8 @@ import {
   ExternalLink,
   RefreshCw,
   MessageSquare,
+  UploadCloud,
+  X,
 } from 'lucide-react';
 import { UploadBatch } from '@/types/document';
 import RenameModal from './RenameModal';
@@ -116,18 +118,17 @@ export default function DocumentTable({
             borderBottom: '1px solid var(--border-default, #e2e8f0)',
           }}
         >
-        {/* Left: Title + Inline Segmented Switcher */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-              {language === 'en' ? 'Verified Documents' : 'Arsip Dokumen'}
-            </span>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-              · {batches.length} file
-            </span>
+        {/* Left: Page Title + Inline Segmented Switcher */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontSize: '13.5px', fontWeight: 600, letterSpacing: '-0.015em', color: 'var(--text-primary)', lineHeight: 1.25 }}>
+              {language === 'en' ? 'Knowledge Base' : 'Basis Pengetahuan'}
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '1px' }}>
+              {filteredBatches.length} {language === 'en' ? 'documents' : 'dokumen'}
+            </div>
           </div>
 
-          {/* Segmented Filter Switcher */}
           {/* Segmented Filter Switcher (Smooth Pill) */}
           <div
             style={{
@@ -202,7 +203,7 @@ export default function DocumentTable({
         </div>
 
         {/* Right: Slim Search + Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {/* Search box with smooth pill & Ctrl+K */}
           <div
             style={{
@@ -239,17 +240,34 @@ export default function DocumentTable({
                 minWidth: 0,
               }}
             />
-            <kbd
-              className="kbd-shortcut"
-              style={{
-                fontSize: '9px',
-                padding: '1px 5px',
-                borderRadius: '9999px',
-                flexShrink: 0,
-              }}
-            >
-              Ctrl K
-            </kbd>
+            {searchQuery ? (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                style={{
+                  display: 'flex',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  color: 'var(--text-muted)',
+                  padding: 0,
+                }}
+              >
+                <X size={11} />
+              </button>
+            ) : (
+              <kbd
+                className="kbd-shortcut"
+                style={{
+                  fontSize: '9px',
+                  padding: '1px 5px',
+                  borderRadius: '9999px',
+                  flexShrink: 0,
+                }}
+              >
+                Ctrl K
+              </kbd>
+            )}
           </div>
 
           {onActivateAll && inactiveCount > 0 && hasPermission('documents:toggle_active') && (
@@ -264,7 +282,7 @@ export default function DocumentTable({
               }}
               disabled={isLoading || isActivatingAll}
               className="btn btn-outline btn-xs"
-              style={{ fontWeight: 600, height: '26px', fontSize: '11px', gap: '4px', padding: '0 8px' }}
+              style={{ fontWeight: 600, height: '26px', fontSize: '11px', gap: '4px', padding: '0 8px', borderRadius: '9999px' }}
               title="Aktifkan seluruh dokumen yang masih Standby agar dapat langsung dijawab oleh AI Chatbot"
             >
               <CheckCircle2 size={12} className={isActivatingAll ? 'animate-spin' : ''} />
@@ -276,11 +294,40 @@ export default function DocumentTable({
             onClick={onRefresh}
             disabled={isLoading}
             className="btn btn-ghost btn-xs"
-            style={{ height: '26px', width: '26px', padding: 0 }}
+            style={{ height: '26px', width: '26px', padding: 0, borderRadius: '9999px' }}
             title={t('table.refresh')}
           >
             <RefreshCw size={12} className={isLoading ? 'animate-spin' : ''} color="var(--text-secondary)" />
           </button>
+
+          {onUpload && hasPermission('documents:upload') && (
+            <button
+              type="button"
+              onClick={onUpload}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                height: '26px',
+                padding: '0 11px',
+                fontSize: '11.5px',
+                fontWeight: 500,
+                letterSpacing: '-0.01em',
+                color: '#ffffff',
+                backgroundColor: '#0f172a',
+                border: '1px solid #0f172a',
+                borderRadius: '9999px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1e293b'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#0f172a'; }}
+            >
+              <UploadCloud size={11} strokeWidth={2.4} />
+              <span>{language === 'en' ? 'Upload Document' : 'Unggah Dokumen'}</span>
+            </button>
+          )}
         </div>
       </div>
         <div
@@ -359,8 +406,8 @@ export default function DocumentTable({
                     <Link
                       href={`/documents/${batch.id}`}
                       style={{
-                        fontWeight: 600,
-                        fontSize: '12px',
+                        fontWeight: 500,
+                        fontSize: '13px',
                         color: 'var(--text-primary)',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
@@ -380,7 +427,7 @@ export default function DocumentTable({
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
-                        fontSize: '11px',
+                        fontSize: '11.5px',
                         color: 'var(--text-muted)',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',

@@ -19,6 +19,7 @@
     "@langchain/textsplitters": "^0.1.0",
     "bullmq": "^5.41.0",
     "dotenv": "^16.4.7",
+    "geist": "^1.8.1",
     "lucide-react": "^1.40.0",
     "mupdf": "^0.2.0",
     "next": "^14.2.24",

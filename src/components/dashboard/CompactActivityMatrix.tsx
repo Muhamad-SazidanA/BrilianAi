@@ -72,8 +72,9 @@ export default function CompactActivityMatrix({ trend, isLoading = false }: Comp
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span
                 style={{
-                  fontSize: '16px',
-                  fontWeight: 700,
+                  fontSize: '15px',
+                  fontWeight: 600,
+                  letterSpacing: '-0.015em',
                   color: 'var(--text-primary)',
                   fontFeatureSettings: '"tnum"',
                   whiteSpace: 'nowrap',

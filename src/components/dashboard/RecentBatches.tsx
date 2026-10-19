@@ -118,8 +118,8 @@ export default function RecentBatches({ batches, isLoading }: RecentBatchesProps
                   <div style={{ minWidth: 0 }}>
                     <div
                       style={{
-                        fontSize: '12px',
-                        fontWeight: 600,
+                        fontSize: '13px',
+                        fontWeight: 500,
                         color: 'var(--text-primary)',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
@@ -133,7 +133,7 @@ export default function RecentBatches({ batches, isLoading }: RecentBatchesProps
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
-                        fontSize: '11px',
+                        fontSize: '11.5px',
                         color: 'var(--text-secondary)',
                         marginTop: '1px',
                       }}

@@ -6,12 +6,11 @@ import {
   Users, Trash2, Pencil, Eye, Copy, Check,
 } from 'lucide-react';
 import { Role, PermissionKey, PERMISSIONS_CATALOG, PermissionCategory } from '@/types/user';
+import EnterprisePagination from '@/components/ui/EnterprisePagination';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserSession } from '@/context/UserSessionContext';
 import { toast } from 'sonner';
-import EnterprisePageHeader from '@/components/layout/EnterprisePageHeader';
-import DashboardMetricCard from '@/components/dashboard/DashboardMetricCard';
-import EnterprisePagination from '@/components/ui/EnterprisePagination';
+
 
 /* ─── Category labels ─────────────────────────────── */
 const CAT_LABELS: Record<PermissionCategory, string> = {
@@ -170,35 +169,6 @@ export default function RolesPermissionsView() {
   const [pageSize, setPageSize] = useState(10);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const statsRef = useRef<HTMLDivElement>(null);
-  const cardHeaderRef = useRef<HTMLDivElement>(null);
-  const [statsHeight, setStatsHeight] = useState(110);
-  const [cardHeaderHeight, setCardHeaderHeight] = useState(42);
-
-  // Dynamic sticky measurement for 4 stats cards & card header
-  useEffect(() => {
-    const updateHeights = () => {
-      if (statsRef.current) {
-        const h = Math.round(statsRef.current.getBoundingClientRect().height);
-        if (h > 0) setStatsHeight(h);
-      }
-      if (cardHeaderRef.current) {
-        const ch = Math.round(cardHeaderRef.current.getBoundingClientRect().height);
-        if (ch > 0) setCardHeaderHeight(ch);
-      }
-    };
-    updateHeights();
-    const observer = new ResizeObserver(updateHeights);
-    if (statsRef.current) observer.observe(statsRef.current);
-    if (cardHeaderRef.current) observer.observe(cardHeaderRef.current);
-    window.addEventListener('resize', updateHeights);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', updateHeights);
-    };
-  }, [roles]);
-
-  const tableHeaderStickyTop = 48 + statsHeight - 1 + cardHeaderHeight - 1;
 
   // Keyboard shortcut Ctrl+K and /
   useEffect(() => {
@@ -413,95 +383,7 @@ export default function RolesPermissionsView() {
 
   return (
     <div className="enterprise-page-container">
-      {/* ── Enterprise Page Header ── */}
-      <EnterprisePageHeader
-        title={language === 'en' ? 'Roles & Permissions (RBAC)' : 'Role & Hak Akses (RBAC)'}
-        subtitle={
-          language === 'en'
-            ? 'Define permission privileges and granular controls for workspace members and managers.'
-            : 'Atur hierarki kewenangan pengguna melalui matriks perizinan bertingkat (RBAC).'
-        }
-        syncTime={syncTime}
-        onRefresh={fetchRoles}
-        isLoading={isLoading}
-        actions={
-          canManage ? (
-            <button
-              type="button"
-              onClick={openCreate}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                height: '28px',
-                padding: '0 12px',
-                fontSize: '11.5px',
-                fontWeight: 500,
-                letterSpacing: '-0.01em',
-                color: '#FFFFFF',
-                backgroundColor: '#2563EB',
-                border: '1px solid #1D4ED8',
-                borderRadius: '9999px',
-                cursor: 'pointer',
-                boxShadow: '0 1px 2px rgba(37, 99, 235, 0.15)',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              <Plus size={12} strokeWidth={2.4} />
-              <span>{language === 'en' ? 'New Role' : 'Role Baru'}</span>
-            </button>
-          ) : null
-        }
-      />
 
-      {/* ── 4 Pure Enterprise Metric Cards ── */}
-      <div
-        ref={statsRef}
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: '10px',
-          flexShrink: 0,
-        }}
-      >
-          <DashboardMetricCard
-            title={language === 'en' ? 'Total Roles' : 'Total Role'}
-            value={`${roles.length} Role`}
-            badge="RBAC"
-            badgeType="neutral"
-            footerText={language === 'en' ? 'Configured permission groups' : 'Struktur perizinan aktif'}
-            isLoading={isLoading}
-            onClick={() => setSearchQuery('')}
-          />
-
-          <DashboardMetricCard
-            title={language === 'en' ? 'System Roles' : 'Role Sistem Terkunci'}
-            value={`${systemRoles.length} Terkunci`}
-            badge="Protected"
-            badgeType="neutral"
-            footerText={language === 'en' ? 'Core system definitions' : 'Role bawaan integritas sistem'}
-            isLoading={isLoading}
-          />
-
-          <DashboardMetricCard
-            title={language === 'en' ? 'Custom Roles' : 'Role Kustom'}
-            value={`${customRoles.length} Kustom`}
-            badge="Custom"
-            badgeType="neutral"
-            statusDot="blue"
-            footerText={language === 'en' ? 'Workspace customized' : 'Dikonfigurasi administrator'}
-            isLoading={isLoading}
-          />
-
-          <DashboardMetricCard
-            title={language === 'en' ? 'Permission Catalog' : 'Katalog Hak Akses'}
-            value={`${PERMISSIONS_CATALOG.length} Izin`}
-            badge="ABAC Matrix"
-            badgeType="neutral"
-            footerText={language === 'en' ? 'Granular action privileges' : 'Izin fungsional modular'}
-            isLoading={isLoading}
-          />
-      </div>
 
       {/* ── Main Stream Card (Linear / Vercel Enterprise Style) ── */}
       <div
@@ -516,7 +398,6 @@ export default function RolesPermissionsView() {
       >
         {/* Card Header Controls */}
         <div
-          ref={cardHeaderRef}
           className="enterprise-card-header"
           style={{
             flexShrink: 0,
@@ -526,17 +407,19 @@ export default function RolesPermissionsView() {
             borderBottom: '1px solid var(--border-default, #e2e8f0)',
           }}
         >
-          {/* Left: Section Title & Count */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-              {language === 'en' ? 'Role Hierarchy' : 'Daftar Role Sistem'}
-            </span>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-              · {filtered.length} role
-            </span>
+          {/* Left: Page Title + Count */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontSize: '13.5px', fontWeight: 600, letterSpacing: '-0.015em', color: 'var(--text-primary)', lineHeight: 1.25 }}>
+                {language === 'en' ? 'Roles & Permissions' : 'Role & Hak Akses'}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '1px' }}>
+                {filtered.length} role
+              </div>
+            </div>
           </div>
 
-          {/* Right: Search Box with Smooth Pill & Ctrl+K */}
+          {/* Right: Search + New Role */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div
               style={{
@@ -547,7 +430,7 @@ export default function RolesPermissionsView() {
                 borderRadius: '9999px',
                 padding: '0 8px 0 10px',
                 height: '26px',
-                width: '230px',
+                width: '220px',
                 gap: '6px',
               }}
             >
@@ -569,23 +452,53 @@ export default function RolesPermissionsView() {
                   minWidth: 0,
                 }}
               />
-              <kbd className="kbd-shortcut" style={{ fontSize: '9px', padding: '1px 4px' }}>
-                Ctrl K
-              </kbd>
+              {searchQuery && (
+                <button type="button" onClick={() => setSearchQuery('')} style={{ display: 'flex', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)', padding: 0 }}>
+                  <X size={11} />
+                </button>
+              )}
             </div>
+            {canManage && (
+              <button
+                type="button"
+                onClick={openCreate}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  height: '26px',
+                  padding: '0 11px',
+                  fontSize: '11.5px',
+                  fontWeight: 500,
+                  letterSpacing: '-0.01em',
+                  color: '#ffffff',
+                  backgroundColor: '#0f172a',
+                  border: '1px solid #0f172a',
+                  borderRadius: '9999px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1e293b'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#0f172a'; }}
+              >
+                <Plus size={11} strokeWidth={2.4} />
+                <span>{language === 'en' ? 'New Role' : 'Role Baru'}</span>
+              </button>
+            )}
           </div>
         </div>
 
         {/* ── Table Content ── */}
         <div className="enterprise-table-wrapper">
-          <table style={{ width: '100%', minWidth: '720px', borderCollapse: 'separate', borderSpacing: 0, fontSize: '12.5px' }}>
+          <table style={{ width: '100%', minWidth: '760px', borderCollapse: 'separate', borderSpacing: 0, fontSize: '12.5px' }}>
             <thead>
               <tr>
                 {[
-                  { label: 'Role & Deskripsi', width: '50%' },
-                  { label: 'Pengguna', width: '14%' },
-                  { label: 'Cakupan Izin', width: '18%' },
-                  { label: 'Aksi', width: '18%', align: 'right' },
+                  { label: 'Role & Deskripsi', width: '46%', align: 'left' },
+                  { label: 'Pengguna', width: '16%', align: 'center' },
+                  { label: 'Cakupan Izin', width: '20%', align: 'center' },
+                  { label: 'Aksi', width: '18%', align: 'center' },
                 ].map((col) => (
                   <th
                     key={col.label}
@@ -599,7 +512,8 @@ export default function RolesPermissionsView() {
                       fontSize: '11px',
                       letterSpacing: '0.02em',
                       color: 'var(--text-secondary)',
-                      textAlign: (col.align as any) || 'left',
+                      textAlign: col.align as any,
+                      verticalAlign: 'middle',
                       width: col.width,
                       whiteSpace: 'nowrap',
                       borderBottom: '1px solid var(--border-default, #e2e8f0)',
@@ -614,7 +528,7 @@ export default function RolesPermissionsView() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={4} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  <td colSpan={4} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-secondary)', verticalAlign: 'middle' }}>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
                       <Loader2 size={16} className="animate-spin" color="var(--color-primary, #2563eb)" />
                       <span>Memuat data role...</span>
@@ -623,7 +537,7 @@ export default function RolesPermissionsView() {
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={4} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <td colSpan={4} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)', verticalAlign: 'middle' }}>
                     <p style={{ margin: 0, fontWeight: 600, color: 'var(--text-primary)', fontSize: '13px' }}>
                       Tidak ada role yang cocok
                     </p>
@@ -644,48 +558,53 @@ export default function RolesPermissionsView() {
                     onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                   >
                     {/* Role Info */}
-                    <td style={{ padding: '10px 14px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '2px' }}>
-                        <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)' }}>
-                          {role.name}
-                        </span>
-                        {role.is_system && (
-                          <span
-                            style={{
-                              fontSize: '10.5px',
-                              fontWeight: 600,
-                              padding: '1px 7px',
-                              borderRadius: '9999px',
-                              backgroundColor: 'var(--bg-subtle, #f1f5f9)',
-                              border: '1px solid var(--border-default, #e2e8f0)',
-                              color: 'var(--text-secondary)',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '3px',
-                            }}
-                          >
-                            <Lock size={9} />
-                            Terkunci
+                    <td style={{ padding: '10px 14px', textAlign: 'left', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap', marginBottom: '2px' }}>
+                          <span style={{ fontWeight: 500, fontSize: '13px', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                            {role.name}
                           </span>
+                          {role.is_system && (
+                            <span
+                              style={{
+                                fontSize: '10.5px',
+                                fontWeight: 600,
+                                padding: '1px 7px',
+                                borderRadius: '9999px',
+                                backgroundColor: 'var(--bg-subtle, #f1f5f9)',
+                                border: '1px solid var(--border-default, #e2e8f0)',
+                                color: 'var(--text-secondary)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              <Lock size={9} />
+                              Terkunci
+                            </span>
+                          )}
+                        </div>
+                        {role.description && (
+                          <p style={{ margin: 0, fontSize: '11.5px', color: 'var(--text-secondary)', lineHeight: 1.4, whiteSpace: 'nowrap' }}>
+                            {role.description}
+                          </p>
                         )}
                       </div>
-                      {role.description && (
-                        <p style={{ margin: 0, fontSize: '11.5px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-                          {role.description}
-                        </p>
-                      )}
                     </td>
 
                     {/* Pengguna */}
-                    <td style={{ padding: '10px 14px' }}>
+                    <td style={{ padding: '10px 14px', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                       <span
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
+                          justifyContent: 'center',
                           gap: '5px',
                           fontSize: '12px',
                           color: 'var(--text-secondary)',
                           fontFamily: 'var(--font-mono, monospace)',
+                          whiteSpace: 'nowrap',
                         }}
                       >
                         <Users size={12} color="var(--text-muted)" />
@@ -694,15 +613,17 @@ export default function RolesPermissionsView() {
                     </td>
 
                     {/* Permission Count */}
-                    <td style={{ padding: '10px 14px' }}>
+                    <td style={{ padding: '10px 14px', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                       <span
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
+                          justifyContent: 'center',
                           padding: '2px 8px',
                           borderRadius: '9999px',
                           fontSize: '11px',
                           fontWeight: 600,
+                          whiteSpace: 'nowrap',
                           backgroundColor:
                             role.permissions.length > 0
                               ? 'rgba(37, 99, 235, 0.08)'
@@ -718,8 +639,8 @@ export default function RolesPermissionsView() {
                     </td>
 
                     {/* Actions */}
-                    <td style={{ padding: '10px 14px', textAlign: 'right' }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end' }}>
+                    <td style={{ padding: '10px 14px', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
                         {role.is_system ? (
                           <IBtn title="Lihat detail role" onClick={() => openView(role)}>
                             <Eye size={12} />
@@ -758,7 +679,7 @@ export default function RolesPermissionsView() {
           totalItems={filtered.length}
           pageSize={pageSize}
           onPageChange={setPage}
-          onPageSizeChange={(newSize) => {
+          onPageSizeChange={(newSize: number) => {
             setPageSize(newSize);
             setPage(1);
           }}

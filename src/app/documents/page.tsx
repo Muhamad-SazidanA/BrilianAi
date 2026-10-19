@@ -2,11 +2,8 @@
 
 import React, { useEffect, useState, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { UploadCloud } from 'lucide-react';
 import AppShell from '@/components/layout/AppShell';
-import EnterprisePageHeader from '@/components/layout/EnterprisePageHeader';
 import DocumentTable from '@/components/documents/DocumentTable';
-import DocumentStatsCards from '@/components/documents/DocumentStatsCards';
 import DocumentUploadModal from '@/components/documents/DocumentUploadModal';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import { UploadBatch } from '@/types/document';
@@ -25,28 +22,6 @@ function DocumentsContent() {
   const [deletingDoc, setDeletingDoc] = useState<{ id: string; filename: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
-
-  // Dynamic sticky measurement for 4 stats cards
-  const statsRef = useRef<HTMLDivElement>(null);
-  const [statsHeight, setStatsHeight] = useState(110);
-
-  useEffect(() => {
-    if (!statsRef.current) return;
-    const updateHeight = () => {
-      if (statsRef.current) {
-        const h = Math.round(statsRef.current.getBoundingClientRect().height);
-        if (h > 0) setStatsHeight(h);
-      }
-    };
-    updateHeight();
-    const observer = new ResizeObserver(updateHeight);
-    observer.observe(statsRef.current);
-    window.addEventListener('resize', updateHeight);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', updateHeight);
-    };
-  }, [batches]);
 
   useEffect(() => {
     if (searchParams.get('action') === 'upload') {
@@ -73,6 +48,15 @@ function DocumentsContent() {
 
   useEffect(() => {
     fetchBatches();
+
+    const handleCompleted = () => {
+      fetchBatches();
+    };
+
+    window.addEventListener('document_ingestion_completed', handleCompleted);
+    return () => {
+      window.removeEventListener('document_ingestion_completed', handleCompleted);
+    };
   }, []);
 
   const handleDelete = async (batchId: string, filename: string) => {
@@ -179,62 +163,7 @@ function DocumentsContent() {
   return (
     <AppShell requiredPermission="documents:read">
       <div className="enterprise-page-container">
-        {/* Enterprise Page Header */}
-        <EnterprisePageHeader
-          title={language === 'en' ? 'Knowledge Base' : 'Basis Pengetahuan'}
-          subtitle={
-            language === 'en'
-              ? 'Vision OCR per page, document volume, and curated insights.'
-              : 'Vision OCR per halaman, volume dokumen, dan kurasi analitik.'
-          }
-          syncTime={syncTime}
-          onRefresh={fetchBatches}
-          isLoading={isLoading}
-          actions={
-            hasPermission('documents:upload') ? (
-              <button
-                type="button"
-                onClick={() => setIsUploadOpen(true)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  height: '28px',
-                  padding: '0 12px',
-                  fontSize: '11.5px',
-                  fontWeight: 500,
-                  letterSpacing: '-0.01em',
-                  color: '#FFFFFF',
-                  backgroundColor: '#2563EB',
-                  border: '1px solid #1D4ED8',
-                  borderRadius: '9999px',
-                  cursor: 'pointer',
-                  boxShadow: '0 1px 2px rgba(37, 99, 235, 0.15)',
-                  transition: 'all 0.15s ease',
-                  whiteSpace: 'nowrap',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#1D4ED8';
-                  e.currentTarget.style.transform = 'translateY(-0.5px)';
-                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(37, 99, 235, 0.25)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#2563EB';
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(37, 99, 235, 0.15)';
-                }}
-              >
-                <UploadCloud size={12} strokeWidth={2.2} />
-                <span>{language === 'en' ? 'Upload Document' : 'Unggah Dokumen'}</span>
-              </button>
-            ) : null
-          }
-        />
-
-        {/* Document Stats Cards (Pure 4-card enterprise metrics) */}
-        <DocumentStatsCards batches={batches} isLoading={isLoading} />
-
-        {/* Document Table with High-Density Controls & Shimmer Skeleton */}
+        {/* Document Table (Unified Spensify-style Stream Card) */}
         <DocumentTable
           batches={batches}
           isLoading={isLoading}

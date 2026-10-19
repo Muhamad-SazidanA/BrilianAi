@@ -146,7 +146,7 @@ function LoginForm() {
         alignItems: 'center',
         justifyContent: 'flex-end',
         overflow: 'hidden',
-        fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+        fontFamily: "var(--font-sans)",
         userSelect: 'none',
         boxSizing: 'border-box',
       }}
@@ -428,7 +428,7 @@ function LoginFallback() {
         alignItems: 'center',
         justifyContent: 'flex-end',
         overflow: 'hidden',
-        fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+        fontFamily: "var(--font-sans)",
         userSelect: 'none',
         boxSizing: 'border-box',
       }}

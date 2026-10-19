@@ -78,11 +78,12 @@ export async function POST(req: NextRequest) {
 
     const clientId =
       (formData.get('clientId') as string | null) || `upload-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    clearIngestProgress(clientId);
+    
     setIngestProgress(clientId, {
       clientId,
+      filename,
       status: 'queued',
-      message: 'Antrian ingest dibuat, menunggu eksekusi pipeline...',
+      message: 'Dokumen diantrekan ke pipeline ingestion...',
       progressPercent: 5,
     });
 
@@ -112,14 +113,86 @@ export async function POST(req: NextRequest) {
       reviewDueDate,
     };
 
-    const result = await queuePdfIngestion(buffer, filename, options, clientId);
+    const isAsync = req.nextUrl.searchParams.get('async') === 'true' || formData.get('async') === 'true';
 
+    const runBackgroundIngestion = async () => {
+      try {
+        const result = await queuePdfIngestion(buffer, filename, options, clientId);
+
+        if (Array.isArray(userGrants) && userGrants.length > 0) {
+          const { bulkGrantDocumentAccess } = await import('@lib/db/documentGrantStore');
+          await bulkGrantDocumentAccess(result.uploadBatchId, userGrants, ownerId);
+        }
+
+        setIngestProgress(clientId, {
+          clientId,
+          filename,
+          status: 'completed',
+          message: `Selesai: ${result.pageCount} halaman dan ${result.chunkCount} chunks berhasil di-ingest.`,
+          progressPercent: 100,
+          totalPages: result.pageCount,
+          currentPage: result.pageCount,
+          totalChunks: result.chunkCount,
+          processedChunks: result.chunkCount,
+          result: {
+            upload_batch_id: result.uploadBatchId,
+            original_filename: result.originalFilename,
+            page_count: result.pageCount,
+            chunk_count: result.chunkCount,
+          },
+        });
+      } catch (err: any) {
+        console.error(`[Background Ingestion Error] ${filename} (clientId: ${clientId}):`, err);
+        setIngestProgress(clientId, {
+          clientId,
+          filename,
+          status: 'error',
+          message: err.message || 'Gagal memproses dokumen',
+          progressPercent: 100,
+          error: err.message || 'Gagal memproses dokumen',
+        });
+      }
+    };
+
+    if (isAsync) {
+      // Fire and forget in Node.js background lifecycle
+      setImmediate(runBackgroundIngestion);
+
+      return NextResponse.json(
+        {
+          status: 'queued',
+          clientId,
+          original_filename: filename,
+          message: 'Dokumen diterima dan sedang diproses di background.',
+        },
+        { status: 202 }
+      );
+    }
+
+    // Synchronous execution fallback
+    const result = await queuePdfIngestion(buffer, filename, options, clientId);
     if (Array.isArray(userGrants) && userGrants.length > 0) {
       const { bulkGrantDocumentAccess } = await import('@lib/db/documentGrantStore');
       await bulkGrantDocumentAccess(result.uploadBatchId, userGrants, ownerId);
     }
 
-    clearIngestProgress(clientId);
+    setIngestProgress(clientId, {
+      clientId,
+      filename,
+      status: 'completed',
+      message: `Selesai: ${result.pageCount} halaman dan ${result.chunkCount} chunks berhasil di-ingest.`,
+      progressPercent: 100,
+      totalPages: result.pageCount,
+      currentPage: result.pageCount,
+      totalChunks: result.chunkCount,
+      processedChunks: result.chunkCount,
+      result: {
+        upload_batch_id: result.uploadBatchId,
+        original_filename: result.originalFilename,
+        page_count: result.pageCount,
+        chunk_count: result.chunkCount,
+      },
+    });
 
     return NextResponse.json(
       {

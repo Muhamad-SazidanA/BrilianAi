@@ -3,14 +3,12 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Search, Download, X, Loader2, Eye,
-  MessageSquare, Users, ArrowRight, Clock, FileText,
+  MessageSquare, Users, ArrowRight, Clock, FileText, RefreshCw,
 } from 'lucide-react';
 import { ChatAuditLog, AuditAnalyticsSummary, User } from '@/types/user';
 import MarkdownContent from '@/components/ui/MarkdownContent';
 import { toast } from 'sonner';
 import UserAvatar from '@/components/ui/UserAvatar';
-import EnterprisePageHeader from '@/components/layout/EnterprisePageHeader';
-import DashboardMetricCard from '@/components/dashboard/DashboardMetricCard';
 import EnterprisePagination from '@/components/ui/EnterprisePagination';
 import EnterpriseSelect, { EnterpriseSelectOption } from '@/components/ui/EnterpriseSelect';
 import { useLanguage } from '@/context/LanguageContext';
@@ -110,35 +108,6 @@ export default function AuditLogsView() {
   const [inspecting, setInspecting] = useState<ChatAuditLog | null>(null);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const statsRef = useRef<HTMLDivElement>(null);
-  const cardHeaderRef = useRef<HTMLDivElement>(null);
-  const [statsHeight, setStatsHeight] = useState(110);
-  const [cardHeaderHeight, setCardHeaderHeight] = useState(42);
-
-  // Dynamic sticky measurement for 4 stats cards & card header
-  useEffect(() => {
-    const updateHeights = () => {
-      if (statsRef.current) {
-        const h = Math.round(statsRef.current.getBoundingClientRect().height);
-        if (h > 0) setStatsHeight(h);
-      }
-      if (cardHeaderRef.current) {
-        const ch = Math.round(cardHeaderRef.current.getBoundingClientRect().height);
-        if (ch > 0) setCardHeaderHeight(ch);
-      }
-    };
-    updateHeights();
-    const observer = new ResizeObserver(updateHeights);
-    if (statsRef.current) observer.observe(statsRef.current);
-    if (cardHeaderRef.current) observer.observe(cardHeaderRef.current);
-    window.addEventListener('resize', updateHeights);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', updateHeights);
-    };
-  }, [logs, analytics, activeTab]);
-
-  const tableHeaderStickyTop = 48 + statsHeight - 1 + cardHeaderHeight - 1;
 
   // Keyboard shortcut Ctrl+K and /
   useEffect(() => {
@@ -250,101 +219,6 @@ export default function AuditLogsView() {
 
   return (
     <div className="enterprise-page-container">
-      {/* ── Enterprise Page Header ── */}
-      <EnterprisePageHeader
-        title={language === 'en' ? 'Chat Audit Logs' : 'Audit Log Percakapan'}
-        subtitle={
-          language === 'en'
-            ? 'Enterprise query volume monitoring, topic analysis, and cited document inspection.'
-            : 'Monitoring volume pertanyaan pengguna, analisis topik bahasan, dan audit rujukan dokumen AI.'
-        }
-        syncTime={syncTime}
-        onRefresh={refreshAll}
-        isLoading={isLoading || isLoadingAnalytics}
-        actions={
-          <button
-            type="button"
-            onClick={handleExport}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              height: '28px',
-              padding: '0 12px',
-              fontSize: '11.5px',
-              fontWeight: 500,
-              letterSpacing: '-0.01em',
-              color: 'var(--text-primary)',
-              backgroundColor: 'var(--bg-card, #ffffff)',
-              border: '1px solid var(--border-default, #e2e8f0)',
-              borderRadius: '9999px',
-              cursor: 'pointer',
-              boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            <Download size={12} strokeWidth={2.2} />
-            <span>{language === 'en' ? 'Export CSV' : 'Ekspor CSV'}</span>
-          </button>
-        }
-      />
-
-      {/* ── 4 Pure Enterprise Metric Cards ── */}
-      <div
-        ref={statsRef}
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: '10px',
-          flexShrink: 0,
-        }}
-      >
-          <DashboardMetricCard
-            title={language === 'en' ? 'Total Sessions' : 'Total Percakapan'}
-            value={`${totalLogs.toLocaleString('id-ID')} Sesi`}
-            badge="KMS Audit"
-            badgeType="neutral"
-            footerText={language === 'en' ? 'Interactions logged' : 'Riwayat dialog interaktif AI'}
-            isLoading={isLoading}
-            onClick={() => setActiveTab('logs')}
-          />
-
-          <DashboardMetricCard
-            title={language === 'en' ? 'Active Users' : 'Pengguna Aktif'}
-            value={`${analytics?.total_active_users ?? (analytics?.top_users?.length ?? 0)} Pengguna`}
-            badge="Active"
-            badgeType="neutral"
-            statusDot="live"
-            footerText={language === 'en' ? 'Submitted AI queries' : 'Mengajukan pertanyaan AI'}
-            isLoading={isLoadingAnalytics}
-            onClick={() => setActiveTab('topUsers')}
-          />
-
-          <DashboardMetricCard
-            title={language === 'en' ? 'Discovered Topics' : 'Klaster Topik'}
-            value={`${analytics?.top_topics?.length || 0} Topik`}
-            badge="NLP"
-            badgeType="neutral"
-            footerText={language === 'en' ? 'Dominant intent clusters' : 'Distribusi domain bahasan'}
-            isLoading={isLoadingAnalytics}
-          />
-
-          <DashboardMetricCard
-            title={language === 'en' ? 'Top Contributor' : 'Pengguna Teraktif'}
-            value={
-              analytics?.top_users?.[0]?.name
-                ? `${analytics.top_users[0].name.split(' ')[0]} (${analytics.top_users[0].total_queries})`
-                : '—'
-            }
-            badge="Leaderboard"
-            badgeType="neutral"
-            statusDot="blue"
-            footerText={language === 'en' ? 'Most queries submitted' : 'Aktivitas dialog AI tertinggi'}
-            isLoading={isLoadingAnalytics}
-            onClick={() => setActiveTab('topUsers')}
-          />
-      </div>
-
       {/* ── Main Stream Card (Linear / Vercel Enterprise Style) ── */}
       <div
         className="enterprise-card"
@@ -358,108 +232,124 @@ export default function AuditLogsView() {
       >
         {/* Card Header Controls */}
         <div
-          ref={cardHeaderRef}
           className="enterprise-card-header"
           style={{
+            position: 'relative',
+            zIndex: 30,
             flexShrink: 0,
-            flexWrap: 'wrap',
-            gap: '8px',
+            flexWrap: 'nowrap',
+            gap: '10px',
             backgroundColor: 'var(--bg-card, #ffffff)',
             borderBottom: '1px solid var(--border-default, #e2e8f0)',
           }}
         >
-          {/* Left: Tab Switcher (Smooth Pill Style) */}
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              backgroundColor: 'var(--bg-subtle, #f1f5f9)',
-              border: '1px solid var(--border-default, #e2e8f0)',
-              borderRadius: '9999px',
-              padding: '2px',
-              gap: '2px',
-              height: '26px',
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => setActiveTab('logs')}
+          {/* Left: Page Title + Tab Switcher */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, whiteSpace: 'nowrap' }}>
+            <div style={{ flexShrink: 0 }}>
+              <div style={{ fontSize: '13px', fontWeight: 600, letterSpacing: '-0.015em', color: 'var(--text-primary)', lineHeight: 1.25, whiteSpace: 'nowrap' }}>
+                {language === 'en' ? 'Chat Audit Logs' : 'Audit Log Percakapan'}
+              </div>
+              <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '1px', whiteSpace: 'nowrap' }}>
+                {totalLogs} {language === 'en' ? 'sessions recorded' : 'sesi tersimpan'}
+              </div>
+            </div>
+
+            {/* Tab Switcher (Smooth Pill Style) */}
+            <div
               style={{
-                borderRadius: '9999px',
-                padding: '2px 10px',
-                fontSize: '11px',
-                height: '22px',
-                fontWeight: activeTab === 'logs' ? 600 : 500,
-                border: 'none',
-                backgroundColor: activeTab === 'logs' ? 'var(--bg-card, #ffffff)' : 'transparent',
-                color: activeTab === 'logs' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                boxShadow: activeTab === 'logs' ? '0 1px 2px rgba(15, 23, 42, 0.06)' : 'none',
-                cursor: 'pointer',
-                transition: 'all 0.12s ease',
-                whiteSpace: 'nowrap',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '5px',
+                backgroundColor: 'var(--bg-subtle, #f1f5f9)',
+                border: '1px solid var(--border-default, #e2e8f0)',
+                borderRadius: '9999px',
+                padding: '2px',
+                gap: '2px',
+                height: '26px',
+                flexShrink: 0,
               }}
             >
-              <MessageSquare size={12} />
-              <span>{language === 'en' ? 'All Conversations' : 'Semua Percakapan'}</span>
-              <span
+              <button
+                type="button"
+                onClick={() => setActiveTab('logs')}
                 style={{
-                  fontSize: '10px',
-                  fontWeight: 600,
-                  padding: '0 5px',
                   borderRadius: '9999px',
-                  backgroundColor: activeTab === 'logs' ? 'var(--bg-subtle, #f1f5f9)' : 'rgba(0,0,0,0.05)',
-                  color: 'var(--text-muted)',
+                  padding: '2px 9px',
+                  fontSize: '11px',
+                  height: '22px',
+                  fontWeight: activeTab === 'logs' ? 600 : 500,
+                  border: 'none',
+                  backgroundColor: activeTab === 'logs' ? 'var(--bg-card, #ffffff)' : 'transparent',
+                  color: activeTab === 'logs' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  boxShadow: activeTab === 'logs' ? '0 1px 2px rgba(15, 23, 42, 0.06)' : 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.12s ease',
+                  whiteSpace: 'nowrap',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  flexShrink: 0,
                 }}
               >
-                {totalLogs}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('topUsers')}
-              style={{
-                borderRadius: '9999px',
-                padding: '2px 10px',
-                fontSize: '11px',
-                height: '22px',
-                fontWeight: activeTab === 'topUsers' ? 600 : 500,
-                border: 'none',
-                backgroundColor: activeTab === 'topUsers' ? 'var(--bg-card, #ffffff)' : 'transparent',
-                color: activeTab === 'topUsers' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                boxShadow: activeTab === 'topUsers' ? '0 1px 2px rgba(15, 23, 42, 0.06)' : 'none',
-                cursor: 'pointer',
-                transition: 'all 0.12s ease',
-                whiteSpace: 'nowrap',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
-              }}
-            >
-              <Users size={12} />
-              <span>{language === 'en' ? 'Top Users' : 'Pengguna Teraktif'}</span>
-              {analytics?.top_users?.length ? (
+                <MessageSquare size={12} />
+                <span>{language === 'en' ? 'All Conversations' : 'Semua Percakapan'}</span>
                 <span
                   style={{
                     fontSize: '10px',
                     fontWeight: 600,
                     padding: '0 5px',
                     borderRadius: '9999px',
-                    backgroundColor: activeTab === 'topUsers' ? 'var(--bg-subtle, #f1f5f9)' : 'rgba(0,0,0,0.05)',
+                    backgroundColor: activeTab === 'logs' ? 'var(--bg-subtle, #f1f5f9)' : 'rgba(0,0,0,0.05)',
                     color: 'var(--text-muted)',
                   }}
                 >
-                  {analytics.top_users.length}
+                  {totalLogs}
                 </span>
-              ) : null}
-            </button>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('topUsers')}
+                style={{
+                  borderRadius: '9999px',
+                  padding: '2px 9px',
+                  fontSize: '11px',
+                  height: '22px',
+                  fontWeight: activeTab === 'topUsers' ? 600 : 500,
+                  border: 'none',
+                  backgroundColor: activeTab === 'topUsers' ? 'var(--bg-card, #ffffff)' : 'transparent',
+                  color: activeTab === 'topUsers' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  boxShadow: activeTab === 'topUsers' ? '0 1px 2px rgba(15, 23, 42, 0.06)' : 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.12s ease',
+                  whiteSpace: 'nowrap',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  flexShrink: 0,
+                }}
+              >
+                <Users size={12} />
+                <span>{language === 'en' ? 'Top Users' : 'Pengguna Teraktif'}</span>
+                {analytics?.top_users?.length ? (
+                  <span
+                    style={{
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      padding: '0 5px',
+                      borderRadius: '9999px',
+                      backgroundColor: activeTab === 'topUsers' ? 'var(--bg-subtle, #f1f5f9)' : 'rgba(0,0,0,0.05)',
+                      color: 'var(--text-muted)',
+                    }}
+                  >
+                    {analytics.top_users.length}
+                  </span>
+                ) : null}
+              </button>
+            </div>
           </div>
 
-          {/* Right: Controls (Search + User Filter + Date Filter) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          {/* Right: Controls (Search + Filters + Refresh + Export) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, whiteSpace: 'nowrap' }}>
             {activeTab === 'logs' && (
               <>
                 {/* Search Box */}
@@ -470,10 +360,11 @@ export default function AuditLogsView() {
                     backgroundColor: 'var(--bg-subtle, #f8fafc)',
                     border: '1px solid var(--border-default, #e2e8f0)',
                     borderRadius: '9999px',
-                    padding: '0 8px 0 10px',
+                    padding: '0 8px 0 9px',
                     height: '26px',
-                    width: '210px',
-                    gap: '6px',
+                    width: 'clamp(120px, 11vw, 165px)',
+                    gap: '5px',
+                    flexShrink: 1,
                   }}
                 >
                   <Search size={12} color="var(--text-muted)" style={{ flexShrink: 0 }} />
@@ -491,19 +382,39 @@ export default function AuditLogsView() {
                       border: 'none',
                       background: 'transparent',
                       outline: 'none',
-                      fontSize: '11.5px',
+                      fontSize: '11px',
                       color: 'var(--text-primary)',
                       padding: 0,
                       minWidth: 0,
                     }}
                   />
-                  <kbd className="kbd-shortcut" style={{ fontSize: '9px', padding: '1px 4px' }}>
-                    Ctrl K
-                  </kbd>
+                  {searchQuery ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchQuery('');
+                        setCurrentPage(1);
+                      }}
+                      style={{
+                        display: 'flex',
+                        border: 'none',
+                        background: 'transparent',
+                        cursor: 'pointer',
+                        color: 'var(--text-muted)',
+                        padding: 0,
+                      }}
+                    >
+                      <X size={11} />
+                    </button>
+                  ) : (
+                    <kbd className="kbd-shortcut" style={{ fontSize: '9px', padding: '1px 4px' }}>
+                      Ctrl K
+                    </kbd>
+                  )}
                 </div>
 
                 {/* User Dropdown Filter */}
-                <div style={{ width: '150px' }}>
+                <div style={{ width: '115px', flexShrink: 0, position: 'relative', zIndex: 32 }}>
                   <EnterpriseSelect
                     value={userFilter}
                     onChange={(val) => {
@@ -513,13 +424,14 @@ export default function AuditLogsView() {
                     options={userSelectOptions}
                     size="xs"
                     variant="pill"
-                    direction="auto"
+                    direction="down"
+                    menuWidth="150px"
                     searchable={usersList.length > 5}
                   />
                 </div>
 
                 {/* Date Range Dropdown Filter */}
-                <div style={{ width: '130px' }}>
+                <div style={{ width: '100px', flexShrink: 0, position: 'relative', zIndex: 31 }}>
                   <EnterpriseSelect
                     value={dateRange}
                     onChange={(val) => {
@@ -529,11 +441,51 @@ export default function AuditLogsView() {
                     options={dateRangeSelectOptions}
                     size="xs"
                     variant="pill"
-                    direction="auto"
+                    direction="down"
+                    menuWidth="130px"
                   />
                 </div>
               </>
             )}
+
+            <button
+              type="button"
+              onClick={refreshAll}
+              disabled={isLoading || isLoadingAnalytics}
+              className="btn btn-ghost btn-xs"
+              style={{ height: '26px', width: '26px', padding: 0, borderRadius: '9999px', flexShrink: 0 }}
+              title="Refresh data"
+            >
+              <RefreshCw size={12} className={isLoading || isLoadingAnalytics ? 'animate-spin' : ''} color="var(--text-secondary)" />
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExport}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                height: '26px',
+                padding: '0 8px',
+                fontSize: '11px',
+                fontWeight: 500,
+                letterSpacing: '-0.01em',
+                color: 'var(--text-primary)',
+                backgroundColor: 'var(--bg-card, #ffffff)',
+                border: '1px solid var(--border-default, #e2e8f0)',
+                borderRadius: '9999px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-subtle, #f8fafc)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-card, #ffffff)'; }}
+            >
+              <Download size={11} strokeWidth={2.2} />
+              <span>{language === 'en' ? 'Export CSV' : 'Ekspor CSV'}</span>
+            </button>
           </div>
         </div>
 
@@ -545,12 +497,12 @@ export default function AuditLogsView() {
                 <thead>
                   <tr>
                     {[
-                      { label: 'Pengguna', width: '22%' },
-                      { label: 'Pertanyaan & Topik', width: '38%' },
-                      { label: 'Cuplikan Jawaban AI', width: '24%' },
+                      { label: 'Pengguna', width: '22%', align: 'left' },
+                      { label: 'Pertanyaan & Topik', width: '38%', align: 'left' },
+                      { label: 'Cuplikan Jawaban AI', width: '24%', align: 'center' },
                       { label: 'Rujukan', width: '8%', align: 'center' },
-                      { label: 'Waktu', width: '8%' },
-                      { label: 'Aksi', width: '6%', align: 'right' },
+                      { label: 'Waktu', width: '8%', align: 'center' },
+                      { label: 'Aksi', width: '6%', align: 'center' },
                     ].map((col) => (
                       <th
                         key={col.label}
@@ -565,6 +517,7 @@ export default function AuditLogsView() {
                           letterSpacing: '0.02em',
                           color: 'var(--text-secondary)',
                           textAlign: (col.align as any) || 'left',
+                          verticalAlign: 'middle',
                           width: col.width,
                           whiteSpace: 'nowrap',
                           borderBottom: '1px solid var(--border-default, #e2e8f0)',
@@ -579,7 +532,7 @@ export default function AuditLogsView() {
                 <tbody>
                   {isLoading ? (
                     <tr>
-                      <td colSpan={6} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                      <td colSpan={6} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-secondary)', verticalAlign: 'middle' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
                           <Loader2 size={16} className="animate-spin" color="var(--color-primary, #2563eb)" />
                           <span>Memuat log percakapan...</span>
@@ -588,7 +541,7 @@ export default function AuditLogsView() {
                     </tr>
                   ) : logs.length === 0 ? (
                     <tr>
-                      <td colSpan={6} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      <td colSpan={6} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)', verticalAlign: 'middle' }}>
                         <MessageSquare size={24} style={{ margin: '0 auto 6px', display: 'block', color: 'var(--border-default)' }} />
                         <p style={{ margin: 0, fontWeight: 600, color: 'var(--text-primary)', fontSize: '13px' }}>
                           {searchQuery || userFilter !== 'all' ? 'Tidak ada percakapan yang cocok' : 'Belum ada percakapan tercatat'}
@@ -610,14 +563,14 @@ export default function AuditLogsView() {
                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                       >
                         {/* Pengguna */}
-                        <td style={{ padding: '9px 14px', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '9px 14px', textAlign: 'left', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <UserAvatar name={log.user_name || 'User'} size={28} />
                             <div style={{ minWidth: 0 }}>
                               <div
                                 style={{
-                                  fontWeight: 600,
-                                  fontSize: '12px',
+                                  fontWeight: 500,
+                                  fontSize: '13px',
                                   color: 'var(--text-primary)',
                                   whiteSpace: 'nowrap',
                                   overflow: 'hidden',
@@ -626,7 +579,7 @@ export default function AuditLogsView() {
                               >
                                 {log.user_name || 'Anonim'}
                               </div>
-                              <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
+                              <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                                 {log.user_department || '—'}
                               </div>
                             </div>
@@ -634,44 +587,48 @@ export default function AuditLogsView() {
                         </td>
 
                         {/* Pertanyaan & Topik */}
-                        <td style={{ padding: '9px 14px' }}>
-                          <div
-                            style={{
-                              fontSize: '12px',
-                              fontWeight: 500,
-                              color: 'var(--text-primary)',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              maxWidth: '380px',
-                            }}
-                            title={log.query_text}
-                          >
-                            {log.query_text}
-                          </div>
-                          {log.topic && (
-                            <span
+                        <td style={{ padding: '9px 14px', textAlign: 'left', verticalAlign: 'middle' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', maxWidth: '380px' }}>
+                            <div
                               style={{
-                                display: 'inline-block',
-                                marginTop: '3px',
-                                fontSize: '10px',
-                                fontWeight: 600,
-                                padding: '1px 6px',
-                                borderRadius: '4px',
-                                backgroundColor: 'var(--bg-subtle, #f1f5f9)',
-                                color: 'var(--text-secondary)',
-                                border: '1px solid var(--border-default, #e2e8f0)',
+                                fontSize: '12px',
+                                fontWeight: 500,
+                                color: 'var(--text-primary)',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                maxWidth: '380px',
                               }}
+                              title={log.query_text}
                             >
-                              {log.topic}
-                            </span>
-                          )}
+                              {log.query_text}
+                            </div>
+                            {log.topic && (
+                              <span
+                                style={{
+                                  display: 'inline-block',
+                                  marginTop: '3px',
+                                  fontSize: '10px',
+                                  fontWeight: 600,
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  backgroundColor: 'var(--bg-subtle, #f1f5f9)',
+                                  color: 'var(--text-secondary)',
+                                  border: '1px solid var(--border-default, #e2e8f0)',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {log.topic}
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         {/* Jawaban AI Excerpt */}
-                        <td style={{ padding: '9px 14px' }}>
+                        <td style={{ padding: '9px 14px', textAlign: 'center', verticalAlign: 'middle' }}>
                           <div
                             style={{
+                              display: 'inline-block',
                               fontSize: '11.5px',
                               color: 'var(--text-secondary)',
                               overflow: 'hidden',
@@ -686,7 +643,7 @@ export default function AuditLogsView() {
                         </td>
 
                         {/* Rujukan Dikutip */}
-                        <td style={{ padding: '9px 14px', textAlign: 'center' }}>
+                        <td style={{ padding: '9px 14px', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                           <span
                             style={{
                               fontSize: '11.5px',
@@ -700,15 +657,17 @@ export default function AuditLogsView() {
                         </td>
 
                         {/* Waktu */}
-                        <td style={{ padding: '9px 14px', fontSize: '11px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '9px 14px', fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                           {fmtDateShort(log.created_at)}
                         </td>
 
                         {/* Aksi */}
-                        <td style={{ padding: '9px 14px', textAlign: 'right' }}>
-                          <IBtn title="Lihat detail percakapan" onClick={() => setInspecting(log)}>
-                            <Eye size={12} />
-                          </IBtn>
+                        <td style={{ padding: '9px 14px', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <IBtn title="Lihat detail percakapan" onClick={() => setInspecting(log)}>
+                              <Eye size={12} />
+                            </IBtn>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -740,11 +699,11 @@ export default function AuditLogsView() {
                 <tr>
                   {[
                     { label: 'Peringkat', width: '8%', align: 'center' },
-                    { label: 'Pengguna', width: '28%' },
-                    { label: 'Departemen', width: '18%' },
+                    { label: 'Pengguna', width: '28%', align: 'left' },
+                    { label: 'Departemen', width: '18%', align: 'center' },
                     { label: 'Total Pertanyaan', width: '16%', align: 'center' },
-                    { label: 'Topik Dominan', width: '22%' },
-                    { label: 'Aksi', width: '8%', align: 'right' },
+                    { label: 'Topik Dominan', width: '22%', align: 'left' },
+                    { label: 'Aksi', width: '8%', align: 'center' },
                   ].map((col) => (
                     <th
                       key={col.label}
@@ -758,7 +717,8 @@ export default function AuditLogsView() {
                         fontSize: '11px',
                         letterSpacing: '0.02em',
                         color: 'var(--text-secondary)',
-                        textAlign: (col.align as any) || 'left',
+                        textAlign: col.align as any,
+                        verticalAlign: 'middle',
                         width: col.width,
                         whiteSpace: 'nowrap',
                         borderBottom: '1px solid var(--border-default, #e2e8f0)',
@@ -773,7 +733,7 @@ export default function AuditLogsView() {
               <tbody>
                 {isLoadingAnalytics ? (
                   <tr>
-                    <td colSpan={6} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                    <td colSpan={6} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-secondary)', verticalAlign: 'middle' }}>
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
                         <Loader2 size={16} className="animate-spin" color="var(--color-primary, #2563eb)" />
                         <span>Menganalisis aktivitas pengguna...</span>
@@ -782,7 +742,7 @@ export default function AuditLogsView() {
                   </tr>
                 ) : !analytics || analytics.top_users.length === 0 ? (
                   <tr>
-                    <td colSpan={6} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <td colSpan={6} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)', verticalAlign: 'middle' }}>
                       <Users size={24} style={{ margin: '0 auto 6px', display: 'block', color: 'var(--border-default)' }} />
                       <p style={{ margin: 0, fontWeight: 600, color: 'var(--text-primary)', fontSize: '13px' }}>
                         Belum ada aktivitas chat pengguna
@@ -804,7 +764,7 @@ export default function AuditLogsView() {
                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
                       {/* Peringkat */}
-                      <td style={{ padding: '9px 14px', textAlign: 'center' }}>
+                      <td style={{ padding: '9px 14px', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                         <span
                           style={{
                             display: 'inline-flex',
@@ -825,25 +785,25 @@ export default function AuditLogsView() {
                       </td>
 
                       {/* Pengguna */}
-                      <td style={{ padding: '9px 14px', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '9px 14px', textAlign: 'left', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <UserAvatar name={u.name || 'User'} size={28} />
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ fontWeight: 600, fontSize: '12.5px', color: 'var(--text-primary)' }}>
+                            <div style={{ fontWeight: 500, fontSize: '13px', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
                               {u.name}
                             </div>
-                            <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>{u.email}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{u.email}</div>
                           </div>
                         </div>
                       </td>
 
                       {/* Departemen */}
-                      <td style={{ padding: '9px 14px', fontSize: '12px', color: 'var(--text-primary)' }}>
+                      <td style={{ padding: '9px 14px', fontSize: '12px', color: 'var(--text-primary)', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                         {u.department || '—'}
                       </td>
 
                       {/* Total Pertanyaan */}
-                      <td style={{ padding: '9px 14px', textAlign: 'center' }}>
+                      <td style={{ padding: '9px 14px', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                         <span
                           style={{
                             display: 'inline-block',
@@ -855,6 +815,7 @@ export default function AuditLogsView() {
                             backgroundColor: 'rgba(37, 99, 235, 0.08)',
                             color: '#2563eb',
                             border: '1px solid rgba(37, 99, 235, 0.18)',
+                            whiteSpace: 'nowrap',
                           }}
                         >
                           {u.total_queries} query
@@ -862,8 +823,8 @@ export default function AuditLogsView() {
                       </td>
 
                       {/* Topik Dominan */}
-                      <td style={{ padding: '9px 14px' }}>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                      <td style={{ padding: '9px 14px', textAlign: 'left', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', flexWrap: 'nowrap', gap: '4px' }}>
                           {u.top_topics && u.top_topics.length > 0 ? (
                             u.top_topics.slice(0, 2).map((tp, tidx) => (
                               <span
@@ -888,31 +849,34 @@ export default function AuditLogsView() {
                       </td>
 
                       {/* Aksi */}
-                      <td style={{ padding: '9px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '9px 14px', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                         {u.user_id ? (
-                          <button
-                            type="button"
-                            onClick={() => selectUserAndShowLogs(u.user_id)}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              padding: '3px 8px',
-                              borderRadius: '9999px',
-                              border: '1px solid var(--border-default, #e2e8f0)',
-                              backgroundColor: 'var(--bg-card, #ffffff)',
-                              fontSize: '11px',
-                              fontWeight: 500,
-                              color: '#2563eb',
-                              cursor: 'pointer',
-                              transition: 'all 0.12s ease',
-                            }}
-                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-subtle, #f8fafc)')}
-                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-card, #ffffff)')}
-                          >
-                            <span>Lihat Log</span>
-                            <ArrowRight size={10} />
-                          </button>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => selectUserAndShowLogs(u.user_id)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '3px 8px',
+                                borderRadius: '9999px',
+                                border: '1px solid var(--border-default, #e2e8f0)',
+                                backgroundColor: 'var(--bg-card, #ffffff)',
+                                fontSize: '11px',
+                                fontWeight: 500,
+                                color: '#2563eb',
+                                cursor: 'pointer',
+                                transition: 'all 0.12s ease',
+                                whiteSpace: 'nowrap',
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-subtle, #f8fafc)')}
+                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-card, #ffffff)')}
+                            >
+                              <span>Lihat Log</span>
+                              <ArrowRight size={10} />
+                            </button>
+                          </div>
                         ) : (
                           <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>—</span>
                         )}
