@@ -128,75 +128,56 @@ export default function DocumentGrantsTab({ batchId }: DocumentGrantsTabProps) {
   const availableUsers = allUsers.filter((u) => !grantedUserIds.has(u.id));
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginTop: '1rem' }}>
+    <div className="flex flex-col gap-4">
       {/* Information Banner */}
-      <div
-        className="ui-card"
-        style={{
-          padding: '1rem 1.25rem',
-          backgroundColor: 'var(--bg-subtle)',
-          border: '1px solid var(--border-default)',
-          borderRadius: 'var(--radius-md)',
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: '12px',
-        }}
-      >
-        <Info size={18} style={{ color: 'var(--text-secondary)', marginTop: '2px', flexShrink: 0 }} />
-        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-          <strong style={{ color: 'var(--text-primary)', display: 'block', marginBottom: '2px' }}>
+      <div className="p-4 bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-900/50 rounded-2xl flex items-start gap-3 text-slate-700 dark:text-slate-300 shadow-xs">
+        <Info size={16} className="text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+        <div className="text-xs leading-relaxed">
+          <strong className="text-slate-900 dark:text-slate-100 block mb-0.5 text-xs font-bold">
             Kebijakan Hak Akses Dokumen Khusus (User Whitelist)
           </strong>
           Dokumen ini secara default dilindungi oleh klasifikasi kerahasiaan dan divisi. Anda dapat menambahkan pengguna tertentu ke dalam daftar izin di bawah ini untuk memberi mereka hak akses langsung, meskipun jabatan atau divisinya tidak mencakup dokumen ini.
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '1.5rem', alignItems: 'flex-start' }}>
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4 items-start">
         {/* Table of Active Grants */}
-        <div className="ui-card" style={{ padding: '1.25rem', borderRadius: 'var(--radius-md)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Users size={16} style={{ color: 'var(--text-secondary)' }} />
-              <h3 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Users size={16} className="text-blue-600 dark:text-blue-400" />
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 m-0">
                 Pengguna dengan Akses Khusus ({grants.length})
               </h3>
             </div>
-            {isLoading && <Loader2 size={15} className="spin" style={{ color: 'var(--text-secondary)' }} />}
+            {isLoading && <Loader2 size={14} className="animate-spin text-slate-400" />}
           </div>
 
           {isLoading ? (
-            <div style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
-              <Loader2 size={20} className="spin" style={{ margin: '0 auto 8px', display: 'block' }} />
+            <div className="p-10 text-center text-slate-500 text-xs">
+              <Loader2 size={18} className="animate-spin mx-auto mb-2 text-blue-600" />
               Memuat daftar izin pengguna...
             </div>
           ) : grants.length === 0 ? (
-            <div
-              style={{
-                padding: '2.5rem 1rem',
-                textAlign: 'center',
-                backgroundColor: 'var(--bg-subtle)',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px dashed var(--border-default)',
-              }}
-            >
-              <Shield size={24} style={{ color: 'var(--text-muted)', margin: '0 auto 8px', display: 'block' }} />
-              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+            <div className="p-10 text-center bg-slate-50/60 dark:bg-slate-800/40 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
+              <Shield size={26} className="text-slate-400 mx-auto mb-2" />
+              <div className="text-xs font-bold text-slate-800 dark:text-slate-200 mb-1">
                 Belum ada pengguna khusus
               </div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', maxWidth: '380px', margin: '0 auto' }}>
+              <div className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto leading-relaxed">
                 Dokumen hanya dapat diakses sesuai batasan Divisi dan Klasifikasi standar. Gunakan formulir di samping untuk menambahkan akses khusus.
               </div>
             </div>
           ) : (
-            <div className="enterprise-table-wrapper">
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+            <div className="enterprise-table-wrapper rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+              <table className="w-full border-collapse text-left text-xs">
                 <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border-default)', color: 'var(--text-secondary)', backgroundColor: 'var(--bg-subtle, #f8fafc)' }}>
-                    <th style={{ padding: '8px 14px', fontWeight: 600, fontSize: '11px', letterSpacing: '0.02em', textAlign: 'left', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Pengguna</th>
-                    <th style={{ padding: '8px 14px', fontWeight: 600, fontSize: '11px', letterSpacing: '0.02em', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Divisi & Peran</th>
-                    <th style={{ padding: '8px 14px', fontWeight: 600, fontSize: '11px', letterSpacing: '0.02em', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Tingkat Akses</th>
-                    <th style={{ padding: '8px 14px', fontWeight: 600, fontSize: '11px', letterSpacing: '0.02em', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Diberikan Oleh</th>
-                    <th style={{ padding: '8px 14px', fontWeight: 600, fontSize: '11px', letterSpacing: '0.02em', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Aksi</th>
+                  <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 font-semibold text-[11px]">
+                    <th className="py-2.5 px-3.5 text-left whitespace-nowrap">Pengguna</th>
+                    <th className="py-2.5 px-3.5 text-center whitespace-nowrap">Divisi & Peran</th>
+                    <th className="py-2.5 px-3.5 text-center whitespace-nowrap">Tingkat Akses</th>
+                    <th className="py-2.5 px-3.5 text-center whitespace-nowrap">Diberikan Oleh</th>
+                    <th className="py-2.5 px-3.5 text-center whitespace-nowrap">Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -261,32 +242,17 @@ export default function DocumentGrantsTab({ batchId }: DocumentGrantsTabProps) {
         </div>
 
         {/* Add Grant Form Card */}
-        <div
-          className="ui-card"
-          style={{
-            padding: '1.25rem',
-            borderRadius: 'var(--radius-md)',
-            border: '1px solid var(--border-default)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.25rem' }}>
-            <UserPlus size={16} style={{ color: 'var(--text-secondary)' }} />
-            <h3 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-3.5">
+            <UserPlus size={16} className="text-blue-600 dark:text-blue-400" />
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 m-0">
               Beri Akses Pengguna
             </h3>
           </div>
 
-          <form onSubmit={handleGrant} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <form onSubmit={handleGrant} className="space-y-3.5">
             <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  color: 'var(--text-secondary)',
-                  marginBottom: '6px',
-                }}
-              >
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                 Pilih Pengguna
               </label>
               <EnterpriseSelect
@@ -309,30 +275,16 @@ export default function DocumentGrantsTab({ batchId }: DocumentGrantsTabProps) {
             </div>
 
             <div>
-              <label
-                style={{
-                  display: 'block',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  color: 'var(--text-secondary)',
-                  marginBottom: '6px',
-                }}
-              >
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                 Tingkat Akses
               </label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div className="space-y-2">
                 <label
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '8px',
-                    fontSize: '12.5px',
-                    cursor: 'pointer',
-                    padding: '8px 10px',
-                    borderRadius: 'var(--radius-sm)',
-                    border: selectedLevel === 'viewer' ? '1px solid var(--text-primary)' : '1px solid var(--border-subtle)',
-                    backgroundColor: selectedLevel === 'viewer' ? 'var(--bg-subtle)' : 'transparent',
-                  }}
+                  className={`flex items-start gap-2.5 text-xs cursor-pointer p-2.5 rounded-xl border transition-all ${
+                    selectedLevel === 'viewer'
+                      ? 'border-blue-500 bg-blue-50/40 dark:bg-blue-950/30'
+                      : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                  }`}
                 >
                   <input
                     type="radio"
@@ -340,28 +292,22 @@ export default function DocumentGrantsTab({ batchId }: DocumentGrantsTabProps) {
                     value="viewer"
                     checked={selectedLevel === 'viewer'}
                     onChange={() => setSelectedLevel('viewer')}
-                    style={{ marginTop: '2px' }}
+                    className="mt-0.5 accent-blue-600"
                   />
                   <div>
-                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Viewer (Hanya Baca & Tanya)</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    <div className="font-semibold text-slate-900 dark:text-slate-100">Viewer (Hanya Baca & Tanya)</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">
                       Dapat mencari dokumen, menanyakan via AI, dan membaca konten.
                     </div>
                   </div>
                 </label>
 
                 <label
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '8px',
-                    fontSize: '12.5px',
-                    cursor: 'pointer',
-                    padding: '8px 10px',
-                    borderRadius: 'var(--radius-sm)',
-                    border: selectedLevel === 'editor' ? '1px solid var(--text-primary)' : '1px solid var(--border-subtle)',
-                    backgroundColor: selectedLevel === 'editor' ? 'var(--bg-subtle)' : 'transparent',
-                  }}
+                  className={`flex items-start gap-2.5 text-xs cursor-pointer p-2.5 rounded-xl border transition-all ${
+                    selectedLevel === 'editor'
+                      ? 'border-blue-500 bg-blue-50/40 dark:bg-blue-950/30'
+                      : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                  }`}
                 >
                   <input
                     type="radio"
@@ -369,11 +315,11 @@ export default function DocumentGrantsTab({ batchId }: DocumentGrantsTabProps) {
                     value="editor"
                     checked={selectedLevel === 'editor'}
                     onChange={() => setSelectedLevel('editor')}
-                    style={{ marginTop: '2px' }}
+                    className="mt-0.5 accent-blue-600"
                   />
                   <div>
-                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Editor (Penuh)</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    <div className="font-semibold text-slate-900 dark:text-slate-100">Editor (Penuh)</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">
                       Dapat mengedit kurasi insight, mengubah metadata, dan status dokumen.
                     </div>
                   </div>
@@ -384,17 +330,16 @@ export default function DocumentGrantsTab({ batchId }: DocumentGrantsTabProps) {
             <button
               type="submit"
               disabled={isSubmitting || !selectedUserId}
-              className="btn btn-primary btn-sm"
-              style={{ width: '100%', marginTop: '0.5rem', display: 'flex', justifyContent: 'center', gap: '6px' }}
+              className="w-full h-8 px-4 rounded-full text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm shadow-blue-500/20 transition-all inline-flex items-center justify-center gap-1.5 cursor-pointer mt-2"
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 size={14} className="spin" />
+                  <Loader2 size={13} className="animate-spin" />
                   <span>Menyimpan...</span>
                 </>
               ) : (
                 <>
-                  <Check size={14} />
+                  <Check size={13} />
                   <span>Simpan Hak Akses</span>
                 </>
               )}

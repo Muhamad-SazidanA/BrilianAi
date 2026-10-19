@@ -295,19 +295,19 @@ export default function CuratedInsightsTab({
   const currentPercent = isCurating ? (progress?.currentPercent ?? pct) : pct;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div className="flex flex-col gap-4">
       {/* Top Action Header Card */}
-      <div className="ui-card" style={{ padding: '1.25rem 1.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
+            <div className="flex items-center gap-2.5">
+              <h3 className="text-sm md:text-base font-bold text-slate-900 dark:text-slate-100">
                 Curated Insights ({insights.length})
               </h3>
               {(() => {
                 if (isCompleted) {
                   return (
-                    <span className="badge badge-success" style={{ fontSize: '11px', fontWeight: 600 }}>
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800">
                       100% Terkurasi ({insights.length} Insight)
                     </span>
                   );
@@ -315,7 +315,7 @@ export default function CuratedInsightsTab({
 
                 if (processedCount > 0 && targetTotal > 0) {
                   return (
-                    <span className="badge badge-warning" style={{ fontSize: '11px', fontWeight: 600 }}>
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800">
                       {pct}% ({insights.length} Insight)
                     </span>
                   );
@@ -323,77 +323,71 @@ export default function CuratedInsightsTab({
 
                 if (insights.length > 0) {
                   return (
-                    <span className="badge badge-success" style={{ fontSize: '11px', fontWeight: 600 }}>
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800">
                       Terkurasi ({insights.length} Insight)
                     </span>
                   );
                 }
 
                 return (
-                  <span
-                    className="badge"
-                    style={{
-                      backgroundColor: 'var(--bg-subtle)',
-                      color: 'var(--text-muted)',
-                      border: '1px solid var(--border-default)',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                    }}
-                  >
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">
                     Belum Dikurasi
                   </span>
                 );
               })()}
             </div>
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '3px' }}>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
               {t('curate.subtitle')}
             </p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <div className="flex items-center gap-2 flex-wrap">
             <button
+              type="button"
               onClick={() => handleExport('json')}
-              className="btn btn-outline btn-sm"
               disabled={insights.length === 0}
+              className="h-8 px-3 rounded-full text-xs font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-1.5 shadow-xs"
             >
-              <Download size={14} />
+              <Download size={13} />
               <span>{t('curate.export_json')}</span>
             </button>
             <button
+              type="button"
               onClick={() => handleExport('csv')}
-              className="btn btn-outline btn-sm"
               disabled={insights.length === 0}
+              className="h-8 px-3 rounded-full text-xs font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-1.5 shadow-xs"
             >
-              <FileSpreadsheet size={14} />
+              <FileSpreadsheet size={13} />
               <span>{t('curate.export_csv')}</span>
             </button>
             {hasPermission('curation:edit') && (
               <button
+                type="button"
                 onClick={() => {
                   setEditingInsight(null);
                   setIsModalOpen(true);
                 }}
-                className="btn btn-outline btn-sm"
+                className="h-8 px-3.5 rounded-full text-xs font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors inline-flex items-center gap-1.5 shadow-xs"
               >
-                <Plus size={14} />
+                <Plus size={13} />
                 <span>{t('curate.add_manual')}</span>
               </button>
             )}
             {hasPermission('curation:trigger') && (
               <button
+                type="button"
                 onClick={handleStartCuration}
                 disabled={isCurating}
-                className="btn btn-primary btn-sm"
-                style={{ fontWeight: 600 }}
+                className="h-8 px-4 rounded-full text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-sm shadow-blue-500/25 disabled:opacity-50 transition-all inline-flex items-center gap-1.5"
               >
                 {isCurating ? (
                   <>
-                    <Loader2 size={14} className="animate-spin" />
+                    <Loader2 size={13} className="animate-spin" />
                     <span>Memproses ({currentPercent}%)...</span>
                   </>
                 ) : (
                   <>
-                    <Sparkles size={14} />
+                    <Sparkles size={13} />
                     <span>
                       {insights.length === 0
                         ? (language === 'en' ? 'Start AI Curation' : 'Mulai Kurasi AI')
@@ -411,22 +405,13 @@ export default function CuratedInsightsTab({
         {/* Status message */}
         {feedbackMsg && (
           <div
-            style={{
-              marginTop: '14px',
-              padding: '10px 14px',
-              borderRadius: 'var(--radius-sm)',
-              backgroundColor:
-                feedbackMsg.type === 'success' ? 'var(--color-success-subtle)' : 'var(--color-danger-subtle)',
-              border: `1px solid ${feedbackMsg.type === 'success' ? 'var(--color-success-border)' : 'var(--color-danger-border)'}`,
-              color: feedbackMsg.type === 'success' ? 'var(--color-success-text)' : 'var(--color-danger-text)',
-              fontSize: '13px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontWeight: 500,
-            }}
+            className={`mt-3.5 p-3 rounded-xl border text-xs font-medium flex items-center gap-2 ${
+              feedbackMsg.type === 'success'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
+                : 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800'
+            }`}
           >
-            {feedbackMsg.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+            {feedbackMsg.type === 'success' ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}
             <span>{feedbackMsg.text}</span>
           </div>
         )}
@@ -524,53 +509,29 @@ export default function CuratedInsightsTab({
 
       {/* Uncurated Callout Banner (jika belum dikurasi dan tidak sedang loading) */}
       {!isCurating && insights.length === 0 && !isLoading && (
-        <div
-          className="ui-card"
-          style={{
-            padding: '2rem 1.5rem',
-            textAlign: 'center',
-            backgroundColor: 'var(--bg-card)',
-            border: '2px dashed var(--border-default)',
-            borderRadius: 'var(--radius-xl)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '12px',
-          }}
-        >
-          <div
-            style={{
-              width: '52px',
-              height: '52px',
-              borderRadius: '50%',
-              backgroundColor: 'var(--color-primary-subtle)',
-              color: 'var(--color-primary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Sparkles size={26} />
+        <div className="bg-gradient-to-b from-slate-50/80 to-white dark:from-slate-900/40 dark:to-slate-900 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-8 md:p-12 text-center flex flex-col items-center gap-3.5 shadow-xs">
+          <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-950/60 border border-blue-100 dark:border-blue-900/50 text-blue-600 flex items-center justify-center shadow-sm">
+            <Sparkles size={24} className="text-blue-600 animate-pulse" />
           </div>
-          <div style={{ maxWidth: '480px' }}>
-            <h4 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
+          <div className="max-w-md">
+            <h4 className="text-base font-bold text-slate-900 dark:text-slate-100 tracking-tight">
               {language === 'en' ? 'Document Not Yet Curated' : 'Dokumen Ini Belum Dikurasi'}
             </h4>
-            <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', marginTop: '6px', lineHeight: '21px' }}>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">
               {language === 'en'
                 ? 'Run AI Curation to transform raw extracted chunks into clean, structured insights with tables, key metrics, and importance tags.'
-                : 'Jalankan Kurasi AI untuk menyaring teks mentah hasil ekstraksi menjadi intisari berkualitas tinggi, tabel Markdown, dan metrik finansial/operasional dengan progres 1-100%.'}
+                : 'Jalankan Kurasi AI untuk mengubah potongan raw chunk menjadi insight terstruktur yang siap dijadikan rujukan cerdas AI.'}
             </p>
           </div>
 
           {hasPermission('curation:trigger') && (
             <button
+              type="button"
               onClick={handleStartCuration}
-              className="btn btn-primary"
-              style={{ marginTop: '6px', padding: '10px 22px', fontSize: '14px', fontWeight: 700 }}
+              className="mt-2 inline-flex items-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-500/25 hover:shadow-blue-500/40 transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
             >
-              <Sparkles size={16} />
-              <span>{language === 'en' ? 'Start AI Curation (1-100%)' : 'Mulai Kurasi AI Sekarang'}</span>
+              <Sparkles size={14} />
+              <span>{language === 'en' ? 'Start AI Curation (1-100%)' : 'Mulai Kurasi AI Sekarang (1-100%)'}</span>
             </button>
           )}
         </div>

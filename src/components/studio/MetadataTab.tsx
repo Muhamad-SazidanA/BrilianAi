@@ -114,15 +114,15 @@ export default function MetadataTab({ batch, chunks, onBatchUpdated }: MetadataT
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div className="flex flex-col gap-6">
       {/* Enterprise KMS Governance & ABAC Card */}
-      <div className="ui-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem' }}>
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col gap-5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-100 dark:border-slate-800 gap-3">
           <div>
-            <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">
               Tata Kelola Dokumen & Keamanan Akses (ABAC)
             </h3>
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
               Klasifikasi keamanan, divisi pemilik, siklus hidup dokumen, dan jadwal tinjauan berkala
             </p>
           </div>
@@ -136,18 +136,17 @@ export default function MetadataTab({ batch, chunks, onBatchUpdated }: MetadataT
                 setEditReviewDueDate(batch.review_due_date ? String(batch.review_due_date).split('T')[0] : '');
                 setIsEditing(true);
               }}
-              className="btn btn-outline btn-sm"
-              style={{ gap: '6px' }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/60 shadow-sm transition-all self-start sm:self-auto"
             >
-              <Pencil size={13} />
+              <Pencil size={13} className="text-slate-500" />
               <span>Ubah Tata Kelola</span>
             </button>
           ) : (
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div className="flex items-center gap-2 self-start sm:self-auto">
               <button
                 onClick={() => setIsEditing(false)}
                 disabled={isSaving}
-                className="btn btn-ghost btn-sm"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 <X size={14} />
                 <span>Batal</span>
@@ -155,7 +154,7 @@ export default function MetadataTab({ batch, chunks, onBatchUpdated }: MetadataT
               <button
                 onClick={handleSaveGovernance}
                 disabled={isSaving}
-                className="btn btn-primary btn-sm"
+                className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-sm transition-all"
               >
                 {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                 <span>Simpan Perubahan</span>
@@ -165,24 +164,23 @@ export default function MetadataTab({ batch, chunks, onBatchUpdated }: MetadataT
         </div>
 
         {isEditing ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Divisi */}
             <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
                 Divisi Pemilik
               </label>
               <input
                 type="text"
                 value={editDivision}
                 onChange={(e) => setEditDivision(e.target.value)}
-                className="input-text"
-                style={{ width: '100%', fontSize: '13px' }}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               />
             </div>
 
             {/* Klasifikasi ABAC */}
             <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
                 Klasifikasi Keamanan
               </label>
               <EnterpriseSelect
@@ -200,7 +198,7 @@ export default function MetadataTab({ batch, chunks, onBatchUpdated }: MetadataT
 
             {/* Status Siklus Hidup */}
             <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
                 Status Siklus Hidup
               </label>
               <EnterpriseSelect
@@ -219,87 +217,88 @@ export default function MetadataTab({ batch, chunks, onBatchUpdated }: MetadataT
 
             {/* Tanggal Tinjau */}
             <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
                 Jadwal Tinjau Berkala
               </label>
               <input
                 type="date"
                 value={editReviewDueDate}
                 onChange={(e) => setEditReviewDueDate(e.target.value)}
-                className="input-text"
-                style={{ width: '100%', fontSize: '13px' }}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               />
             </div>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Divisi */}
-            <div style={{ padding: '12px 14px', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-app)', border: '1px solid var(--border-default)' }}>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <Building2 size={12} />
+            <div className="p-4 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-800/80">
+              <div className="text-[11px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <Building2 size={13} className="text-slate-400" />
                 <span>Divisi Pemilik</span>
               </div>
-              <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+              <div className="text-sm font-bold text-slate-900 dark:text-white">
                 {batch.division_id || 'General'}
               </div>
             </div>
 
             {/* Klasifikasi */}
-            <div style={{ padding: '12px 14px', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-app)', border: '1px solid var(--border-default)' }}>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                {batch.classification === 'Sangat Rahasia' ? <Lock size={12} /> : <Shield size={12} />}
+            <div className="p-4 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-800/80">
+              <div className="text-[11px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                {batch.classification === 'Sangat Rahasia' ? <Lock size={13} /> : <Shield size={13} />}
                 <span>Klasifikasi Akses</span>
               </div>
-              <span
-                className={`badge ${
-                  batch.classification === 'Publik'
-                    ? 'badge-success'
-                    : batch.classification === 'Rahasia'
-                    ? 'badge-warning'
-                    : batch.classification === 'Sangat Rahasia'
-                    ? 'badge-danger'
-                    : 'badge-neutral'
-                }`}
-                style={{ fontSize: '12px', fontWeight: 700, padding: '3px 8px' }}
-              >
-                {batch.classification || 'Internal'}
-              </span>
+              <div>
+                <span
+                  className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold border ${
+                    batch.classification === 'Publik'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800'
+                      : batch.classification === 'Rahasia'
+                      ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800'
+                      : batch.classification === 'Sangat Rahasia'
+                      ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800'
+                      : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800'
+                  }`}
+                >
+                  {batch.classification || 'Internal'}
+                </span>
+              </div>
             </div>
 
             {/* Status Siklus */}
-            <div style={{ padding: '12px 14px', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-app)', border: '1px solid var(--border-default)' }}>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <GitBranch size={12} />
+            <div className="p-4 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-800/80">
+              <div className="text-[11px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <GitBranch size={13} className="text-slate-400" />
                 <span>Status Siklus Hidup</span>
               </div>
-              <span
-                className={`badge ${
-                  batch.status === 'Aktif'
-                    ? 'badge-success'
-                    : batch.status === 'Review'
-                    ? 'badge-warning'
-                    : 'badge-neutral'
-                }`}
-                style={{ fontSize: '12px', fontWeight: 700, padding: '3px 8px' }}
-              >
-                {batch.status || (batch.is_active_knowledge ? 'Aktif' : 'Draft')}
-              </span>
+              <div>
+                <span
+                  className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold border ${
+                    batch.status === 'Aktif'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800'
+                      : batch.status === 'Review'
+                      ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800'
+                      : 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+                  }`}
+                >
+                  {batch.status || (batch.is_active_knowledge ? 'Aktif' : 'Draft')}
+                </span>
+              </div>
             </div>
 
             {/* Versi & Tanggal Tinjau */}
-            <div style={{ padding: '12px 14px', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-app)', border: '1px solid var(--border-default)' }}>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <Calendar size={12} />
+            <div className="p-4 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-800/80">
+              <div className="text-[11px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <Calendar size={13} className="text-slate-400" />
                 <span>Versi & Jadwal Tinjau</span>
               </div>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              <div className="text-xs font-bold text-slate-800 dark:text-slate-200">
                 v{batch.version || '1.0'}{' '}
                 {batch.review_due_date ? (
-                  <span style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+                  <span className="text-[11px] text-slate-500 font-normal">
                     · Tinjau: {new Date(batch.review_due_date).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' })}
                   </span>
                 ) : (
-                  <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>· Belum dijadwalkan</span>
+                  <span className="text-[11px] text-slate-400 font-normal">· Belum dijadwalkan</span>
                 )}
               </div>
             </div>
@@ -308,38 +307,29 @@ export default function MetadataTab({ batch, chunks, onBatchUpdated }: MetadataT
       </div>
 
       {/* Technical Extraction Details Card */}
-      <div className="ui-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col gap-5">
         <div>
-          <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
+          <h3 className="text-base font-bold text-slate-900 dark:text-white">
             {t('meta.title')}
           </h3>
-          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             {t('meta.subtitle')}
           </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {metadataItems.map((item) => (
             <div
               key={item.label}
-              style={{
-                padding: '14px 16px',
-                borderRadius: 'var(--radius-md)',
-                backgroundColor: 'var(--bg-app)',
-                border: '1px solid var(--border-default)',
-              }}
+              className="p-4 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
             >
-              <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>
+              <div className="text-[11px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider mb-1.5">
                 {item.label}
               </div>
               <div
-                style={{
-                  fontSize: '14px',
-                  fontWeight: 700,
-                  color: 'var(--text-primary)',
-                  fontFamily: item.mono ? 'var(--font-mono)' : 'inherit',
-                  wordBreak: 'break-all',
-                }}
+                className={`text-sm font-semibold text-slate-800 dark:text-slate-100 ${
+                  item.mono ? 'font-mono text-xs text-blue-600 dark:text-blue-400' : ''
+                } break-all`}
               >
                 {item.value}
               </div>
