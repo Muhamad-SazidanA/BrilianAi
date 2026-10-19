@@ -15,6 +15,36 @@ export interface DocumentGrantRecord {
   updated_at: string;
 }
 
+let isGrantTableInitialized = false;
+
+/**
+ * Memastikan tabel document_access_grants ada di PostgreSQL.
+ */
+export async function ensureGrantTableExists(): Promise<void> {
+  if (isGrantTableInitialized) return;
+  const pool = getPool();
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS document_access_grants (
+        id BIGSERIAL PRIMARY KEY,
+        upload_batch_id UUID NOT NULL REFERENCES upload_batches(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        access_level VARCHAR(20) NOT NULL DEFAULT 'viewer' CHECK (access_level IN ('viewer', 'editor')),
+        granted_by UUID REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        CONSTRAINT uq_doc_user_grant UNIQUE (upload_batch_id, user_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_doc_grants_batch ON document_access_grants (upload_batch_id);
+      CREATE INDEX IF NOT EXISTS idx_doc_grants_user ON document_access_grants (user_id);
+      CREATE INDEX IF NOT EXISTS idx_doc_grants_level ON document_access_grants (access_level);
+    `);
+    isGrantTableInitialized = true;
+  } catch (err) {
+    console.warn('[DocumentGrantStore] ensureGrantTableExists warning:', err);
+  }
+}
+
 /**
  * Grants or updates document access for a specific user.
  */
@@ -24,6 +54,7 @@ export async function grantDocumentAccess(
   accessLevel: 'viewer' | 'editor' = 'viewer',
   grantedBy?: string | null
 ): Promise<void> {
+  await ensureGrantTableExists();
   const pool = getPool();
   const query = `
     INSERT INTO document_access_grants (upload_batch_id, user_id, access_level, granted_by, updated_at)
@@ -38,6 +69,7 @@ export async function grantDocumentAccess(
  * Revokes document access for a specific user.
  */
 export async function revokeDocumentAccess(batchId: string, userId: string): Promise<boolean> {
+  await ensureGrantTableExists();
   const pool = getPool();
   const res = await pool.query(
     'DELETE FROM document_access_grants WHERE upload_batch_id = $1 AND user_id = $2',
@@ -50,6 +82,7 @@ export async function revokeDocumentAccess(batchId: string, userId: string): Pro
  * Lists all active user grants for a specific document batch.
  */
 export async function listDocumentGrants(batchId: string): Promise<DocumentGrantRecord[]> {
+  await ensureGrantTableExists();
   const pool = getPool();
   try {
     const query = `
@@ -91,6 +124,7 @@ export async function getUserDocumentGrant(
   batchId: string,
   userId: string
 ): Promise<{ access_level: 'viewer' | 'editor' } | null> {
+  await ensureGrantTableExists();
   const pool = getPool();
   try {
     const query = `
@@ -110,6 +144,7 @@ export async function getUserDocumentGrant(
  * Returns all upload batch IDs that have been explicitly granted to this user.
  */
 export async function listUserGrantedBatchIds(userId: string): Promise<string[]> {
+  await ensureGrantTableExists();
   const pool = getPool();
   try {
     const query = `
