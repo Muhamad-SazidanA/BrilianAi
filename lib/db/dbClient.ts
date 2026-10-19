@@ -19,6 +19,21 @@ export function getResolvedDatabaseUrl(): string {
   return connectionString;
 }
 
+let migrationTriggered = false;
+
+export function triggerBackgroundMigration(): void {
+  if (migrationTriggered) return;
+  migrationTriggered = true;
+  Promise.resolve().then(async () => {
+    try {
+      const { ensureCompleteDatabaseSchema } = await import('./autoMigration');
+      await ensureCompleteDatabaseSchema();
+    } catch (err) {
+      console.warn('[DB AutoMigration] Init warning:', err);
+    }
+  });
+}
+
 /**
  * Returns a singleton connection pool for PostgreSQL.
  */
@@ -36,6 +51,8 @@ export function getPool(): Pool {
     poolInstance.on('error', (err) => {
       console.error('[DB Pool] Unexpected error on idle PostgreSQL client:', err);
     });
+
+    triggerBackgroundMigration();
   }
 
   return poolInstance;

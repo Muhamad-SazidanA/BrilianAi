@@ -1,6 +1,7 @@
 import { getPool } from './dbClient';
 import { ChatResponseResult } from '../chat/chatService';
-import { parseUserFormattingInstruction } from '../chat/chatUtils';
+import { parseUserFormattingInstruction, isDataNotFoundAnswer } from '../chat/chatUtils';
+import { ensureCompleteDatabaseSchema } from './autoMigration';
 
 export const GOLDEN_FISIOTERAPI_ANSWER = `Fisioterapi adalah profesi kesehatan holistik yang berfokus pada gerak dan fungsi manusia sepanjang rentang kehidupan. Profesi ini mempertimbangkan hubungan antara gangguan tubuh, keterbatasan aktivitas, dan hambatan partisipasi, dengan selalu memperhitungkan faktor personal dan lingkungan.
 
@@ -27,25 +28,50 @@ const memoryCache = new Map<string, ChatResponseResult>();
 let isTableInitialized = false;
 
 /**
+ * Memeriksa apakah sebuah jawaban tergolong respon gagal / data tidak ditemukan / error.
+ * Jawaban semacam ini TIDAK BOLEH disimpan ke cache dan TIDAK BOLEH digunakan ulang.
+ */
+export function isUncacheableAnswer(
+  answer?: string,
+  sources?: any[],
+  allowPublicKnowledge?: boolean
+): boolean {
+  if (!answer || typeof answer !== 'string') return true;
+  const trimmed = answer.trim();
+  if (trimmed.length === 0) return true;
+
+  // 1. Evaluasi penolakan data tidak ditemukan
+  if (isDataNotFoundAnswer(trimmed)) return true;
+
+  const lower = trimmed.toLowerCase();
+  if (
+    lower.includes('data tidak ditemukan') ||
+    lower.includes('tidak dapat ditemukan') ||
+    lower.includes('tidak ditemukan di dalam dokumen') ||
+    lower.includes('tidak terdapat di dalam dokumen') ||
+    lower.includes('tidak memuat informasi') ||
+    lower.includes('gagal memproses pertanyaan') ||
+    lower.includes('internal server error') ||
+    lower.includes('maaf, data tidak')
+  ) {
+    return true;
+  }
+
+  // 2. Jika bukan mode pengetahuan umum, jawaban wajib memiliki setidaknya 1 sumber rujukan riil
+  if (!allowPublicKnowledge && (!sources || sources.length === 0)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Memastikan tabel chat_response_cache ada di database PostgreSQL
  */
 export async function ensureChatCacheTable(): Promise<void> {
   if (isTableInitialized) return;
   try {
-    const pool = getPool();
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS chat_response_cache (
-        cache_key TEXT PRIMARY KEY,
-        query TEXT NOT NULL,
-        answer TEXT NOT NULL,
-        sources JSONB NOT NULL DEFAULT '[]',
-        allow_public_knowledge BOOLEAN NOT NULL DEFAULT false,
-        retrieved_count INT NOT NULL DEFAULT 0,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-      );
-      CREATE INDEX IF NOT EXISTS idx_chat_cache_key ON chat_response_cache (cache_key);
-    `);
+    await ensureCompleteDatabaseSchema();
     isTableInitialized = true;
   } catch (err) {
     // If pool is mocked (e.g. unit testing), fail gracefully
@@ -105,11 +131,18 @@ export function clearChatCache(): void {
 }
 
 /**
- * Mengambil jawaban chat yang tersimpan di cache
+ * Mengambil jawaban chat yang tersimpan di cache.
+ * Menjamin HANYA jawaban yang valid dan berinformasi yang dikembalikan.
+ * Jawaban gagal / "tidak ditemukan" langsung ditolak dan dibersihkan dari database.
  */
 export async function getCachedChatResponse(cacheKey: string): Promise<ChatResponseResult | null> {
   if (memoryCache.has(cacheKey)) {
-    return memoryCache.get(cacheKey)!;
+    const mem = memoryCache.get(cacheKey)!;
+    if (isUncacheableAnswer(mem.answer, mem.sources, mem.allowPublicKnowledge)) {
+      memoryCache.delete(cacheKey);
+    } else {
+      return mem;
+    }
   }
 
   // Pada unit test environment, gunakan memoryCache murni agar tidak mengonsumsi mockPool
@@ -130,10 +163,20 @@ export async function getCachedChatResponse(cacheKey: string): Promise<ChatRespo
 
     if (res.rows && res.rows.length > 0) {
       const row = res.rows[0];
+      const sources = Array.isArray(row.sources) ? row.sources : JSON.parse(row.sources || '[]');
+      const allowPublicKnowledge = Boolean(row.allow_public_knowledge);
+
+      // Verifikasi: jika di database tersimpan jawaban gagal / data tidak ditemukan, bersihkan segera
+      if (isUncacheableAnswer(row.answer, sources, allowPublicKnowledge)) {
+        await pool.query('DELETE FROM chat_response_cache WHERE cache_key = $1', [cacheKey]).catch(() => {});
+        memoryCache.delete(cacheKey);
+        return null;
+      }
+
       const result: ChatResponseResult = {
         answer: row.answer,
-        sources: Array.isArray(row.sources) ? row.sources : JSON.parse(row.sources || '[]'),
-        allowPublicKnowledge: Boolean(row.allow_public_knowledge),
+        sources,
+        allowPublicKnowledge,
         retrievedCount: Number(row.retrieved_count) || 0,
       };
       memoryCache.set(cacheKey, result);
@@ -149,12 +192,19 @@ export async function getCachedChatResponse(cacheKey: string): Promise<ChatRespo
 /**
  * Menyimpan jawaban chat ke cache agar pertanyaan yang sama
  * menghasilkan jawaban yang konsisten dan deterministik.
+ * HANYA menyimpan jawaban yang benar-benar ada isinya (bukan gagal/tidak ditemukan).
  */
 export async function saveCachedChatResponse(
   cacheKey: string,
   query: string,
   result: ChatResponseResult
 ): Promise<void> {
+  // Guard ketat: Jangan pernah simpan jawaban gagal atau data tidak ditemukan
+  if (isUncacheableAnswer(result?.answer, result?.sources, result?.allowPublicKnowledge)) {
+    memoryCache.delete(cacheKey);
+    return;
+  }
+
   memoryCache.set(cacheKey, result);
 
   // Pada unit test environment, simpan di memoryCache murni

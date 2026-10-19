@@ -15,21 +15,26 @@ function readUserId(request: NextRequest): string | null {
 }
 
 export async function getAuthenticatedUser(request: NextRequest): Promise<User | null> {
-  // 1. Enterprise Database Session Validation (Primary Secure Path)
-  const sessionToken = request.cookies.get('brilian_session_token')?.value;
-  if (sessionToken) {
-    const sessionUser = await validateSession(sessionToken);
-    if (sessionUser && sessionUser.status === 'active') {
-      return sessionUser;
+  try {
+    // 1. Enterprise Database Session Validation (Primary Secure Path)
+    const sessionToken = request.cookies.get('brilian_session_token')?.value;
+    if (sessionToken) {
+      const sessionUser = await validateSession(sessionToken);
+      if (sessionUser && sessionUser.status === 'active') {
+        return sessionUser;
+      }
     }
-  }
 
-  // 2. Fallback to active user cookie (with status check) for dev / test compatibility
-  const userId = readUserId(request);
-  if (!userId) return null;
-  const user = await getUserById(userId);
-  if (!user || user.status !== 'active') return null;
-  return user;
+    // 2. Fallback to active user cookie (with status check) for dev / test compatibility
+    const userId = readUserId(request);
+    if (!userId) return null;
+    const user = await getUserById(userId);
+    if (!user || user.status !== 'active') return null;
+    return user;
+  } catch (err) {
+    console.warn('[serverAuth] getAuthenticatedUser error:', err);
+    return null;
+  }
 }
 
 export async function hasServerPermission(
