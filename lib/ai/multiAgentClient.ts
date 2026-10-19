@@ -17,19 +17,105 @@ export interface GuardrailDecision {
  * Agent 3: Guardrail & Router
  * - Mencegah Prompt Injection / Jailbreak
  * - Mendeteksi sapaan murni (langsung dijawab tanpa beban RAG)
+/**
+ * Menentukan apakah sebuah query merupakan sapaan murni, ucapan terima kasih, konfirmasi santai, atau perkenalan
+ * tanpa pertanyaan spesifik mengenai isi dokumen.
+ */
+export function detectPureGreeting(trimmed: string): { isGreeting: boolean; response?: string } {
+  if (!trimmed) return { isGreeting: false };
+
+  // 1. Bersihkan tanda baca di sekeliling
+  const clean = trimmed
+    .toLowerCase()
+    .replace(/[!?.,:;~_`'"@#$%^&*()\-+=<>/\\]+/g, ' ')
+    .trim();
+
+  if (!clean) return { isGreeting: true, response: 'Halo! Ada yang bisa saya bantu terkait dokumen Anda?' };
+
+  const words = clean.split(/\s+/).filter(Boolean);
+  if (words.length > 7) return { isGreeting: false }; // Pertanyaan dokumen biasanya lebih panjang
+
+  // Ucapan terima kasih
+  const THANKS_REGEX = /^(terima\s*kasih|makasih|makasi|tengkyu|thanks|thank\s*you|syukron|matur\s*nuwun|hatur\s*nuhun)[!?. ]*$/i;
+  if (THANKS_REGEX.test(trimmed)) {
+    return {
+      isGreeting: true,
+      response: 'Sama-sama! Senang bisa membantu Anda. Jika ada dokumen atau informasi lain yang ingin ditanyakan, silakan beri tahu saya ya!',
+    };
+  }
+
+  // Pertanyaan identitas / kemampuan bot
+  const IDENTITY_REGEX = /^(siapa\s+kamu|kamu\s+siapa|siapa\s+anda|anda\s+siapa|kamu\s+ini\s+siapa|ini\s+siapa|kamu\s+bisa\s+apa|bisa\s+bantu\s+apa(\s+saja)?|apa\s+(saja\s+)?yang\s+bisa\s+kamu\s+lakukan)[!?. ]*$/i;
+  if (IDENTITY_REGEX.test(trimmed)) {
+    return {
+      isGreeting: true,
+      response: 'Saya adalah asisten AI BrilianAi. Saya dapat membantu Anda mencari, merangkum, dan menganalisis informasi dari seluruh dokumen yang tersimpan dalam basis pengetahuan perusahaan.',
+    };
+  }
+
+  // Konfirmasi santai (Acknowledgement)
+  const ACK_REGEX = /^(oke|ok|okay|siap|baik|baiklah|sip|mantap|noted|siap\s*(min|kak|gan|pak|bu)?)[!?. ]*$/i;
+  if (ACK_REGEX.test(trimmed)) {
+    return {
+      isGreeting: true,
+      response: 'Baik! Silakan ajukan pertanyaan kapan saja jika Anda membutuhkan informasi dari dokumen.',
+    };
+  }
+
+  // Sapaan komprehensif termasuk halo/hallo/hello, hai, selamat pagi/siang/sore/malam, assalamualaikum, dll.
+  const GENERAL_GREETING_REGEX = /^(h+[ae]+l+l*o+|h+a+i+|h+e+y+|h+i+|h+e+i+|p+|ping|tes+|test+|testing|selamat\s+(pagi|siang|sore|malam|datang)|pagi|siang|sore|malam|ass?alamu\s*[']?\s*alaikum(\s+wr\s+wb)?|salam|shalom|sampurasun|kulonuwun|permisi|punten|apa\s+kabar|gimana\s+kabar(nya)?)[!?. ]*$/i;
+  if (GENERAL_GREETING_REGEX.test(trimmed)) {
+    return {
+      isGreeting: true,
+      response: 'Halo! Saya asisten AI BrilianAi. Ada dokumen atau informasi apa yang bisa saya bantu cari dan analisis hari ini?',
+    };
+  }
+
+  // Cek jika seluruh kata adalah kombinasi sapaan + panggilan (contoh: "Halo selamat pagi min", "Hallo kak", "Pagi min", "Hai bot")
+  const GREETING_TOKENS = new Set([
+    'halo', 'hallo', 'hello', 'helo', 'holla',
+    'hai', 'hi', 'hey', 'hei', 'hy',
+    'p', 'ping', 'tes', 'test',
+    'pagi', 'siang', 'sore', 'malam', 'selamat',
+    'salam', 'assalam', 'assalamualaikum', 'assalamu', 'alaikum', 'wr', 'wb',
+    'permisi', 'punten', 'numpang', 'tanya',
+    'min', 'admin', 'bot', 'ai', 'kak', 'mas', 'mbak', 'bang', 'bro', 'sis', 'gan', 'pak', 'bu',
+    'brilian', 'brilianai', 'kawan', 'sahabat',
+    'apa', 'kabar', 'kabarnya', 'gimana',
+  ]);
+
+  const allTokensMatch = words.every((w) => {
+    const simplified = w.replace(/(.)\1+/g, '$1');
+    return GREETING_TOKENS.has(w) || GREETING_TOKENS.has(simplified);
+  });
+
+  if (allTokensMatch) {
+    return {
+      isGreeting: true,
+      response: 'Halo! Saya asisten AI BrilianAi. Ada dokumen atau informasi apa yang bisa saya bantu cari dan analisis hari ini?',
+    };
+  }
+
+  return { isGreeting: false };
+}
+
+/**
+ * Agent 3: Guardrail & Router
+ * - Mencegah Prompt Injection / Jailbreak
+ * - Mendeteksi sapaan murni (langsung dijawab tanpa beban RAG)
  * - Mereformulasi query user agar pencarian vektor di pgvector lebih akurat
  */
 export async function runGuardrailAndRouter(userQuery: string): Promise<GuardrailDecision> {
   const trimmed = (userQuery || '').trim();
 
-  // Fast-Path 1: Deteksi sapaan murni via Regex (< 0.1ms tanpa LLM)
-  const GREETING_REGEX = /^(halo|hai|hey|hi|hei|selamat (pagi|siang|sore|malam)|assalamu[']?alaikum|salam|terima kasih|makasih|thanks|thank you|siapa kamu|kamu siapa)[!?. ]*$/i;
-  if (GREETING_REGEX.test(trimmed)) {
+  // Fast-Path 1: Deteksi sapaan murni komprehensif (< 0.1ms tanpa LLM)
+  const greetingCheck = detectPureGreeting(trimmed);
+  if (greetingCheck.isGreeting) {
     return {
       isBlocked: false,
       blockReason: '',
       isDirectGreeting: true,
-      directGreetingResponse: 'Halo! Saya asisten AI BrilianAi. Ada dokumen atau informasi apa yang bisa saya bantu cari dan analisis hari ini?',
+      directGreetingResponse: greetingCheck.response || 'Halo! Saya asisten AI BrilianAi. Ada dokumen atau informasi apa yang bisa saya bantu cari dan analisis hari ini?',
       optimizedQuery: trimmed,
     };
   }
