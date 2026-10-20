@@ -287,3 +287,235 @@ Hasilkan JSON dashboard sekarang sesuai instruksi sistem. Kembalikan HANYA JSON.
     ],
   };
 }
+
+// =========================================================================
+// Interactive Dashboard Copilot
+// Menjawab pertanyaan tentang data dashboard & memanipulasi chart/tabel
+// =========================================================================
+
+export interface DashboardCopilotInput {
+  message: string;
+  dashboard: DashboardData;
+  history?: Array<{ role: 'user' | 'assistant'; content: string }>;
+}
+
+export interface DashboardCopilotResponse {
+  answer: string;
+  action?: {
+    type: 'morph_widget';
+    widgetIndex: number;
+    targetType: 'bar_chart' | 'table';
+    reason?: string;
+  };
+}
+
+export async function askDashboardCopilot(input: DashboardCopilotInput): Promise<DashboardCopilotResponse> {
+  const { message, dashboard, history = [] } = input;
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  const openAiApiKey = process.env.OPENAI_API_KEY;
+  const deepseekApiKey = process.env.DEEPSEEK_API_KEY;
+
+  const copilotSystemPrompt = `Kamu adalah "Brilian AI Dashboard Copilot" — asisten cerdas yang menganalisis dan berinteraksi langsung dengan data dashboard visual di BrilianAi.
+
+KONTEKS DASHBOARD AKTIF:
+- Judul: "${dashboard.title}"
+- Subjudul: "${dashboard.subtitle || '-'}"
+- Query Asal: "${dashboard.sourceQuery || '-'}"
+- Jumlah Widget: ${dashboard.widgets.length}
+- Detail Widget:
+${JSON.stringify(dashboard.widgets, null, 2)}
+
+TUGAS UTAMA:
+1. Jika pengguna bertanya apa arti/makna data ("ini data apaan?", "tolong jelaskan", "apa insight utama?"):
+   - Berikan penjelasan komprehensif, ringkas, dan jelas dalam Bahasa Indonesia.
+   - Sorot metrik utama, perbandingan, atau temuan menarik dari widget yang tersedia.
+   - Format jawaban dengan rapi menggunakan bullet points atau paragraf padat.
+2. Jika pengguna meminta mengubah bentuk visualisasi (misal: "ubah tabel ke bar chart", "jadikan grafik batang", "ubah chart ini jadi tabel", "tampilkan data tabel dalam bentuk grafik"):
+   - Cari index widget tabel/bar_chart yang dimaksud (0-indexed).
+   - Jelaskan bahwa kamu telah mengubah visualisasinya.
+   - Sertakan field "action" dengan:
+     {
+       "type": "morph_widget",
+       "widgetIndex": <number>,
+       "targetType": "bar_chart" atau "table",
+       "reason": "keterangan singkat perubahan"
+     }
+3. Jika tidak ada permintaan transformasi visualisasi, set "action" ke null.
+
+ATURAN OUTPUT:
+Kembalikan HANYA format JSON valid tanpa tanda kutip markdown pembuka/penutup:
+{
+  "answer": "Penjelasan AI untuk pengguna dalam Bahasa Indonesia...",
+  "action": null // atau { "type": "morph_widget", "widgetIndex": 0, "targetType": "bar_chart" }
+}`;
+
+  const conversationText = history
+    .slice(-4)
+    .map((h) => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.content}`)
+    .join('\n');
+
+  const userQuery = conversationText
+    ? `Riwayat Percakapan Terakhir:\n${conversationText}\n\nPertanyaan User Sekarang: "${message}"`
+    : `Pertanyaan User: "${message}"`;
+
+  // Helper untuk sanitize dan parse respons
+  const parseCopilotResponse = (raw: string): DashboardCopilotResponse => {
+    try {
+      let cleaned = raw.trim();
+      if (cleaned.startsWith('```')) {
+        cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '');
+      }
+      const match = cleaned.match(/\{[\s\S]*\}/);
+      if (match) cleaned = match[0];
+      const parsed = JSON.parse(cleaned);
+      if (parsed && typeof parsed.answer === 'string') {
+        return {
+          answer: parsed.answer,
+          action: parsed.action || undefined,
+        };
+      }
+    } catch {
+      // JSON parse gagal, gunakan raw text
+    }
+    return { answer: raw.replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim() };
+  };
+
+  // TIER 1: Gemini
+  if (geminiApiKey) {
+    try {
+      const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash-lite';
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 18000);
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `${copilotSystemPrompt}\n\n${userQuery}` }] }],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 2000,
+            responseMimeType: 'application/json',
+          },
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const data = await res.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) return parseCopilotResponse(text);
+      }
+    } catch (err: any) {
+      console.warn('[DashboardCopilot] Gemini error:', err?.message);
+    }
+  }
+
+  // TIER 2: OpenAI
+  if (openAiApiKey) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 18000);
+
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${openAiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: copilotSystemPrompt },
+            { role: 'user', content: userQuery },
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0.2,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const data = await res.json();
+        const content = data?.choices?.[0]?.message?.content;
+        if (content) return parseCopilotResponse(content);
+      }
+    } catch (err: any) {
+      console.warn('[DashboardCopilot] OpenAI error:', err?.message);
+    }
+  }
+
+  // TIER 3: DeepSeek
+  if (deepseekApiKey) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 18000);
+
+      const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${deepseekApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+          messages: [
+            { role: 'system', content: copilotSystemPrompt },
+            { role: 'user', content: userQuery },
+          ],
+          temperature: 0.2,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const data = await res.json();
+        const content = data?.choices?.[0]?.message?.content;
+        if (content) return parseCopilotResponse(content);
+      }
+    } catch (err: any) {
+      console.warn('[DashboardCopilot] DeepSeek error:', err?.message);
+    }
+  }
+
+  // TIER 4: Local Heuristic Fallback
+  const lowerMsg = message.toLowerCase();
+  const wantsBarChart = lowerMsg.includes('bar chart') || lowerMsg.includes('grafik') || lowerMsg.includes('batang') || lowerMsg.includes('chart');
+  const wantsTable = lowerMsg.includes('tabel') || lowerMsg.includes('table');
+
+  // Check if there is a table or bar chart to morph
+  const tableIdx = dashboard.widgets.findIndex((w) => w.type === 'table');
+  const barChartIdx = dashboard.widgets.findIndex((w) => w.type === 'bar_chart');
+
+  if (wantsBarChart && tableIdx !== -1) {
+    return {
+      answer: `Tentu! Saya telah mengubah data tabel **"${dashboard.widgets[tableIdx].title}"** menjadi **Bar Chart (Grafik Batang)** agar perbandingan data lebih mudah dianalisis secara visual.`,
+      action: {
+        type: 'morph_widget',
+        widgetIndex: tableIdx,
+        targetType: 'bar_chart',
+        reason: 'Permintaan konversi tabel ke bar chart',
+      },
+    };
+  }
+
+  if (wantsTable && barChartIdx !== -1) {
+    return {
+      answer: `Tentu! Saya telah mengubah grafik **"${dashboard.widgets[barChartIdx].title}"** menjadi format **Tabel** terstruktur agar setiap nilai dan label dapat dibaca dengan presisi.`,
+      action: {
+        type: 'morph_widget',
+        widgetIndex: barChartIdx,
+        targetType: 'table',
+        reason: 'Permintaan konversi bar chart ke tabel',
+      },
+    };
+  }
+
+  return {
+    answer: `Dashboard **"${dashboard.title}"** ini memuat **${dashboard.widgets.length} widget visual** yang merangkum hasil analisis data dokumen Anda. Terdiri dari metrik kunci, daftar terstruktur, dan representasi visual untuk memudahkan pengambilan keputusan. Anda juga dapat meminta saya untuk mengubah visualisasi tabel ke bar chart atau sebaliknya kapan saja!`,
+  };
+}

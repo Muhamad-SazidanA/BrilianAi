@@ -110,3 +110,28 @@ export async function getUserDashboards(userId: string): Promise<DashboardRecord
 
   return result.rows;
 }
+
+/**
+ * Update existing dashboard data (e.g. after interactive AI widget morphing or editing).
+ */
+export async function updateDashboardData(
+  dashboardId: string,
+  data: DashboardData,
+  title?: string
+): Promise<DashboardRecord | null> {
+  await ensureTableExists();
+  const pool = getPool();
+
+  const finalTitle = title || data.title;
+  const result = await pool.query<DashboardRecord>(
+    `UPDATE ai_dashboards
+     SET data = $2,
+         title = COALESCE($3, title),
+         updated_at = now()
+     WHERE dashboard_id = $1
+     RETURNING *`,
+    [dashboardId, JSON.stringify(data), finalTitle]
+  );
+
+  return result.rows[0] || null;
+}

@@ -79,13 +79,39 @@ function StatCard({ widget }: { widget: StatCardWidget }) {
   );
 }
 
-function BarChart({ widget }: { widget: BarChartWidget }) {
+function BarChart({ widget, onMorph }: { widget: BarChartWidget; onMorph?: () => void }) {
   const max = Math.max(...widget.items.map(i => i.value), 1);
   return (
     <div className="db-widget db-barchart">
-      <div className="db-widget-title">
-        <BarChart2 size={14} />
-        <span>{widget.title}</span>
+      <div className="db-widget-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <BarChart2 size={14} />
+          <span>{widget.title}</span>
+        </div>
+        {onMorph && (
+          <button
+            type="button"
+            onClick={onMorph}
+            title="Ubah visualisasi menjadi Tabel"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '2px 8px',
+              fontSize: '11px',
+              fontWeight: 500,
+              color: 'var(--color-primary)',
+              background: 'var(--color-primary-subtle)',
+              border: '1px solid var(--color-primary-border)',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <Table2 size={11} />
+            <span>Tabel</span>
+          </button>
+        )}
       </div>
       <div className="db-barchart-rows">
         {widget.items.map((item, i) => (
@@ -148,12 +174,38 @@ function ListWidgetComp({ widget }: { widget: ListWidget }) {
   );
 }
 
-function TableWidgetComp({ widget }: { widget: TableWidget }) {
+function TableWidgetComp({ widget, onMorph }: { widget: TableWidget; onMorph?: () => void }) {
   return (
     <div className="db-widget db-table-widget">
-      <div className="db-widget-title">
-        <Table2 size={14} />
-        <span>{widget.title}</span>
+      <div className="db-widget-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Table2 size={14} />
+          <span>{widget.title}</span>
+        </div>
+        {onMorph && (
+          <button
+            type="button"
+            onClick={onMorph}
+            title="Ubah visualisasi menjadi Bar Chart"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '2px 8px',
+              fontSize: '11px',
+              fontWeight: 500,
+              color: 'var(--color-primary)',
+              background: 'var(--color-primary-subtle)',
+              border: '1px solid var(--color-primary-border)',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <BarChart2 size={11} />
+            <span>Bar Chart</span>
+          </button>
+        )}
       </div>
       <div className="db-table-wrap">
         <table className="db-table">
@@ -260,14 +312,15 @@ function TextSummaryWidgetComp({ widget }: { widget: TextSummaryWidget }) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
 // Widget Router
 // ─────────────────────────────────────────────────────────────
-function WidgetRenderer({ widget }: { widget: DashboardWidget }) {
+function WidgetRenderer({ widget, onMorph }: { widget: DashboardWidget; onMorph?: () => void }) {
   switch (widget.type) {
     case 'stat_card':   return <StatCard widget={widget} />;
-    case 'bar_chart':   return <BarChart widget={widget} />;
+    case 'bar_chart':   return <BarChart widget={widget} onMorph={onMorph} />;
     case 'list':        return <ListWidgetComp widget={widget} />;
-    case 'table':       return <TableWidgetComp widget={widget} />;
+    case 'table':       return <TableWidgetComp widget={widget} onMorph={onMorph} />;
     case 'timeline':    return <TimelineWidgetComp widget={widget} />;
     case 'comparison':  return <ComparisonWidgetComp widget={widget} />;
     case 'text_summary':return <TextSummaryWidgetComp widget={widget} />;
@@ -276,13 +329,14 @@ function WidgetRenderer({ widget }: { widget: DashboardWidget }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Main Dashboard Preview (inline in chat)
+// Main Dashboard Preview (inline in chat / dynamic dashboard)
 // ─────────────────────────────────────────────────────────────
-interface AiDashboardPreviewProps {
+export interface AiDashboardPreviewProps {
   data: DashboardData;
   dashboardId: string;
   onClose?: () => void;
   compact?: boolean;
+  onMorphWidget?: (index: number, targetType: 'bar_chart' | 'table') => void;
 }
 
 export function AiDashboardPreview({
@@ -290,6 +344,7 @@ export function AiDashboardPreview({
   dashboardId,
   onClose,
   compact = false,
+  onMorphWidget,
 }: AiDashboardPreviewProps) {
   const [copiedLink, setCopiedLink] = useState(false);
   const { language } = useLanguage();
@@ -336,14 +391,16 @@ export function AiDashboardPreview({
           >
             {copiedLink ? <Check size={13} color="var(--color-success)" /> : <Copy size={13} />}
           </button>
-          <button
-            type="button"
-            onClick={handleOpenFull}
-            className="db-icon-btn"
-            title={language === 'en' ? 'Open full dashboard' : 'Buka dashboard penuh'}
-          >
-            <ExternalLink size={13} />
-          </button>
+          {compact && (
+            <button
+              type="button"
+              onClick={handleOpenFull}
+              className="db-icon-btn"
+              title={language === 'en' ? 'Open full dashboard' : 'Buka dashboard penuh'}
+            >
+              <ExternalLink size={13} />
+            </button>
+          )}
           {onClose && (
             <button
               type="button"
@@ -369,9 +426,17 @@ export function AiDashboardPreview({
       {/* Other widgets */}
       {otherWidgets.length > 0 && (
         <div className="db-widget-grid">
-          {otherWidgets.map((w, i) => (
-            <WidgetRenderer key={i} widget={w} />
-          ))}
+          {otherWidgets.map((w, i) => {
+            const originalIndex = data.widgets.indexOf(w);
+            const isMorphable = w.type === 'table' || w.type === 'bar_chart';
+            const handleMorph = onMorphWidget && isMorphable
+              ? () => {
+                  const targetType = w.type === 'table' ? 'bar_chart' : 'table';
+                  onMorphWidget(originalIndex, targetType);
+                }
+              : undefined;
+            return <WidgetRenderer key={i} widget={w} onMorph={handleMorph} />;
+          })}
         </div>
       )}
 

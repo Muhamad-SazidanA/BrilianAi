@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { DashboardData } from '@/types/dashboard';
 import { AiDashboardPreview } from '@/components/chat/AiDashboardPreview';
+import DashboardCopilot from '@/components/dashboard/DashboardCopilot';
+import { morphWidget } from '@/lib/utils/dashboardMorph';
 import { toast } from 'sonner';
 
 interface DashboardPageData {
@@ -108,6 +110,40 @@ export default function DashboardPage() {
       handleCopyLink();
     }
   }, [dashboardId, pageData, handleCopyLink]);
+
+  const handleMorphWidget = useCallback(
+    (index: number, targetType: 'bar_chart' | 'table') => {
+      setPageData((prev) => {
+        if (!prev) return prev;
+        const currentWidgets = [...prev.data.widgets];
+        const targetWidget = currentWidgets[index];
+        if (!targetWidget) return prev;
+
+        const morphed = morphWidget(targetWidget, targetType);
+        currentWidgets[index] = morphed;
+
+        const updatedData: DashboardData = {
+          ...prev.data,
+          widgets: currentWidgets,
+        };
+
+        // Persist change to database in background
+        fetch(`/api/dashboard/${dashboardId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: updatedData }),
+        }).catch((err) => {
+          console.warn('[DashboardPage] Failed to persist morphed widget:', err);
+        });
+
+        return {
+          ...prev,
+          data: updatedData,
+        };
+      });
+    },
+    [dashboardId]
+  );
 
   // ── Loading state ──
   if (isLoading) {
@@ -213,8 +249,16 @@ export default function DashboardPage() {
           data={pageData.data}
           dashboardId={pageData.dashboardId}
           compact={false}
+          onMorphWidget={handleMorphWidget}
         />
       </main>
+
+      {/* Interactive Floating AI Copilot */}
+      <DashboardCopilot
+        dashboardId={pageData.dashboardId}
+        dashboardData={pageData.data}
+        onMorphWidget={handleMorphWidget}
+      />
 
       {/* Footer */}
       <footer className="db-page-footer">
