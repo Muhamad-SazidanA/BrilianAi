@@ -246,7 +246,48 @@ export async function runRagSynthesizer(
 
   const userContent = `=== KONTEKS DOKUMEN ===\n${contextDocument}\n\n=== PERTANYAAN PENGGUNA ===\n${userQuery}`;
 
-  // 1. Primary: Google Gemini Flash (Funded by Google Cloud Rp 5.3M Credits)
+  // 1. Primary: DeepSeek-V3 (deepseek-chat)
+  if (deepseekApiKey) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+
+      const res = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${deepseekApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: options?.model || process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userContent },
+          ],
+          temperature: options?.temperature ?? 0.2,
+          max_tokens: 4096,
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const data = await res.json();
+        const content = data?.choices?.[0]?.message?.content;
+        if (content && typeof content === 'string') {
+          return content.trim();
+        }
+      } else {
+        const errText = await res.text();
+        console.warn(`[Agent 4: Synthesizer] DeepSeek API HTTP ${res.status}: ${errText}. Mencoba fallback...`);
+      }
+    } catch (error: any) {
+      console.warn(`[Agent 4: Synthesizer] DeepSeek gagal: ${error?.message}. Mencoba fallback...`);
+    }
+  }
+
+  // 2. Secondary (Menggantikan OpenAI): Google Gemini Flash (Funded by Google Cloud Credits)
   if (geminiApiKey) {
     const configuredModel = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
     const modelsToTry = Array.from(new Set([
@@ -300,47 +341,6 @@ export async function runRagSynthesizer(
       } catch (err: any) {
         console.warn(`[MultiAgentClient] Model "${geminiModel}" error:`, err?.message);
       }
-    }
-  }
-
-  // 2. Secondary Fallback: DeepSeek-V3 (deepseek-chat)
-  if (deepseekApiKey) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
-
-      const res = await fetch('https://api.deepseek.com/chat/completions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${deepseekApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: options?.model || process.env.DEEPSEEK_MODEL || 'deepseek-chat',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userContent },
-          ],
-          temperature: options?.temperature ?? 0.2,
-          max_tokens: 4096,
-        }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (res.ok) {
-        const data = await res.json();
-        const content = data?.choices?.[0]?.message?.content;
-        if (content && typeof content === 'string') {
-          return content.trim();
-        }
-      } else {
-        const errText = await res.text();
-        console.warn(`[Agent 4: Synthesizer] DeepSeek API HTTP ${res.status}: ${errText}. Mencoba fallback...`);
-      }
-    } catch (error: any) {
-      console.warn(`[Agent 4: Synthesizer] DeepSeek gagal: ${error?.message}. Mencoba fallback...`);
     }
   }
 
@@ -557,7 +557,18 @@ export async function runRagSynthesizerStream(
     }
   };
 
-  // 1. Primary: Google Gemini Flash stream (Funded by GCP Billing Credits)
+  // 1. Primary: DeepSeek-V3 stream
+  if (deepseekApiKey) {
+    const dsResult = await streamOpenAiCompatible(
+      'https://api.deepseek.com/chat/completions',
+      deepseekApiKey,
+      options?.model || process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+      options?.temperature ?? 0.2
+    );
+    if (dsResult) return dsResult;
+  }
+
+  // 2. Secondary (Menggantikan OpenAI): Google Gemini Flash stream (Funded by GCP Billing Credits)
   if (geminiApiKey) {
     const configuredModel = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
     const modelsToTry = Array.from(new Set([
@@ -576,18 +587,7 @@ export async function runRagSynthesizerStream(
     }
   }
 
-  // 2. Secondary: DeepSeek-V3 stream
-  if (deepseekApiKey) {
-    const dsResult = await streamOpenAiCompatible(
-      'https://api.deepseek.com/chat/completions',
-      deepseekApiKey,
-      options?.model || process.env.DEEPSEEK_MODEL || 'deepseek-chat',
-      options?.temperature ?? 0.2
-    );
-    if (dsResult) return dsResult;
-  }
-
-  // 3. Tertiary: OpenAI GPT-4o-mini stream
+  // 3. Tertiary Fallback: OpenAI GPT-4o-mini stream
   if (openAiApiKey) {
     const oaiResult = await streamOpenAiCompatible(
       'https://api.openai.com/v1/chat/completions',
