@@ -240,14 +240,16 @@ Hasilkan JSON dashboard sekarang sesuai instruksi sistem. Kembalikan HANYA JSON.
   // TIER 1: Google Gemini API (gemini-2.5-flash / gemini-1.5-flash fallback)
   // =========================================================================
   if (geminiApiKey) {
-    const configuredModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    const configuredModel = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
     const modelsToTry = Array.from(new Set([
       configuredModel,
+      'gemini-3.8-flash',
+      'gemini-flash-latest',
       'gemini-2.5-flash',
       'gemini-1.5-flash',
       'gemini-2.5-flash-lite',
       'gemini-2.0-flash',
-    ])).filter(m => m !== 'gemini-2.0-flash-lite'); // Filter out deprecated preview model
+    ])).filter(m => m !== 'gemini-2.0-flash-lite');
 
     for (const model of modelsToTry) {
       try {
@@ -568,9 +570,11 @@ Kembalikan HANYA format JSON valid tanpa tanda kutip markdown pembuka/penutup:
 
   // TIER 1: Gemini (gemini-2.5-flash / gemini-1.5-flash)
   if (geminiApiKey) {
-    const configuredModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    const configuredModel = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
     const modelsToTry = Array.from(new Set([
       configuredModel,
+      'gemini-3.8-flash',
+      'gemini-flash-latest',
       'gemini-2.5-flash',
       'gemini-1.5-flash',
       'gemini-2.5-flash-lite',

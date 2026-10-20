@@ -72,7 +72,7 @@ export async function extractPageText(
   }
 
   // Model ID default
-  const modelName = options?.model || process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  const modelName = options?.model || process.env.GEMINI_MODEL || 'gemini-3.8-flash';
   const maxRetries = options?.maxRetries ?? 2;
   const timeoutMs = options?.timeoutMs ?? 45000;
   let delay = options?.initialBackoffMs ?? 1000;
@@ -128,7 +128,7 @@ export async function extractPageText(
         console.warn(`[Agent 1: Vision Ingestion] Model "${modelName}" 404 (dihentikan Google). Mengalihkan ke model aktif alternatif...`);
 
         // 1. Coba Gemini alternatif
-        const fallbackGeminiModels = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.5-flash-lite'];
+        const fallbackGeminiModels = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-2.5-flash', 'gemini-1.5-flash'];
         for (const altModel of fallbackGeminiModels) {
           if (altModel === modelName) continue;
           try {

@@ -248,9 +248,11 @@ export async function runRagSynthesizer(
 
   // 1. Primary: Google Gemini Flash (Funded by Google Cloud Rp 5.3M Credits)
   if (geminiApiKey) {
-    const configuredModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    const configuredModel = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
     const modelsToTry = Array.from(new Set([
       configuredModel,
+      'gemini-3.8-flash',
+      'gemini-flash-latest',
       'gemini-2.5-flash',
       'gemini-1.5-flash',
       'gemini-2.5-flash-lite',
@@ -557,9 +559,11 @@ export async function runRagSynthesizerStream(
 
   // 1. Primary: Google Gemini Flash stream (Funded by GCP Billing Credits)
   if (geminiApiKey) {
-    const configuredModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    const configuredModel = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
     const modelsToTry = Array.from(new Set([
       configuredModel,
+      'gemini-3.8-flash',
+      'gemini-flash-latest',
       'gemini-2.5-flash',
       'gemini-1.5-flash',
       'gemini-2.5-flash-lite',
@@ -647,7 +651,7 @@ KEMBALIKAN HANYA TEKS JAWABAN AKHIR SIAP SAJI.`;
   // Prefer Gemini if available (using funded GCP Credits)
   if (geminiApiKey) {
     try {
-      const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+      const model = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
 
