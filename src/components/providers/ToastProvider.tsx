@@ -36,7 +36,17 @@ export default function ToastProvider() {
       richColors
       closeButton
       theme={theme}
+      offset={{ top: 10, right: 12 }}
+      gap={6}
       style={{ fontFamily: 'inherit' }}
+      toastOptions={{
+        style: {
+          padding: '7px 11px',
+          fontSize: '11.5px',
+          borderRadius: '8px',
+          maxWidth: '310px',
+        },
+      }}
     />
   );
 }

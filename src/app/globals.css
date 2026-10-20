@@ -2510,3 +2510,73 @@ thead::-webkit-scrollbar {
   .db-page-main .db-widget-grid { grid-template-columns: 1fr; }
   .db-barchart-label { min-width: 60px; max-width: 60px; }
 }
+
+/* =====================================================
+   Compact Top-Right Notification Toasts (Sonner)
+   Placed tightly into the top-right corner with clean,
+   minimalist padding and proportional font sizing
+   ===================================================== */
+[data-sonner-toaster][data-y-position='top'][data-x-position='right'] {
+  top: 10px !important;
+  right: 12px !important;
+}
+
+[data-sonner-toaster] [data-sonner-toast] {
+  padding: 7px 11px !important;
+  font-size: 11.5px !important;
+  line-height: 1.35 !important;
+  border-radius: 8px !important;
+  min-height: 34px !important;
+  width: auto !important;
+  max-width: 320px !important;
+  box-shadow: 0 4px 14px -2px rgba(15, 23, 42, 0.1), 0 2px 6px -1px rgba(15, 23, 42, 0.04) !important;
+  border: 1px solid var(--border-default, #e2e8f0) !important;
+}
+
+[data-sonner-toaster] [data-sonner-toast] [data-icon] {
+  margin-right: 7px !important;
+  width: 14px !important;
+  height: 14px !important;
+  flex-shrink: 0 !important;
+}
+
+[data-sonner-toaster] [data-sonner-toast] [data-icon] svg {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+[data-sonner-toaster] [data-sonner-toast] [data-title] {
+  font-size: 11.5px !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.01em !important;
+}
+
+[data-sonner-toaster] [data-sonner-toast] [data-description] {
+  font-size: 10.5px !important;
+  margin-top: 2px !important;
+  color: var(--text-secondary, #64748b) !important;
+}
+
+/* Sleek close button aligned inside top-right corner without overlapping icon */
+[data-sonner-toaster] [data-sonner-toast] [data-close-button] {
+  top: 6px !important;
+  right: 6px !important;
+  left: auto !important;
+  transform: none !important;
+  width: 16px !important;
+  height: 16px !important;
+  border-radius: 4px !important;
+  background: transparent !important;
+  border: none !important;
+  opacity: 0.55 !important;
+  transition: all 0.15s ease !important;
+}
+
+[data-sonner-toaster] [data-sonner-toast] [data-close-button]:hover {
+  opacity: 1 !important;
+  background: rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme='dark'] [data-sonner-toaster] [data-sonner-toast] [data-close-button]:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
