@@ -42,7 +42,9 @@ export async function embedTexts(
   }
 
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
+  const useOllamaExplicit = process.env.EMBEDDING_PROVIDER === 'ollama';
+
+  const runOllamaFallback = async (): Promise<number[][]> => {
     try {
       let baseUrl = process.env.OLLAMA_ENDPOINT || process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
       if (baseUrl.includes('//ollama:') && !process.env.DOCKER_CONTAINER) {
@@ -58,8 +60,12 @@ export async function embedTexts(
       }
       return vectors;
     } catch {
-      return texts.map(() => new Array(1024).fill(0.01));
+      return texts.map(() => new Array(dimensions).fill(0.01));
     }
+  };
+
+  if (!apiKey || useOllamaExplicit) {
+    return await runOllamaFallback();
   }
 
   // OpenAI supports max 2048 inputs per batch
@@ -73,14 +79,14 @@ export async function embedTexts(
     const sanitizedBatch = chunkBatch.map((t) => (t || '').replace(/\r\n|\r|\n/g, ' ').trim());
 
     let attempt = 0;
-    const maxRetries = 3;
+    const maxRetries = 2;
     let delay = 1000;
     let success = false;
 
     while (attempt <= maxRetries && !success) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
         const response = await fetch('https://api.openai.com/v1/embeddings', {
           method: 'POST',
@@ -100,6 +106,13 @@ export async function embedTexts(
 
         if (!response.ok) {
           const errText = await response.text();
+          // Jika kuota OpenAI habis (429) atau API Key kedaluwarsa (401), langsung alihkan ke Ollama bge-m3
+          if (response.status === 429 || response.status === 401) {
+            console.warn(
+              `[Agent 2: Embedding] OpenAI kuota habis/error (HTTP ${response.status}). Mengalihkan otomatis ke Ollama bge-m3...`
+            );
+            return await runOllamaFallback();
+          }
           throw new Error(`OpenAI Embedding API error HTTP ${response.status}: ${errText}`);
         }
 
@@ -122,8 +135,8 @@ export async function embedTexts(
           await new Promise((resolve) => setTimeout(resolve, delay));
           delay *= 2;
         } else {
-          console.error(`[Agent 2: Embedding] Gagal total membuat embedding batch: ${error?.message}`);
-          throw error;
+          console.warn(`[Agent 2: Embedding] OpenAI gagal (${error?.message}). Mengalihkan otomatis ke Ollama bge-m3...`);
+          return await runOllamaFallback();
         }
       }
     }

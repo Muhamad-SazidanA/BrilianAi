@@ -246,86 +246,7 @@ export async function runRagSynthesizer(
 
   const userContent = `=== KONTEKS DOKUMEN ===\n${contextDocument}\n\n=== PERTANYAAN PENGGUNA ===\n${userQuery}`;
 
-  // 1. Primary: DeepSeek-V3 (deepseek-chat)
-  if (deepseekApiKey) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
-
-      const res = await fetch('https://api.deepseek.com/chat/completions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${deepseekApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: options?.model || process.env.DEEPSEEK_MODEL || 'deepseek-chat',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userContent },
-          ],
-          temperature: options?.temperature ?? 0.2,
-          max_tokens: 4096,
-        }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (res.ok) {
-        const data = await res.json();
-        const content = data?.choices?.[0]?.message?.content;
-        if (content && typeof content === 'string') {
-          return content.trim();
-        }
-      } else {
-        const errText = await res.text();
-        console.warn(`[Agent 4: Synthesizer] DeepSeek API HTTP ${res.status}: ${errText}. Mencoba fallback...`);
-      }
-    } catch (error: any) {
-      console.warn(`[Agent 4: Synthesizer] DeepSeek gagal: ${error?.message}. Mencoba fallback...`);
-    }
-  }
-
-  // 2. Secondary Fallback: OpenAI GPT-4o-mini
-  if (openAiApiKey) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${openAiApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userContent },
-          ],
-          temperature: options?.temperature ?? 0.2,
-          max_tokens: 4096,
-        }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (res.ok) {
-        const data = await res.json();
-        const content = data?.choices?.[0]?.message?.content;
-        if (content && typeof content === 'string') {
-          return content.trim();
-        }
-      }
-    } catch (err: any) {
-      console.warn(`[Agent 4: Synthesizer] OpenAI fallback gagal: ${err?.message}.`);
-    }
-  }
-
-  // 3. Tertiary Fallback: Google Gemini Flash
+  // 1. Primary: Google Gemini Flash (Funded by Google Cloud Rp 5.3M Credits)
   if (geminiApiKey) {
     const configuredModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
     const modelsToTry = Array.from(new Set([
@@ -380,15 +301,95 @@ export async function runRagSynthesizer(
     }
   }
 
+  // 2. Secondary Fallback: DeepSeek-V3 (deepseek-chat)
+  if (deepseekApiKey) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+
+      const res = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${deepseekApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: options?.model || process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userContent },
+          ],
+          temperature: options?.temperature ?? 0.2,
+          max_tokens: 4096,
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const data = await res.json();
+        const content = data?.choices?.[0]?.message?.content;
+        if (content && typeof content === 'string') {
+          return content.trim();
+        }
+      } else {
+        const errText = await res.text();
+        console.warn(`[Agent 4: Synthesizer] DeepSeek API HTTP ${res.status}: ${errText}. Mencoba fallback...`);
+      }
+    } catch (error: any) {
+      console.warn(`[Agent 4: Synthesizer] DeepSeek gagal: ${error?.message}. Mencoba fallback...`);
+    }
+  }
+
+  // 3. Tertiary Fallback: OpenAI GPT-4o-mini
+  if (openAiApiKey) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${openAiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userContent },
+          ],
+          temperature: options?.temperature ?? 0.2,
+          max_tokens: 4096,
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const data = await res.json();
+        const content = data?.choices?.[0]?.message?.content;
+        if (content && typeof content === 'string') {
+          return content.trim();
+        }
+      }
+    } catch (err: any) {
+      console.warn(`[Agent 4: Synthesizer] OpenAI fallback gagal: ${err?.message}.`);
+    }
+  }
+
   // 4. Ultimate Fallback: Ollama local chat client
   return await generateChatResponse(userQuery, contextDocument, false);
 }
 
 /**
  * Streams the RAG synthesizer response token-by-token:
- * 1. DeepSeek-V3 stream (if DEEPSEEK_API_KEY)
- * 2. OpenAI stream (if OPENAI_API_KEY)
- * 3. Local Ollama stream (default & offline)
+ * 1. Google Gemini stream (if GEMINI_API_KEY - backed by GCP Credits)
+ * 2. DeepSeek-V3 stream (if DEEPSEEK_API_KEY)
+ * 3. OpenAI stream (if OPENAI_API_KEY)
+ * 4. Local Ollama stream (default & offline)
  */
 export async function runRagSynthesizerStream(
   userQuery: string,
@@ -405,6 +406,7 @@ export async function runRagSynthesizerStream(
     );
   }
 
+  const geminiApiKey = process.env.GEMINI_API_KEY;
   const deepseekApiKey = process.env.DEEPSEEK_API_KEY;
   const openAiApiKey = process.env.OPENAI_API_KEY;
 
@@ -417,6 +419,72 @@ export async function runRagSynthesizerStream(
   }
 
   const userContent = `=== KONTEKS DOKUMEN ===\n${contextDocument}\n\n=== PERTANYAAN PENGGUNA ===\n${userQuery}`;
+
+  // Helper for parsing Gemini SSE streams
+  const streamGemini = async (
+    apiKey: string,
+    modelName: string,
+    temp: number
+  ): Promise<string | null> => {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:streamGenerateContent?alt=sse&key=${apiKey}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [{ text: `${systemPrompt}\n\n${userContent}` }],
+            },
+          ],
+          generationConfig: {
+            temperature: temp,
+            maxOutputTokens: 4096,
+          },
+        }),
+        signal: options?.signal,
+      });
+
+      if (!res.ok || !res.body) {
+        return null;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulated = '';
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith(':')) continue;
+          if (trimmed.startsWith('data: ')) {
+            try {
+              const parsed = JSON.parse(trimmed.slice(6));
+              const token = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (token && typeof token === 'string') {
+                accumulated += token;
+                options?.onToken?.(token);
+              }
+            } catch {
+              // ignore partial line parse
+            }
+          }
+        }
+      }
+
+      return accumulated.trim() ? accumulated : null;
+    } catch (err: any) {
+      console.warn(`[SynthesizerStream] Gemini stream error (${modelName}):`, err?.message);
+      return null;
+    }
+  };
 
   // Helper for parsing OpenAI-compatible SSE streams
   const streamOpenAiCompatible = async (
@@ -487,7 +555,24 @@ export async function runRagSynthesizerStream(
     }
   };
 
-  // 1. Primary: DeepSeek-V3 stream
+  // 1. Primary: Google Gemini Flash stream (Funded by GCP Billing Credits)
+  if (geminiApiKey) {
+    const configuredModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    const modelsToTry = Array.from(new Set([
+      configuredModel,
+      'gemini-2.5-flash',
+      'gemini-1.5-flash',
+      'gemini-2.5-flash-lite',
+      'gemini-2.0-flash',
+    ])).filter(m => m !== 'gemini-2.0-flash-lite');
+
+    for (const model of modelsToTry) {
+      const gemResult = await streamGemini(geminiApiKey, model, options?.temperature ?? 0.2);
+      if (gemResult) return gemResult;
+    }
+  }
+
+  // 2. Secondary: DeepSeek-V3 stream
   if (deepseekApiKey) {
     const dsResult = await streamOpenAiCompatible(
       'https://api.deepseek.com/chat/completions',
@@ -498,7 +583,7 @@ export async function runRagSynthesizerStream(
     if (dsResult) return dsResult;
   }
 
-  // 2. Secondary: OpenAI GPT-4o-mini stream
+  // 3. Tertiary: OpenAI GPT-4o-mini stream
   if (openAiApiKey) {
     const oaiResult = await streamOpenAiCompatible(
       'https://api.openai.com/v1/chat/completions',
@@ -509,7 +594,7 @@ export async function runRagSynthesizerStream(
     if (oaiResult) return oaiResult;
   }
 
-  // 3. Fallback: Local Ollama stream
+  // 4. Fallback: Local Ollama stream
   return await generateChatResponseStream(
     userQuery,
     contextDocument,
@@ -546,7 +631,8 @@ export async function runSafetyEvaluator(
   }
 
   const openAiApiKey = process.env.OPENAI_API_KEY;
-  if (!openAiApiKey) {
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  if (!openAiApiKey && !geminiApiKey) {
     return rawAnswer;
   }
 
@@ -558,41 +644,86 @@ Tugas Anda:
 
 KEMBALIKAN HANYA TEKS JAWABAN AKHIR SIAP SAJI.`;
 
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+  // Prefer Gemini if available (using funded GCP Credits)
+  if (geminiApiKey) {
+    try {
+      const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${openAiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: evaluatorPrompt },
-          {
-            role: 'user',
-            content: `PERTANYAAN PENGGUNA:\n${userQuery}\n\nJAWABAN YANG DIEVALUASI:\n${rawAnswer}`,
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: `${evaluatorPrompt}\n\nPERTANYAAN PENGGUNA:\n${userQuery}\n\nJAWABAN YANG DIEVALUASI:\n${rawAnswer}`,
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.0,
+            maxOutputTokens: 4096,
           },
-        ],
-        temperature: 0.0,
-      }),
-      signal: controller.signal,
-    });
+        }),
+        signal: controller.signal,
+      });
 
-    clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
 
-    if (res.ok) {
-      const data = await res.json();
-      const content = data?.choices?.[0]?.message?.content;
-      if (content && typeof content === 'string') {
-        return content.trim();
+      if (res.ok) {
+        const data = await res.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text && typeof text === 'string') {
+          return text.trim();
+        }
       }
+    } catch (err: any) {
+      console.warn('[Agent 5: Safety & Evaluator] Gemini Evaluator error:', err?.message);
     }
-  } catch (err: any) {
-    console.warn('[Agent 5: Safety & Evaluator] Evaluator dilewati karena timeout:', err?.message);
+  }
+
+  if (openAiApiKey) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${openAiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: evaluatorPrompt },
+            {
+              role: 'user',
+              content: `PERTANYAAN PENGGUNA:\n${userQuery}\n\nJAWABAN YANG DIEVALUASI:\n${rawAnswer}`,
+            },
+          ],
+          temperature: 0.0,
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const data = await res.json();
+        const content = data?.choices?.[0]?.message?.content;
+        if (content && typeof content === 'string') {
+          return content.trim();
+        }
+      }
+    } catch (err: any) {
+      console.warn('[Agent 5: Safety & Evaluator] Evaluator dilewati karena timeout:', err?.message);
+    }
   }
 
   return rawAnswer;

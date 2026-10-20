@@ -49,4 +49,29 @@ describe('embedTexts (AI Embedding Client)', () => {
     expect(result).toEqual([]);
     expect(OllamaEmbeddings.prototype.embedDocuments).not.toHaveBeenCalled();
   });
+
+  it('3. should gracefully fallback to Ollama when OpenAI returns HTTP 429 quota exhausted', async () => {
+    const originalApiKey = process.env.OPENAI_API_KEY;
+    process.env.OPENAI_API_KEY = 'mock-expired-key';
+
+    const mockFetch = vi.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      text: vi.fn().mockResolvedValue('insufficient_quota: You exceeded your current quota.'),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const mockVector = new Array(1024).fill(0.09);
+    vi.mocked(OllamaEmbeddings.prototype.embedDocuments).mockResolvedValueOnce([mockVector]);
+
+    try {
+      const result = await embedTexts(['Test query with expired OpenAI quota']);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toHaveLength(1024);
+      expect(OllamaEmbeddings.prototype.embedDocuments).toHaveBeenCalledTimes(1);
+    } finally {
+      process.env.OPENAI_API_KEY = originalApiKey;
+      vi.unstubAllGlobals();
+    }
+  });
 });

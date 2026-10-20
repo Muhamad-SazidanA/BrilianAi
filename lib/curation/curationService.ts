@@ -48,8 +48,6 @@ export async function curateRawTextMultiple(
   rawContent: string,
   pageRange: string = ''
 ): Promise<CurationResultPayload[]> {
-  const openAiApiKey = process.env.OPENAI_API_KEY;
-
   const prompt = `Berikut potongan teks mentah dari dokumen${pageRange ? ` (${pageRange})` : ''}:
 """
 ${rawContent}
@@ -69,6 +67,75 @@ Format output JSON:
   ]
 }`;
 
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  const openAiApiKey = process.env.OPENAI_API_KEY;
+
+  // 1. Primary: Google Gemini Flash (Funded by Google Cloud Rp 5.3M Credits)
+  if (geminiApiKey) {
+    const configuredModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    const modelsToTry = Array.from(new Set([
+      configuredModel,
+      'gemini-2.5-flash',
+      'gemini-1.5-flash',
+      'gemini-2.5-flash-lite',
+      'gemini-2.0-flash',
+    ])).filter((m) => m !== 'gemini-2.0-flash-lite');
+
+    for (const geminiModel of modelsToTry) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 20000);
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`;
+
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [{ text: `${SYSTEM_CURATION_PROMPT}\n\n${prompt}` }],
+              },
+            ],
+            generationConfig: {
+              responseMimeType: 'application/json',
+              temperature: 0.1,
+              maxOutputTokens: 4096,
+            },
+          }),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const data = await res.json();
+          const rawOutput = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (rawOutput) {
+            const parsed = JSON.parse(rawOutput);
+            const rawItems = Array.isArray(parsed.insights)
+              ? parsed.insights
+              : parsed.title
+              ? [parsed]
+              : [];
+
+            if (rawItems.length > 0) {
+              return rawItems.map((item: any) => ({
+                title: item.title || 'Insight Dokumen',
+                content: item.content || rawContent,
+                importance: ['high', 'medium', 'low'].includes(item.importance) ? item.importance : 'medium',
+                category: item.category || 'track1_financial',
+                tags: Array.isArray(item.tags) && item.tags.length > 0 ? item.tags : ['Umum'],
+              }));
+            }
+          }
+        }
+      } catch (err: any) {
+        console.warn(`[CurationService] Gemini model ${geminiModel} error:`, err?.message);
+      }
+    }
+  }
+
+  // 2. Secondary: OpenAI GPT-4o-mini
   if (openAiApiKey) {
     try {
       const controller = new AbortController();
