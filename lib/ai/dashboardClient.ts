@@ -100,48 +100,62 @@ ${input.answerText}
 Hasilkan JSON dashboard sekarang sesuai instruksi sistem. Kembalikan HANYA JSON.`;
 
   // =========================================================================
-  // TIER 1: Google Gemini API (gemini-2.0-flash-lite)
+  // TIER 1: Google Gemini API (gemini-2.5-flash / gemini-1.5-flash fallback)
   // =========================================================================
   if (geminiApiKey) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 detik timeout
+    const configuredModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    const modelsToTry = Array.from(new Set([
+      configuredModel,
+      'gemini-2.5-flash',
+      'gemini-1.5-flash',
+      'gemini-2.5-flash-lite',
+      'gemini-2.0-flash',
+    ])).filter(m => m !== 'gemini-2.0-flash-lite'); // Filter out deprecated preview model
 
-      const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash-lite';
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`;
+    for (const model of modelsToTry) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 detik timeout
 
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [{ text: `${DASHBOARD_SYSTEM_PROMPT}\n\n${userPrompt}` }],
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
+
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [{ text: `${DASHBOARD_SYSTEM_PROMPT}\n\n${userPrompt}` }],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 3000,
+              responseMimeType: 'application/json',
             },
-          ],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 3000,
-            responseMimeType: 'application/json',
-          },
-        }),
-        signal: controller.signal,
-      });
+          }),
+          signal: controller.signal,
+        });
 
-      clearTimeout(timeoutId);
+        clearTimeout(timeoutId);
 
-      if (res.ok) {
-        const data = await res.json();
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) {
-          return parseAndValidateDashboardJson(text, input);
+        if (res.ok) {
+          const data = await res.json();
+          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            return parseAndValidateDashboardJson(text, input);
+          }
+        } else if (res.status === 404) {
+          console.warn(`[DashboardClient] Gemini model "${model}" 404 (tidak tersedia). Mencoba model aktif alternatif...`);
+          continue;
+        } else {
+          const errBody = await res.text();
+          console.warn(`[DashboardClient] Gemini model "${model}" HTTP ${res.status}: ${errBody}.`);
+          break;
         }
-      } else {
-        const errBody = await res.text();
-        console.warn(`[DashboardClient] Gemini API HTTP ${res.status}: ${errBody}. Mencoba OpenAI...`);
+      } catch (err: any) {
+        console.warn(`[DashboardClient] Gemini model "${model}" gagal (${err?.message}).`);
       }
-    } catch (err: any) {
-      console.warn(`[DashboardClient] Gemini gagal (${err?.message}). Mencoba OpenAI...`);
     }
   }
 
@@ -414,36 +428,49 @@ Kembalikan HANYA format JSON valid tanpa tanda kutip markdown pembuka/penutup:
     return { answer: raw.replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim() };
   };
 
-  // TIER 1: Gemini
+  // TIER 1: Gemini (gemini-2.5-flash / gemini-1.5-flash)
   if (geminiApiKey) {
-    try {
-      const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash-lite';
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`;
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 18000);
+    const configuredModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    const modelsToTry = Array.from(new Set([
+      configuredModel,
+      'gemini-2.5-flash',
+      'gemini-1.5-flash',
+      'gemini-2.5-flash-lite',
+      'gemini-2.0-flash',
+    ])).filter(m => m !== 'gemini-2.0-flash-lite');
 
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `${copilotSystemPrompt}\n\n${userQuery}` }] }],
-          generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: 2000,
-            responseMimeType: 'application/json',
-          },
-        }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
+    for (const model of modelsToTry) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 18000);
 
-      if (res.ok) {
-        const data = await res.json();
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) return parseCopilotResponse(text);
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `${copilotSystemPrompt}\n\n${userQuery}` }] }],
+            generationConfig: {
+              temperature: 0.2,
+              maxOutputTokens: 2000,
+              responseMimeType: 'application/json',
+            },
+          }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const data = await res.json();
+          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) return parseCopilotResponse(text);
+        } else if (res.status === 404) {
+          console.warn(`[DashboardCopilot] Gemini model "${model}" 404. Mencoba model aktif alternatif...`);
+          continue;
+        }
+      } catch (err: any) {
+        console.warn(`[DashboardCopilot] Gemini model "${model}" error:`, err?.message);
       }
-    } catch (err: any) {
-      console.warn('[DashboardCopilot] Gemini error:', err?.message);
     }
   }
 

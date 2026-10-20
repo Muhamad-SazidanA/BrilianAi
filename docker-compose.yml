@@ -35,6 +35,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - brilian_internal
   # =====================================================================
   # OPTIONAL: Local Ollama Service (Dinonaktifkan / Di-comment)
   # Uncomment blok ini jika di masa depan ingin menjalankan AI model lokal
@@ -84,7 +86,7 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash-lite}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}

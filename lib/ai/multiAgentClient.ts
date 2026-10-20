@@ -327,43 +327,56 @@ export async function runRagSynthesizer(
 
   // 3. Tertiary Fallback: Google Gemini Flash
   if (geminiApiKey) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const configuredModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    const modelsToTry = Array.from(new Set([
+      configuredModel,
+      'gemini-2.5-flash',
+      'gemini-1.5-flash',
+      'gemini-2.5-flash-lite',
+      'gemini-2.0-flash',
+    ])).filter(m => m !== 'gemini-2.0-flash-lite');
 
-      const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash-lite';
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`;
+    for (const geminiModel of modelsToTry) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { text: `${systemPrompt}\n\n${userContent}` },
-              ],
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`;
+
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  { text: `${systemPrompt}\n\n${userContent}` },
+                ],
+              },
+            ],
+            generationConfig: {
+              temperature: options?.temperature ?? 0.2,
+              maxOutputTokens: 4096,
             },
-          ],
-          generationConfig: {
-            temperature: options?.temperature ?? 0.2,
-            maxOutputTokens: 4096,
-          },
-        }),
-        signal: controller.signal,
-      });
+          }),
+          signal: controller.signal,
+        });
 
-      clearTimeout(timeoutId);
+        clearTimeout(timeoutId);
 
-      if (res.ok) {
-        const data = await res.json();
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text && typeof text === 'string') {
-          return text.trim();
+        if (res.ok) {
+          const data = await res.json();
+          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text && typeof text === 'string') {
+            return text.trim();
+          }
+        } else if (res.status === 404) {
+          console.warn(`[MultiAgentClient] Model "${geminiModel}" 404. Mencoba model aktif alternatif...`);
+          continue;
         }
+      } catch (err: any) {
+        console.warn(`[MultiAgentClient] Model "${geminiModel}" error:`, err?.message);
       }
-    } catch (err: any) {
-      console.warn(`[Agent 4: Synthesizer] Gemini fallback gagal: ${err?.message}.`);
     }
   }
 
