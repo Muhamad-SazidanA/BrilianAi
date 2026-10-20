@@ -9,6 +9,7 @@ export interface EnterpriseSelectOption {
   sublabel?: string;
   badge?: string;
   icon?: React.ReactNode;
+  disabled?: boolean;
 }
 
 export interface EnterpriseSelectProps {
@@ -171,18 +172,41 @@ export default function EnterpriseSelect({
           ...buttonStyle,
         }}
       >
-        <span
-          style={{
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            fontWeight: selectedOption ? 500 : 400,
-            flex: 1,
-            minWidth: 0,
-          }}
-        >
-          {selectedOption ? selectedOption.label : placeholder}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+          {selectedOption?.icon && (
+            <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+              {selectedOption.icon}
+            </div>
+          )}
+          <span
+            style={{
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              fontWeight: selectedOption ? 500 : 400,
+              flex: 1,
+              minWidth: 0,
+            }}
+          >
+            {selectedOption ? selectedOption.label : placeholder}
+          </span>
+          {selectedOption?.badge && (
+            <span
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: '10px',
+                padding: '1px 6px',
+                borderRadius: '4px',
+                backgroundColor: 'var(--bg-subtle, #f1f5f9)',
+                color: 'var(--text-secondary, #64748b)',
+                border: '1px solid var(--border-default, #e2e8f0)',
+                flexShrink: 0,
+              }}
+            >
+              {selectedOption.badge}
+            </span>
+          )}
+        </div>
 
         <ChevronDown
           size={size === 'xs' ? 10 : 12}
@@ -275,12 +299,16 @@ export default function EnterpriseSelect({
             ) : (
               filteredOptions.map((opt) => {
                 const isSelected = String(opt.value) === String(value);
+                const isOptDisabled = opt.disabled;
+
                 return (
                   <div
                     key={String(opt.value)}
                     role="option"
                     aria-selected={isSelected}
+                    aria-disabled={isOptDisabled}
                     onClick={() => {
+                      if (isOptDisabled) return;
                       onChange(opt.value);
                       setIsOpen(false);
                     }}
@@ -288,50 +316,77 @@ export default function EnterpriseSelect({
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      padding: '5px 8px',
-                      borderRadius: '5px',
+                      padding: '6px 10px',
+                      borderRadius: '6px',
                       fontSize: fontSize,
-                      cursor: 'pointer',
+                      cursor: isOptDisabled ? 'not-allowed' : 'pointer',
+                      opacity: isOptDisabled ? 0.55 : 1,
                       transition: 'all 0.1s ease',
-                      backgroundColor: isSelected ? '#F1F5F9' : 'transparent',
-                      color: isSelected ? '#0F172A' : '#334155',
+                      backgroundColor: isSelected ? 'var(--color-primary-subtle, #eff6ff)' : 'transparent',
+                      color: isSelected ? 'var(--color-primary, #2563eb)' : '#334155',
                       fontWeight: isSelected ? 600 : 450,
                       gap: '8px',
                     }}
                     onMouseEnter={(e) => {
-                      if (!isSelected) {
-                        e.currentTarget.style.backgroundColor = '#F8FAFC';
+                      if (!isSelected && !isOptDisabled) {
+                        e.currentTarget.style.backgroundColor = 'var(--bg-subtle, #f8fafc)';
                         e.currentTarget.style.color = '#0F172A';
                       }
                     }}
                     onMouseLeave={(e) => {
-                      if (!isSelected) {
+                      if (!isSelected && !isOptDisabled) {
                         e.currentTarget.style.backgroundColor = 'transparent';
                         e.currentTarget.style.color = '#334155';
                       }
                     }}
                   >
-                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
-                      <span
-                        style={{
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          letterSpacing: '-0.01em',
-                        }}
-                      >
-                        {opt.label}
-                      </span>
-                      {opt.sublabel && (
-                        <span style={{ fontSize: '10px', color: '#64748B', marginTop: '1px' }}>
-                          {opt.sublabel}
-                        </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                      {opt.icon && (
+                        <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                          {opt.icon}
+                        </div>
                       )}
+                      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                        <span
+                          style={{
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            letterSpacing: '-0.01em',
+                            color: isSelected ? 'var(--color-primary, #2563eb)' : '#0F172A',
+                          }}
+                        >
+                          {opt.label}
+                        </span>
+                        {opt.sublabel && (
+                          <span style={{ fontSize: '10.5px', color: '#64748B', marginTop: '1px' }}>
+                            {opt.sublabel}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
-                    {isSelected && (
-                      <Check size={11} color="#2563EB" style={{ flexShrink: 0, strokeWidth: 2.5 }} />
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                      {opt.badge && (
+                        <span
+                          style={{
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: '10px',
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            backgroundColor: isSelected ? '#ffffff' : 'var(--bg-subtle, #f1f5f9)',
+                            color: 'var(--text-secondary, #64748b)',
+                            border: '1px solid var(--border-default, #e2e8f0)',
+                          }}
+                        >
+                          {opt.badge}
+                        </span>
+                      )}
+
+                      {isSelected && (
+                        <Check size={12} color="#2563EB" style={{ strokeWidth: 2.5 }} />
+                      )}
+                    </div>
                   </div>
                 );
               })
