@@ -261,7 +261,28 @@ export function CardFloatingCopilot({
             </div>
           ) : (
             <div>
-              <div className="db-popover-content">{response?.answer}</div>
+              <div
+                className="db-popover-content"
+                dangerouslySetInnerHTML={{
+                  __html: (response?.answer || '')
+                    // Bold **text**
+                    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                    // Italic *text*
+                    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                    // Bullet points - item / * item
+                    .replace(/^[-*•]\s+(.+)$/gm, '<li>$1</li>')
+                    // Wrap consecutive <li> in <ul>
+                    .replace(/(<li>[\s\S]*?<\/li>)/g, '<ul style="margin:6px 0 6px 12px;padding:0;list-style:disc;">$1</ul>')
+                    // Numbered list 1. item
+                    .replace(/^\d+\.\s+(.+)$/gm, '<li>$1</li>')
+                    // Headers ### text
+                    .replace(/^###\s+(.+)$/gm, '<h4 style="margin:8px 0 4px;font-size:12px;font-weight:700;color:var(--text-primary)">$1</h4>')
+                    .replace(/^##\s+(.+)$/gm, '<h3 style="margin:8px 0 4px;font-size:12.5px;font-weight:700;color:var(--text-primary)">$1</h3>')
+                    // Line breaks
+                    .replace(/\n\n/g, '</p><p style="margin:4px 0">')
+                    .replace(/\n/g, '<br/>')
+                }}
+              />
               {response?.actionDone && (
                 <div className="db-popover-action-badge">
                   <CheckCircle2 size={12} />
