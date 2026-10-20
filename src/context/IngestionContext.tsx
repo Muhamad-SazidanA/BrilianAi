@@ -82,6 +82,10 @@ export function IngestionProvider({ children }: { children: React.ReactNode }) {
           const cutoff = Date.now() - 2 * 60 * 60 * 1000;
           const fresh = parsed.filter((t) => t.startedAt > cutoff);
           setTasks(fresh);
+          // Jika seluruh tugas yang dimuat sudah selesai, otomatis tampilkan dalam mode minimized pill
+          if (fresh.length > 0 && fresh.every((t) => t.status === 'completed' || t.status === 'error')) {
+            setIsDockMinimized(true);
+          }
         }
       }
     } catch (e) {

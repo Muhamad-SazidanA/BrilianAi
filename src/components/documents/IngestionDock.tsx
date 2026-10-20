@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import Link from 'next/link';
 import {
   ChevronDown,
   ChevronUp,
@@ -10,13 +9,11 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
-  ExternalLink,
   Layers,
   Sparkles,
   Database,
   Trash2,
   Maximize2,
-  Minimize2,
 } from 'lucide-react';
 import { useIngestion, IngestionTask, IngestionStage } from '@/context/IngestionContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -51,34 +48,72 @@ export default function IngestionDock() {
   };
 
   const getStageBadge = (stage: IngestionStage, task: IngestionTask) => {
+    const badgeBaseStyle: React.CSSProperties = {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '4px',
+      padding: '2px 8px',
+      borderRadius: '9999px',
+      fontSize: '10.5px',
+      fontWeight: 500,
+    };
+
     switch (stage) {
       case 'queued':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+          <span
+            style={{
+              ...badgeBaseStyle,
+              backgroundColor: 'var(--bg-subtle, #f1f5f9)',
+              color: 'var(--text-secondary, #475569)',
+              border: '1px solid var(--border-default, #e2e8f0)',
+            }}
+          >
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#94a3b8' }} />
             {language === 'en' ? 'Queued' : 'Antrian'}
           </span>
         );
       case 'extracting':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800">
-            <Loader2 className="w-3 h-3 animate-spin text-blue-600" />
+          <span
+            style={{
+              ...badgeBaseStyle,
+              backgroundColor: 'rgba(37, 99, 235, 0.08)',
+              color: '#2563eb',
+              border: '1px solid rgba(37, 99, 235, 0.2)',
+            }}
+          >
+            <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} />
             {language === 'en' ? 'Extracting' : 'Ekstraksi PDF'}
             {task.currentPage && task.totalPages ? ` (${task.currentPage}/${task.totalPages})` : ''}
           </span>
         );
       case 'chunking':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800">
-            <Loader2 className="w-3 h-3 animate-spin text-indigo-600" />
+          <span
+            style={{
+              ...badgeBaseStyle,
+              backgroundColor: 'rgba(79, 70, 229, 0.08)',
+              color: '#4f46e5',
+              border: '1px solid rgba(79, 70, 229, 0.2)',
+            }}
+          >
+            <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} />
             {language === 'en' ? 'Chunking' : 'Chunking'}
             {task.totalChunks ? ` (${task.totalChunks} chunks)` : ''}
           </span>
         );
       case 'embedding':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800">
-            <Sparkles className="w-3 h-3 animate-pulse text-amber-600" />
+          <span
+            style={{
+              ...badgeBaseStyle,
+              backgroundColor: 'rgba(217, 119, 6, 0.08)',
+              color: '#d97706',
+              border: '1px solid rgba(217, 119, 6, 0.2)',
+            }}
+          >
+            <Sparkles size={11} />
             {language === 'en' ? 'Embedding' : 'Vector 1024-d'}
             {task.processedChunks && task.totalChunks
               ? ` (${task.processedChunks}/${task.totalChunks})`
@@ -87,22 +122,43 @@ export default function IngestionDock() {
         );
       case 'storing':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800">
-            <Database className="w-3 h-3 animate-bounce text-purple-600" />
+          <span
+            style={{
+              ...badgeBaseStyle,
+              backgroundColor: 'rgba(147, 51, 234, 0.08)',
+              color: '#9333ea',
+              border: '1px solid rgba(147, 51, 234, 0.2)',
+            }}
+          >
+            <Database size={11} />
             {language === 'en' ? 'Storing' : 'pgvector'}
           </span>
         );
       case 'completed':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800">
-            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+          <span
+            style={{
+              ...badgeBaseStyle,
+              backgroundColor: 'rgba(16, 185, 129, 0.08)',
+              color: '#059669',
+              border: '1px solid rgba(16, 185, 129, 0.2)',
+            }}
+          >
+            <CheckCircle2 size={11} />
             {language === 'en' ? 'Completed' : 'Selesai'}
           </span>
         );
       case 'error':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800">
-            <AlertCircle className="w-3 h-3 text-rose-600" />
+          <span
+            style={{
+              ...badgeBaseStyle,
+              backgroundColor: 'rgba(239, 68, 68, 0.08)',
+              color: '#dc2626',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+            }}
+          >
+            <AlertCircle size={11} />
             {language === 'en' ? 'Failed' : 'Gagal'}
           </span>
         );
@@ -113,25 +169,39 @@ export default function IngestionDock() {
   if (isDockMinimized) {
     return (
       <div
-        className="fixed bottom-5 right-6 z-[9999] flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl cursor-pointer hover:border-blue-400 dark:hover:border-blue-600 transition-all duration-200 group"
+        style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          padding: '8px 16px',
+          borderRadius: '9999px',
+          backgroundColor: 'var(--bg-card, #ffffff)',
+          border: '1px solid var(--border-default, #e2e8f0)',
+          boxShadow: '0 10px 25px -4px rgba(15, 23, 42, 0.15)',
+          cursor: 'pointer',
+          transition: 'all 0.2s ease',
+        }}
         onClick={() => setIsDockMinimized(false)}
         role="button"
         tabIndex={0}
         aria-label="Expand Ingestion Dock"
       >
         {hasActive ? (
-          <div className="relative flex items-center justify-center">
-            <span className="absolute -inset-1 rounded-full bg-blue-400/30 animate-ping" />
-            <Loader2 className="w-4 h-4 animate-spin text-blue-600 dark:text-blue-400" />
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Loader2 size={16} color="#2563eb" style={{ animation: 'spin 1s linear infinite' }} />
           </div>
         ) : errorCount > 0 ? (
-          <AlertCircle className="w-4 h-4 text-rose-500" />
+          <AlertCircle size={16} color="#ef4444" />
         ) : (
-          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+          <CheckCircle2 size={16} color="#10b981" />
         )}
 
-        <div className="flex flex-col">
-          <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary, #0f172a)' }}>
             {hasActive
               ? language === 'en'
                 ? `Processing ${activeTaskCount} document${activeTaskCount > 1 ? 's' : ''}`
@@ -141,7 +211,7 @@ export default function IngestionDock() {
               : `${completedCount} dokumen selesai`}
           </span>
           {hasActive && (
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+            <span style={{ fontSize: '10px', color: 'var(--text-muted, #94a3b8)', fontFamily: 'var(--font-mono, monospace)' }}>
               {language === 'en' ? 'Running in background' : 'Berjalan di latar belakang'}
             </span>
           )}
@@ -153,10 +223,49 @@ export default function IngestionDock() {
             e.stopPropagation();
             setIsDockMinimized(false);
           }}
-          className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 ml-1 rounded-md"
+          title={language === 'en' ? 'Expand' : 'Buka detail'}
+          style={{
+            padding: '3px',
+            color: 'var(--text-muted, #94a3b8)',
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            marginLeft: '4px',
+          }}
         >
-          <ChevronUp className="w-4 h-4" />
+          <ChevronUp size={16} />
         </button>
+
+        {!hasActive && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              clearCompletedTasks();
+            }}
+            title={language === 'en' ? 'Dismiss' : 'Tutup pemberitahuan'}
+            style={{
+              padding: '3px',
+              color: 'var(--text-muted, #94a3b8)',
+              border: 'none',
+              background: 'transparent',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              marginLeft: '2px',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = '#ef4444';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'var(--text-muted, #94a3b8)';
+            }}
+          >
+            <X size={14} />
+          </button>
+        )}
       </div>
     );
   }
@@ -164,22 +273,55 @@ export default function IngestionDock() {
   // Expanded Floating Card Mode (Bottom Right)
   return (
     <div
-      className="fixed bottom-5 right-6 z-[9999] w-[400px] max-w-[calc(100vw-32px)] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[540px] animate-in fade-in slide-in-from-bottom-4 duration-200"
       style={{
-        boxShadow: '0 20px 40px -15px rgba(15, 23, 42, 0.25)',
+        position: 'fixed',
+        bottom: '24px',
+        right: '24px',
+        zIndex: 9999,
+        width: '390px',
+        maxWidth: 'calc(100vw - 32px)',
+        backgroundColor: 'var(--bg-card, #ffffff)',
+        border: '1px solid var(--border-default, #e2e8f0)',
+        borderRadius: '16px',
+        boxShadow: '0 20px 40px -10px rgba(15, 23, 42, 0.22), 0 4px 12px -2px rgba(15, 23, 42, 0.08)',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        maxHeight: '520px',
+        animation: 'fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
       }}
     >
       {/* Header */}
-      <div className="px-4 py-3 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-950/60 flex items-center justify-center text-blue-600 dark:text-blue-400">
-            <Layers className="w-4 h-4" />
+      <div
+        style={{
+          padding: '12px 16px',
+          backgroundColor: 'var(--bg-subtle, #f8fafc)',
+          borderBottom: '1px solid var(--border-default, #e2e8f0)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div
+            style={{
+              width: '30px',
+              height: '30px',
+              borderRadius: '8px',
+              backgroundColor: 'rgba(37, 99, 235, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#2563eb',
+            }}
+          >
+            <Layers size={16} />
           </div>
           <div>
-            <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+            <h3 style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--text-primary, #0f172a)', margin: 0 }}>
               {language === 'en' ? 'Ingestion Pipeline' : 'Pipeline Ingestion Vektor'}
             </h3>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary, #64748b)', margin: '1px 0 0' }}>
               {hasActive
                 ? language === 'en'
                   ? `${activeTaskCount} active processing`
@@ -191,31 +333,108 @@ export default function IngestionDock() {
           </div>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           {completedCount > 0 && (
             <button
               type="button"
               onClick={clearCompletedTasks}
               title={language === 'en' ? 'Clear completed' : 'Bersihkan yang selesai'}
-              className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 rounded-md transition-colors"
+              style={{
+                padding: '6px',
+                color: 'var(--text-muted, #94a3b8)',
+                border: 'none',
+                background: 'transparent',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = '#ef4444';
+                e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.08)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = 'var(--text-muted, #94a3b8)';
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 size={14} />
             </button>
           )}
 
           <button
             type="button"
             onClick={() => setIsDockMinimized(true)}
-            title={language === 'en' ? 'Minimize to pill' : 'Kecilkan dock'}
-            className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 rounded-md transition-colors"
+            title={language === 'en' ? 'Minimize' : 'Kecilkan'}
+            style={{
+              padding: '6px',
+              color: 'var(--text-muted, #94a3b8)',
+              border: 'none',
+              background: 'transparent',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = 'var(--text-primary, #0f172a)';
+              e.currentTarget.style.backgroundColor = 'var(--bg-subtle, #f1f5f9)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'var(--text-muted, #94a3b8)';
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
           >
-            <ChevronDown className="w-4 h-4" />
+            <ChevronDown size={16} />
           </button>
+
+          {!hasActive && (
+            <button
+              type="button"
+              onClick={clearCompletedTasks}
+              title={language === 'en' ? 'Close & dismiss' : 'Tutup pemberitahuan'}
+              style={{
+                padding: '6px',
+                color: 'var(--text-muted, #94a3b8)',
+                border: 'none',
+                background: 'transparent',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = '#ef4444';
+                e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.08)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = 'var(--text-muted, #94a3b8)';
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              <X size={15} />
+            </button>
+          )}
         </div>
       </div>
 
       {/* Task List */}
-      <div className="p-3 overflow-y-auto space-y-2.5 flex-1 divide-y divide-slate-100 dark:divide-slate-800/60">
+      <div
+        style={{
+          padding: '12px',
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px',
+          flex: 1,
+        }}
+      >
         {tasks.map((task) => {
           const isDone = task.status === 'completed';
           const isErr = task.status === 'error';
@@ -224,86 +443,152 @@ export default function IngestionDock() {
           return (
             <div
               key={task.id}
-              className={`pt-2.5 first:pt-0 transition-colors rounded-xl p-2.5 ${
-                isActive
-                  ? 'bg-blue-50/40 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/40'
-                  : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
-              }`}
+              style={{
+                borderRadius: '12px',
+                padding: '10px 12px',
+                backgroundColor: isActive ? 'rgba(37, 99, 235, 0.03)' : 'var(--bg-card, #ffffff)',
+                border: isActive
+                  ? '1px solid rgba(37, 99, 235, 0.2)'
+                  : '1px solid var(--border-default, #e2e8f0)',
+                transition: 'all 0.15s ease',
+              }}
             >
-              <div className="flex items-start justify-between gap-2 mb-1.5">
-                <div className="flex items-start gap-2 min-w-0">
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', minWidth: 0 }}>
                   <div
-                    className={`mt-0.5 p-1.5 rounded-lg flex-shrink-0 ${
-                      isDone
-                        ? 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600'
+                    style={{
+                      marginTop: '2px',
+                      padding: '5px',
+                      borderRadius: '8px',
+                      flexShrink: 0,
+                      backgroundColor: isDone
+                        ? 'rgba(16, 185, 129, 0.1)'
                         : isErr
-                        ? 'bg-rose-100 dark:bg-rose-950/50 text-rose-600'
-                        : 'bg-blue-100 dark:bg-blue-950/50 text-blue-600'
-                    }`}
+                        ? 'rgba(239, 68, 68, 0.1)'
+                        : 'rgba(37, 99, 235, 0.1)',
+                      color: isDone ? '#10b981' : isErr ? '#ef4444' : '#2563eb',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
                   >
-                    <FileText className="w-3.5 h-3.5" />
+                    <FileText size={14} />
                   </div>
-                  <div className="min-w-0">
+                  <div style={{ minWidth: 0 }}>
                     <p
-                      className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate"
+                      style={{
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        color: 'var(--text-primary, #0f172a)',
+                        margin: 0,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        maxWidth: '200px',
+                      }}
                       title={task.fileName}
                     >
                       {task.fileName}
                     </p>
-                    <p className="text-[10px] text-slate-400 font-mono">
+                    <p style={{ fontSize: '10.5px', color: 'var(--text-muted, #94a3b8)', fontFamily: 'var(--font-mono, monospace)', margin: '2px 0 0' }}>
                       {formatFileSize(task.fileSize)}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1 flex-shrink-0">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                   {getStageBadge(task.status, task)}
                   {(isDone || isErr) && (
                     <button
                       type="button"
                       onClick={() => clearTask(task.id)}
                       title={language === 'en' ? 'Remove' : 'Hapus'}
-                      className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded"
+                      style={{
+                        padding: '4px',
+                        color: 'var(--text-muted, #94a3b8)',
+                        border: 'none',
+                        background: 'transparent',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.color = '#ef4444';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.color = 'var(--text-muted, #94a3b8)';
+                      }}
                     >
-                      <X className="w-3 h-3" />
+                      <X size={12} />
                     </button>
                   )}
                 </div>
               </div>
 
               {/* Progress bar */}
-              <div className="space-y-1 my-1.5">
-                <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', margin: '6px 0' }}>
+                <div
+                  style={{
+                    width: '100%',
+                    backgroundColor: 'var(--bg-subtle, #f1f5f9)',
+                    borderRadius: '9999px',
+                    height: '5px',
+                    overflow: 'hidden',
+                  }}
+                >
                   <div
-                    className={`h-full transition-all duration-300 rounded-full ${
-                      isDone
-                        ? 'bg-emerald-500'
+                    style={{
+                      height: '100%',
+                      borderRadius: '9999px',
+                      transition: 'width 0.3s ease',
+                      width: `${Math.min(100, Math.max(5, task.progressPercent))}%`,
+                      background: isDone
+                        ? '#10b981'
                         : isErr
-                        ? 'bg-rose-500'
-                        : 'bg-gradient-to-r from-blue-600 to-indigo-500'
-                    }`}
-                    style={{ width: `${Math.min(100, Math.max(5, task.progressPercent))}%` }}
+                        ? '#ef4444'
+                        : 'linear-gradient(90deg, #2563eb, #6366f1)',
+                    }}
                   />
                 </div>
-                <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-                  <span className="truncate max-w-[260px] text-[10.5px]">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '10.5px', color: 'var(--text-secondary, #64748b)' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '240px' }}>
                     {task.message}
                   </span>
-                  <span className="font-mono font-medium text-[10.5px] ml-1">
+                  <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600, marginLeft: '4px' }}>
                     {task.progressPercent}%
                   </span>
                 </div>
               </div>
 
               {/* View Detail Button */}
-              <div className="flex items-center justify-end pt-1">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingTop: '4px' }}>
                 <button
                   type="button"
                   onClick={() => openDetail(task.id)}
-                  className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-md transition-colors"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '3px 8px',
+                    fontSize: '11px',
+                    fontWeight: 500,
+                    color: '#2563eb',
+                    backgroundColor: 'rgba(37, 99, 235, 0.06)',
+                    border: '1px solid rgba(37, 99, 235, 0.15)',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(37, 99, 235, 0.12)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(37, 99, 235, 0.06)';
+                  }}
                 >
-                  <Maximize2 className="w-3 h-3" />
-                  {language === 'en' ? 'Live Visualizer' : 'Visualizer Pipeline'}
+                  <Maximize2 size={11} />
+                  <span>{language === 'en' ? 'Live Visualizer' : 'Visualizer Pipeline'}</span>
                 </button>
               </div>
             </div>
@@ -312,16 +597,36 @@ export default function IngestionDock() {
       </div>
 
       {/* Footer Info */}
-      <div className="px-4 py-2 bg-slate-50 dark:bg-slate-800/40 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[10.5px] text-slate-500 dark:text-slate-400">
-        <span className="truncate">
+      <div
+        style={{
+          padding: '8px 16px',
+          backgroundColor: 'var(--bg-subtle, #f8fafc)',
+          borderTop: '1px solid var(--border-default, #e2e8f0)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: '11px',
+          color: 'var(--text-muted, #94a3b8)',
+        }}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {language === 'en'
             ? 'Background processing is active'
-            : '🛡️ Berjalan di background walau page ditutup'}
+            : '🛡️ Berjalan di background'}
         </span>
         <button
           type="button"
           onClick={() => setIsDockMinimized(true)}
-          className="text-blue-600 dark:text-blue-400 hover:underline font-medium ml-2 flex-shrink-0"
+          style={{
+            color: '#2563eb',
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            fontWeight: 600,
+            fontSize: '11px',
+            marginLeft: '8px',
+            flexShrink: 0,
+          }}
         >
           {language === 'en' ? 'Minimize' : 'Kecilkan'}
         </button>
