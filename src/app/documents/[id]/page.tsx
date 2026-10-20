@@ -185,60 +185,86 @@ export default function DocumentStudioPage() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         {/* Document Header Card */}
         {batch && (
-          <div className="ui-card" style={{ padding: '1.25rem 1.75rem', borderRadius: 'var(--radius-xl)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div
+            style={{
+              padding: '1.25rem 1.5rem',
+              borderRadius: 'var(--radius-lg, 12px)',
+              backgroundColor: 'var(--bg-card, #ffffff)',
+              border: '1px solid var(--border-default, #e2e8f0)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1.25rem', flexWrap: 'wrap' }}>
+              {/* Left: File icon & metadata */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div
                   style={{
-                    width: '44px',
-                    height: '44px',
-                    borderRadius: 'var(--radius-md)',
-                    backgroundColor: 'var(--color-primary-subtle)',
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '8px',
+                    backgroundColor: 'var(--bg-subtle, #f1f5f9)',
+                    border: '1px solid var(--border-default, #e2e8f0)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: 'var(--color-primary)',
-                    boxShadow: 'var(--shadow-xs)',
+                    color: 'var(--color-primary, #2563eb)',
+                    flexShrink: 0,
                   }}
                 >
-                  <FileText size={24} />
+                  <FileText size={20} />
                 </div>
                 <div>
-                  <h2 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+                  <h2
+                    style={{
+                      fontSize: '16px',
+                      fontWeight: 600,
+                      color: 'var(--text-primary, #0f172a)',
+                      letterSpacing: '-0.01em',
+                      margin: 0,
+                    }}
+                  >
                     {batch.original_filename}
                   </h2>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '5px', flexWrap: 'wrap' }}>
-                    <span className="badge badge-neutral font-mono">{batch.page_count} {t('studio.pages')}</span>
-                    <span className="badge badge-accent font-mono">{batch.chunk_count} {t('studio.chunks')}</span>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      fontSize: '12px',
+                      color: 'var(--text-secondary, #64748b)',
+                      marginTop: '4px',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <span>{batch.page_count} Hal (OCR)</span>
+                    <span style={{ color: 'var(--text-muted)' }}>·</span>
+                    <span style={{ fontFamily: 'var(--font-mono)' }}>{batch.chunk_count} Chunks</span>
+                    <span style={{ color: 'var(--text-muted)' }}>·</span>
+                    <span>{batch.classification || 'Internal'}</span>
+                    <span style={{ color: 'var(--text-muted)' }}>·</span>
+                    <span>{batch.division_id || 'General'}</span>
+                    <span style={{ color: 'var(--text-muted)' }}>·</span>
+                    <span style={{ fontFamily: 'var(--font-mono)' }}>v{batch.version || '1.0'}</span>
+                    <span style={{ color: 'var(--text-muted)' }}>·</span>
                     <span
-                      className={`badge ${
-                        batch.classification === 'Publik'
-                          ? 'badge-success'
-                          : batch.classification === 'Rahasia'
-                          ? 'badge-warning'
-                          : batch.classification === 'Sangat Rahasia'
-                          ? 'badge-danger'
-                          : 'badge-neutral'
-                      }`}
-                      style={{ fontSize: '11px', fontWeight: 600 }}
-                    >
-                      {batch.classification || 'Internal'}
-                    </span>
-                    <span className="badge badge-neutral" style={{ fontSize: '11px' }}>
-                      {batch.division_id || 'General'}
-                    </span>
-                    <span className="badge badge-neutral font-mono" style={{ fontSize: '11px' }}>
-                      v{batch.version || '1.0'}
-                    </span>
-                    <span
-                      className={`badge ${
-                        batch.status === 'Aktif'
-                          ? 'badge-success'
-                          : batch.status === 'Review'
-                          ? 'badge-warning'
-                          : 'badge-neutral'
-                      }`}
-                      style={{ fontSize: '11px', fontWeight: 600 }}
+                      style={{
+                        padding: '1px 8px',
+                        borderRadius: '9999px',
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        backgroundColor:
+                          batch.status === 'Aktif'
+                            ? 'var(--color-success-subtle, #ecfdf5)'
+                            : 'var(--bg-subtle, #f1f5f9)',
+                        color:
+                          batch.status === 'Aktif'
+                            ? 'var(--color-success-text, #047857)'
+                            : 'var(--text-secondary, #64748b)',
+                        border: `1px solid ${
+                          batch.status === 'Aktif'
+                            ? 'var(--color-success-border, #a7f3d0)'
+                            : 'var(--border-default, #e2e8f0)'
+                        }`,
+                      }}
                     >
                       {batch.status || (batch.is_active_knowledge ? 'Aktif' : 'Draft')}
                     </span>
@@ -246,11 +272,19 @@ export default function DocumentStudioPage() {
                 </div>
               </div>
 
-              {/* Curation & Knowledge Base Status & Action Buttons */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                {/* Curation Status Badge */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              {/* Right: Curation Status & AI Knowledge Base Toggle */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+                {/* Curation Status Pill */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
+                  <span
+                    style={{
+                      fontSize: '10.5px',
+                      color: 'var(--text-muted, #94a3b8)',
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                    }}
+                  >
                     Status Kurasi
                   </span>
                   {(() => {
@@ -264,11 +298,14 @@ export default function DocumentStudioPage() {
                     if (is100Percent) {
                       return (
                         <span
-                          className="badge badge-success"
                           style={{
-                            padding: '4px 10px',
+                            padding: '3px 10px',
                             fontSize: '11.5px',
-                            fontWeight: 600,
+                            fontWeight: 500,
+                            borderRadius: '9999px',
+                            backgroundColor: 'var(--color-success-subtle, #ecfdf5)',
+                            color: 'var(--color-success-text, #047857)',
+                            border: '1px solid var(--color-success-border, #a7f3d0)',
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '5px',
@@ -285,11 +322,14 @@ export default function DocumentStudioPage() {
                       const pct = Math.round((processedCount / total) * 100);
                       return (
                         <span
-                          className="badge badge-warning"
                           style={{
-                            padding: '4px 10px',
+                            padding: '3px 10px',
                             fontSize: '11.5px',
-                            fontWeight: 600,
+                            fontWeight: 500,
+                            borderRadius: '9999px',
+                            backgroundColor: 'var(--color-warning-subtle, #fffbeb)',
+                            color: 'var(--color-warning-text, #b45309)',
+                            border: '1px solid var(--color-warning-border, #fde68a)',
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '5px',
@@ -302,73 +342,96 @@ export default function DocumentStudioPage() {
 
                     return (
                       <span
-                        className="badge"
                         style={{
-                          padding: '4px 10px',
+                          padding: '3px 10px',
                           fontSize: '11.5px',
-                          fontWeight: 600,
+                          fontWeight: 500,
+                          borderRadius: '9999px',
+                          backgroundColor: 'var(--bg-subtle, #f1f5f9)',
+                          color: 'var(--text-muted, #94a3b8)',
+                          border: '1px solid var(--border-default, #e2e8f0)',
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '5px',
-                          backgroundColor: 'var(--bg-subtle)',
-                          color: 'var(--text-muted)',
-                          border: '1px solid var(--border-default)',
+                          gap: '6px',
                         }}
                       >
-                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--color-warning)' }} />
-                        <span>Belum Dikurasi</span>
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--color-warning, #f59e0b)' }} />
+                        <span>Menunggu Kurasi</span>
                       </span>
                     );
                   })()}
                 </div>
 
                 {/* Vertical Divider */}
-                <div style={{ width: '1px', height: '32px', backgroundColor: 'var(--border-default)' }} />
+                <div style={{ width: '1px', height: '32px', backgroundColor: 'var(--border-default, #e2e8f0)' }} />
 
-                {/* AI Knowledge Base Status and Action Button */}
+                {/* AI Knowledge Base Status & Action */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     {(batch.curated_count || 0) === 0 ? (
                       <span
                         style={{
                           fontSize: '11.5px',
-                          fontWeight: 700,
-                          color: '#b45309',
+                          fontWeight: 600,
+                          color: 'var(--color-warning-text, #b45309)',
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '5px',
+                          gap: '6px',
                         }}
                       >
-                        <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#f59e0b', boxShadow: '0 0 6px #f59e0b' }} />
-                        STATUS: MENUNGGU KURASI (BELUM TERKURASI)
+                        <span
+                          style={{
+                            width: '7px',
+                            height: '7px',
+                            borderRadius: '50%',
+                            backgroundColor: '#f59e0b',
+                            boxShadow: '0 0 6px #f59e0b',
+                          }}
+                        />
+                        Menunggu Kurasi (Belum Terkurasi)
                       </span>
                     ) : batch.is_active_knowledge ? (
                       <span
                         style={{
                           fontSize: '11.5px',
-                          fontWeight: 700,
-                          color: 'var(--color-success)',
+                          fontWeight: 600,
+                          color: 'var(--color-success-text, #047857)',
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '5px',
+                          gap: '6px',
                         }}
                       >
-                        <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: 'var(--color-success)', boxShadow: '0 0 6px var(--color-success)' }} />
-                        STATUS: AKTIF DI CHAT
+                        <span
+                          style={{
+                            width: '7px',
+                            height: '7px',
+                            borderRadius: '50%',
+                            backgroundColor: 'var(--color-success, #10b981)',
+                            boxShadow: '0 0 6px var(--color-success, #10b981)',
+                          }}
+                        />
+                        Aktif di AI Chat
                       </span>
                     ) : (
                       <span
                         style={{
                           fontSize: '11.5px',
-                          fontWeight: 600,
-                          color: 'var(--text-muted)',
+                          fontWeight: 500,
+                          color: 'var(--text-muted, #94a3b8)',
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '5px',
+                          gap: '6px',
                         }}
                       >
-                        <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: 'var(--border-default)' }} />
-                        STATUS: STANDBY (NON-AKTIF)
+                        <span
+                          style={{
+                            width: '7px',
+                            height: '7px',
+                            borderRadius: '50%',
+                            backgroundColor: 'var(--border-hover, #cbd5e1)',
+                          }}
+                        />
+                        Standby (Non-aktif)
                       </span>
                     )}
                   </div>
@@ -380,31 +443,49 @@ export default function DocumentStudioPage() {
                           setActiveTab('insights');
                           toast.info('Lakukan kurasi insight dokumen terlebih dahulu sebelum mengaktifkannya.');
                         }}
-                        className="btn btn-xs btn-outline"
                         style={{
-                          padding: '3px 10px',
-                          fontSize: '11.5px',
-                          borderRadius: 'var(--radius-xs)',
+                          padding: '3px 12px',
+                          fontSize: '11px',
+                          borderRadius: '9999px',
                           fontWeight: 600,
                           color: '#b45309',
                           borderColor: '#fde68a',
                           backgroundColor: '#fffbeb',
-                          gap: '4px',
+                          border: '1px solid #fde68a',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          cursor: 'pointer',
                         }}
                         title="Buka tab Kurasi AI untuk mengkurasi dokumen ini"
                       >
-                        <Sparkles size={12} />
+                        <Sparkles size={11} />
                         <span>Mulai Kurasi AI</span>
                       </button>
                     ) : (
                       <button
                         onClick={handleToggleActive}
-                        className={`btn btn-xs ${batch.is_active_knowledge ? 'btn-ghost-danger' : 'btn-outline'}`}
                         style={{
-                          padding: '3px 10px',
-                          fontSize: '11.5px',
-                          borderRadius: 'var(--radius-xs)',
-                          fontWeight: 600,
+                          padding: '3px 12px',
+                          fontSize: '11px',
+                          borderRadius: '9999px',
+                          fontWeight: 500,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          backgroundColor: batch.is_active_knowledge
+                            ? 'var(--color-danger-subtle, #fef2f2)'
+                            : 'var(--bg-subtle, #f1f5f9)',
+                          color: batch.is_active_knowledge
+                            ? 'var(--color-danger-text, #b91c1c)'
+                            : 'var(--text-primary, #0f172a)',
+                          border: `1px solid ${
+                            batch.is_active_knowledge
+                              ? 'var(--color-danger-border, #fecaca)'
+                              : 'var(--border-default, #e2e8f0)'
+                          }`,
                         }}
                         title="Klik untuk mengubah status dokumen dalam basis pencarian RAG Chat"
                       >
@@ -428,49 +509,160 @@ export default function DocumentStudioPage() {
           </div>
         )}
 
-        {/* Tab Navigation (Modern Brilian.Ai Pill Tabs) */}
+        {/* Tab Navigation (Brilian Segmented Pill Switcher) */}
         <div
           style={{
-            display: 'flex',
+            display: 'inline-flex',
             alignItems: 'center',
-            gap: '8px',
-            borderBottom: '1px solid var(--border-default)',
-            paddingBottom: '2px',
+            backgroundColor: 'var(--bg-subtle, #f1f5f9)',
+            border: '1px solid var(--border-default, #e2e8f0)',
+            borderRadius: '9999px',
+            padding: '3px',
+            gap: '3px',
+            width: 'fit-content',
           }}
         >
           <button
+            type="button"
             onClick={() => setActiveTab('insights')}
-            className={`btn btn-sm ${activeTab === 'insights' ? 'btn-primary' : 'btn-ghost'}`}
-            style={{ borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0', padding: '8px 16px' }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              borderRadius: '9999px',
+              padding: '5px 14px',
+              fontSize: '12px',
+              height: '30px',
+              fontWeight: activeTab === 'insights' ? 600 : 500,
+              border: 'none',
+              backgroundColor: activeTab === 'insights' ? 'var(--bg-card, #ffffff)' : 'transparent',
+              color: activeTab === 'insights' ? 'var(--text-primary, #0f172a)' : 'var(--text-secondary, #64748b)',
+              boxShadow: activeTab === 'insights' ? '0 1px 3px rgba(15, 23, 42, 0.08)' : 'none',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              whiteSpace: 'nowrap',
+            }}
           >
-            <BookOpen size={15} />
-            <span>{t('studio.tab_curation')} ({insights.length})</span>
+            <BookOpen
+              size={13}
+              style={{
+                color: activeTab === 'insights' ? 'var(--color-primary, #2563eb)' : 'currentColor',
+              }}
+            />
+            <span>Curated Insights</span>
+            <span
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: '11px',
+                padding: '1px 6px',
+                borderRadius: '9999px',
+                backgroundColor: activeTab === 'insights' ? 'var(--bg-subtle, #f1f5f9)' : 'rgba(0,0,0,0.04)',
+                color: activeTab === 'insights' ? 'var(--text-primary, #0f172a)' : 'var(--text-secondary, #64748b)',
+              }}
+            >
+              {insights.length}
+            </span>
           </button>
 
           <button
+            type="button"
             onClick={() => setActiveTab('chunks')}
-            className={`btn btn-sm ${activeTab === 'chunks' ? 'btn-primary' : 'btn-ghost'}`}
-            style={{ borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0', padding: '8px 16px' }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              borderRadius: '9999px',
+              padding: '5px 14px',
+              fontSize: '12px',
+              height: '30px',
+              fontWeight: activeTab === 'chunks' ? 600 : 500,
+              border: 'none',
+              backgroundColor: activeTab === 'chunks' ? 'var(--bg-card, #ffffff)' : 'transparent',
+              color: activeTab === 'chunks' ? 'var(--text-primary, #0f172a)' : 'var(--text-secondary, #64748b)',
+              boxShadow: activeTab === 'chunks' ? '0 1px 3px rgba(15, 23, 42, 0.08)' : 'none',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              whiteSpace: 'nowrap',
+            }}
           >
-            <Layers size={15} />
-            <span>{t('studio.tab_chunks')} ({chunks.length})</span>
+            <Layers
+              size={13}
+              style={{
+                color: activeTab === 'chunks' ? 'var(--color-primary, #2563eb)' : 'currentColor',
+              }}
+            />
+            <span>Raw Chunks</span>
+            <span
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: '11px',
+                padding: '1px 6px',
+                borderRadius: '9999px',
+                backgroundColor: activeTab === 'chunks' ? 'var(--bg-subtle, #f1f5f9)' : 'rgba(0,0,0,0.04)',
+                color: activeTab === 'chunks' ? 'var(--text-primary, #0f172a)' : 'var(--text-secondary, #64748b)',
+              }}
+            >
+              {chunks.length}
+            </span>
           </button>
 
           <button
+            type="button"
             onClick={() => setActiveTab('metadata')}
-            className={`btn btn-sm ${activeTab === 'metadata' ? 'btn-primary' : 'btn-ghost'}`}
-            style={{ borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0', padding: '8px 16px' }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              borderRadius: '9999px',
+              padding: '5px 14px',
+              fontSize: '12px',
+              height: '30px',
+              fontWeight: activeTab === 'metadata' ? 600 : 500,
+              border: 'none',
+              backgroundColor: activeTab === 'metadata' ? 'var(--bg-card, #ffffff)' : 'transparent',
+              color: activeTab === 'metadata' ? 'var(--text-primary, #0f172a)' : 'var(--text-secondary, #64748b)',
+              boxShadow: activeTab === 'metadata' ? '0 1px 3px rgba(15, 23, 42, 0.08)' : 'none',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              whiteSpace: 'nowrap',
+            }}
           >
-            <Info size={15} />
-            <span>{t('studio.tab_metadata')}</span>
+            <Info
+              size={13}
+              style={{
+                color: activeTab === 'metadata' ? 'var(--color-primary, #2563eb)' : 'currentColor',
+              }}
+            />
+            <span>Specs & Metadata</span>
           </button>
 
           <button
+            type="button"
             onClick={() => setActiveTab('grants')}
-            className={`btn btn-sm ${activeTab === 'grants' ? 'btn-primary' : 'btn-ghost'}`}
-            style={{ borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0', padding: '8px 16px' }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              borderRadius: '9999px',
+              padding: '5px 14px',
+              fontSize: '12px',
+              height: '30px',
+              fontWeight: activeTab === 'grants' ? 600 : 500,
+              border: 'none',
+              backgroundColor: activeTab === 'grants' ? 'var(--bg-card, #ffffff)' : 'transparent',
+              color: activeTab === 'grants' ? 'var(--text-primary, #0f172a)' : 'var(--text-secondary, #64748b)',
+              boxShadow: activeTab === 'grants' ? '0 1px 3px rgba(15, 23, 42, 0.08)' : 'none',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              whiteSpace: 'nowrap',
+            }}
           >
-            <Users size={15} />
+            <Users
+              size={13}
+              style={{
+                color: activeTab === 'grants' ? 'var(--color-primary, #2563eb)' : 'currentColor',
+              }}
+            />
             <span>Akses Pengguna</span>
           </button>
         </div>

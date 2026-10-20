@@ -43,12 +43,11 @@ export default function RawChunksTab({
       {/* Uncurated Notification Banner */}
       {!isLoading && curatedCount === 0 && chunks.length > 0 && (
         <div
-          className="ui-card"
           style={{
             padding: '1.25rem 1.5rem',
-            background: 'linear-gradient(135deg, var(--bg-card) 0%, var(--bg-subtle) 100%)',
-            border: '1px solid var(--color-primary-subtle)',
-            borderRadius: 'var(--radius-lg)',
+            backgroundColor: 'var(--bg-card, #ffffff)',
+            border: '1px dashed var(--border-default, #e2e8f0)',
+            borderRadius: 'var(--radius-lg, 12px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -59,29 +58,29 @@ export default function RawChunksTab({
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div
               style={{
-                width: '40px',
-                height: '40px',
+                width: '38px',
+                height: '38px',
                 borderRadius: '50%',
-                backgroundColor: 'var(--color-primary-subtle)',
-                color: 'var(--color-primary)',
+                backgroundColor: 'var(--color-primary-subtle, #eff6ff)',
+                color: 'var(--color-primary, #2563eb)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
               }}
             >
-              <Sparkles size={20} />
+              <Sparkles size={18} />
             </div>
             <div>
-              <h4 style={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--text-primary)' }}>
+              <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary, #0f172a)', margin: 0 }}>
                 {language === 'en'
                   ? 'Document is not yet curated'
                   : 'Dokumen ini belum memiliki kurasi insight'}
               </h4>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+              <p style={{ fontSize: '12.5px', color: 'var(--text-secondary, #64748b)', margin: '2px 0 0' }}>
                 {language === 'en'
                   ? `Extract key insights from ${chunks.length} raw chunks into structured knowledge cards with real-time 1-100% progress.`
-                  : `Ekstrak intisari dari ${chunks.length} raw chunk menjadi kartu insight terstruktur dengan loading persentase 1-100%.`}
+                  : `Ekstrak intisari dari ${chunks.length} raw chunk menjadi kartu insight terstruktur dengan progres 1-100%.`}
               </p>
             </div>
           </div>
@@ -89,33 +88,52 @@ export default function RawChunksTab({
           {onStartCuration && (
             <button
               onClick={onStartCuration}
-              className="btn btn-primary btn-sm"
-              style={{ padding: '8px 16px', fontWeight: 600 }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 14px',
+                borderRadius: '9999px',
+                fontSize: '11.5px',
+                fontWeight: 600,
+                backgroundColor: 'var(--text-primary, #0f172a)',
+                color: '#ffffff',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
             >
-              <Sparkles size={14} />
+              <Sparkles size={13} />
               <span>{language === 'en' ? 'Start AI Curation' : 'Mulai Kurasi AI'}</span>
-              <ArrowRight size={13} />
+              <ArrowRight size={12} />
             </button>
           )}
         </div>
       )}
 
       {/* Search Header */}
-      <div className="ui-card" style={{ padding: '1.25rem 1.5rem' }}>
+      <div
+        style={{
+          padding: '1.125rem 1.5rem',
+          borderRadius: 'var(--radius-lg, 12px)',
+          backgroundColor: 'var(--bg-card, #ffffff)',
+          border: '1px solid var(--border-default, #e2e8f0)',
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
           <div>
-            <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
-              Raw Chunks ({chunks.length})
+            <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary, #0f172a)', margin: 0 }}>
+              Raw Chunks <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-muted, #94a3b8)', fontWeight: 500 }}>({chunks.length})</span>
             </h3>
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+            <p style={{ fontSize: '12.5px', color: 'var(--text-secondary, #64748b)', margin: '2px 0 0' }}>
               {t('chunks.subtitle')}
             </p>
           </div>
 
           <div style={{ position: 'relative', width: '280px' }}>
             <Search
-              size={15}
-              color="var(--text-muted)"
+              size={14}
+              color="var(--text-muted, #94a3b8)"
               style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
             />
             <input
@@ -123,8 +141,18 @@ export default function RawChunksTab({
               placeholder={t('chunks.search_placeholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="input-text"
-              style={{ paddingLeft: '36px', fontSize: '13px' }}
+              style={{
+                width: '100%',
+                height: '32px',
+                borderRadius: '9999px',
+                paddingLeft: '34px',
+                paddingRight: '12px',
+                fontSize: '12px',
+                backgroundColor: 'var(--bg-subtle, #f8fafc)',
+                border: '1px solid var(--border-default, #e2e8f0)',
+                color: 'var(--text-primary, #0f172a)',
+                outline: 'none',
+              }}
             />
           </div>
         </div>
@@ -137,45 +165,101 @@ export default function RawChunksTab({
           <p style={{ fontSize: '13px' }}>{t('chunks.loading')}</p>
         </div>
       ) : filteredChunks.length === 0 ? (
-        <div className="ui-card" style={{ padding: '3.5rem 0', textAlign: 'center', color: 'var(--text-secondary)' }}>
-          <Layers size={38} strokeWidth={1.25} color="var(--text-muted)" style={{ margin: '0 auto 10px' }} />
-          <p style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary)' }}>
+        <div
+          style={{
+            padding: '3.5rem 0',
+            textAlign: 'center',
+            backgroundColor: 'var(--bg-card, #ffffff)',
+            borderRadius: 'var(--radius-lg, 12px)',
+            border: '1px solid var(--border-default, #e2e8f0)',
+          }}
+        >
+          <Layers size={32} strokeWidth={1.5} color="var(--text-muted)" style={{ margin: '0 auto 10px' }} />
+          <p style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>
             {search ? t('chunks.empty_search') : t('chunks.empty')}
           </p>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {filteredChunks.map((chunk) => {
             const pageLabel =
               chunk.source_page_start === chunk.source_page_end
-                ? `${t('chunks.page')} ${chunk.source_page_start}`
-                : `${t('chunks.page')} ${chunk.source_page_start} - ${chunk.source_page_end}`;
+                ? `Hal. ${chunk.source_page_start}`
+                : `Hal. ${chunk.source_page_start} - ${chunk.source_page_end}`;
 
             const isCopied = copiedId === chunk.id;
 
             return (
-              <div key={chunk.id} className="ui-card" style={{ padding: '1.25rem' }}>
+              <div
+                key={chunk.id}
+                style={{
+                  padding: '14px 16px',
+                  backgroundColor: 'var(--bg-card, #ffffff)',
+                  border: '1px solid var(--border-default, #e2e8f0)',
+                  borderRadius: 'var(--radius-md, 10px)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                }}
+              >
                 {/* Chunk Header */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span className="badge badge-accent">Chunk #{chunk.chunk_index}</span>
-                    <span className="badge badge-neutral">{pageLabel}</span>
-                    <span className="badge badge-neutral" style={{ fontSize: '11px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        padding: '1px 8px',
+                        borderRadius: '9999px',
+                        backgroundColor: 'var(--color-primary-subtle, #eff6ff)',
+                        color: 'var(--color-primary, #2563eb)',
+                        border: '1px solid var(--color-primary-border, #bfdbfe)',
+                      }}
+                    >
+                      Chunk #{chunk.chunk_index}
+                    </span>
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '11px',
+                        padding: '1px 8px',
+                        borderRadius: '4px',
+                        backgroundColor: 'var(--bg-subtle, #f1f5f9)',
+                        color: 'var(--text-secondary, #64748b)',
+                        border: '1px solid var(--border-default, #e2e8f0)',
+                      }}
+                    >
+                      {pageLabel}
+                    </span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted, #94a3b8)' }}>
                       {chunk.content.length} {t('chunks.chars')}
                     </span>
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span className="badge badge-neutral font-mono" style={{ fontSize: '11px' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted, #94a3b8)' }}>
                       Dense Vector (1024-dim)
                     </span>
                     <button
                       onClick={() => handleCopy(chunk.id, chunk.content)}
-                      className="btn btn-ghost btn-sm"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '3px 10px',
+                        borderRadius: '9999px',
+                        border: '1px solid var(--border-default, #e2e8f0)',
+                        backgroundColor: 'transparent',
+                        fontSize: '11px',
+                        color: isCopied ? 'var(--color-success, #10b981)' : 'var(--text-secondary, #64748b)',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
                       title={t('chunks.copy')}
                     >
-                      {isCopied ? <Check size={14} color="var(--color-success)" /> : <Copy size={14} />}
-                      <span style={{ fontSize: '12px' }}>{isCopied ? t('chunks.copied') : t('chunks.copy')}</span>
+                      {isCopied ? <Check size={12} color="var(--color-success, #10b981)" /> : <Copy size={12} />}
+                      <span>{isCopied ? t('chunks.copied') : t('chunks.copy')}</span>
                     </button>
                   </div>
                 </div>
@@ -183,14 +267,14 @@ export default function RawChunksTab({
                 {/* Chunk Text Body */}
                 <div
                   style={{
-                    backgroundColor: 'var(--bg-app)',
-                    padding: '14px 16px',
-                    borderRadius: 'var(--radius-sm)',
-                    fontSize: '13.5px',
-                    lineHeight: '22px',
-                    color: 'var(--text-primary)',
+                    backgroundColor: 'var(--bg-subtle, #f8fafc)',
+                    padding: '12px 14px',
+                    borderRadius: 'var(--radius-sm, 8px)',
+                    fontSize: '13px',
+                    lineHeight: '21px',
+                    color: 'var(--text-primary, #0f172a)',
                     whiteSpace: 'pre-wrap',
-                    border: '1px solid var(--border-default)',
+                    border: '1px solid var(--border-default, #e2e8f0)',
                   }}
                 >
                   {chunk.content}
