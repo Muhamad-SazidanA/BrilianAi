@@ -6,7 +6,6 @@ import { UserSessionProvider } from '@/context/UserSessionContext';
 import { SidebarProvider } from '@/context/SidebarContext';
 import { IngestionProvider } from '@/context/IngestionContext';
 import IngestionDock from '@/components/documents/IngestionDock';
-import IngestionDetailModal from '@/components/documents/IngestionDetailModal';
 import ToastProvider from '@/components/providers/ToastProvider';
 
 const geistSans = localFont({
@@ -63,7 +62,6 @@ export default function RootLayout({
               <IngestionProvider>
                 {children}
                 <IngestionDock />
-                <IngestionDetailModal />
                 <ToastProvider />
               </IngestionProvider>
             </SidebarProvider>

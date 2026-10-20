@@ -13,7 +13,6 @@ import {
   Sparkles,
   Database,
   Trash2,
-  Maximize2,
 } from 'lucide-react';
 import { useIngestion, IngestionTask, IngestionStage } from '@/context/IngestionContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -25,7 +24,6 @@ export default function IngestionDock() {
     activeTaskCount,
     isDockMinimized,
     setIsDockMinimized,
-    openDetail,
     clearTask,
     clearCompletedTasks,
   } = useIngestion();
@@ -52,10 +50,11 @@ export default function IngestionDock() {
       display: 'inline-flex',
       alignItems: 'center',
       gap: '4px',
-      padding: '2px 8px',
+      padding: '2px 7px',
       borderRadius: '9999px',
       fontSize: '10.5px',
       fontWeight: 500,
+      letterSpacing: '0.01em',
     };
 
     switch (stage) {
@@ -69,7 +68,7 @@ export default function IngestionDock() {
               border: '1px solid var(--border-default, #e2e8f0)',
             }}
           >
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#94a3b8' }} />
+            <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: '#94a3b8' }} />
             {language === 'en' ? 'Queued' : 'Antrian'}
           </span>
         );
@@ -80,12 +79,12 @@ export default function IngestionDock() {
               ...badgeBaseStyle,
               backgroundColor: 'rgba(37, 99, 235, 0.08)',
               color: '#2563eb',
-              border: '1px solid rgba(37, 99, 235, 0.2)',
+              border: '1px solid rgba(37, 99, 235, 0.18)',
             }}
           >
-            <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} />
-            {language === 'en' ? 'Extracting' : 'Ekstraksi PDF'}
-            {task.currentPage && task.totalPages ? ` (${task.currentPage}/${task.totalPages})` : ''}
+            <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} />
+            {language === 'en' ? 'OCR' : 'Ekstraksi'}
+            {task.currentPage && task.totalPages ? ` ${task.currentPage}/${task.totalPages}` : ''}
           </span>
         );
       case 'chunking':
@@ -93,14 +92,14 @@ export default function IngestionDock() {
           <span
             style={{
               ...badgeBaseStyle,
-              backgroundColor: 'rgba(79, 70, 229, 0.08)',
-              color: '#4f46e5',
-              border: '1px solid rgba(79, 70, 229, 0.2)',
+              backgroundColor: 'rgba(99, 102, 241, 0.08)',
+              color: '#6366f1',
+              border: '1px solid rgba(99, 102, 241, 0.18)',
             }}
           >
-            <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} />
+            <Layers size={10} />
             {language === 'en' ? 'Chunking' : 'Chunking'}
-            {task.totalChunks ? ` (${task.totalChunks} chunks)` : ''}
+            {task.totalChunks ? ` (${task.totalChunks})` : ''}
           </span>
         );
       case 'embedding':
@@ -110,13 +109,13 @@ export default function IngestionDock() {
               ...badgeBaseStyle,
               backgroundColor: 'rgba(217, 119, 6, 0.08)',
               color: '#d97706',
-              border: '1px solid rgba(217, 119, 6, 0.2)',
+              border: '1px solid rgba(217, 119, 6, 0.18)',
             }}
           >
-            <Sparkles size={11} />
-            {language === 'en' ? 'Embedding' : 'Vector 1024-d'}
+            <Sparkles size={10} />
+            {language === 'en' ? 'Vector 1024-d' : 'Vektor 1024-d'}
             {task.processedChunks && task.totalChunks
-              ? ` (${task.processedChunks}/${task.totalChunks})`
+              ? ` ${task.processedChunks}/${task.totalChunks}`
               : ''}
           </span>
         );
@@ -127,11 +126,11 @@ export default function IngestionDock() {
               ...badgeBaseStyle,
               backgroundColor: 'rgba(147, 51, 234, 0.08)',
               color: '#9333ea',
-              border: '1px solid rgba(147, 51, 234, 0.2)',
+              border: '1px solid rgba(147, 51, 234, 0.18)',
             }}
           >
-            <Database size={11} />
-            {language === 'en' ? 'Storing' : 'pgvector'}
+            <Database size={10} />
+            pgvector
           </span>
         );
       case 'completed':
@@ -144,7 +143,7 @@ export default function IngestionDock() {
               border: '1px solid rgba(16, 185, 129, 0.2)',
             }}
           >
-            <CheckCircle2 size={11} />
+            <CheckCircle2 size={10.5} />
             {language === 'en' ? 'Completed' : 'Selesai'}
           </span>
         );
@@ -158,85 +157,59 @@ export default function IngestionDock() {
               border: '1px solid rgba(239, 68, 68, 0.2)',
             }}
           >
-            <AlertCircle size={11} />
+            <AlertCircle size={10.5} />
             {language === 'en' ? 'Failed' : 'Gagal'}
           </span>
         );
     }
   };
 
-  // Minimized Pill Mode (Bottom Right)
+  // ── Minimized Mode: Sleek Floating Pill ──
   if (isDockMinimized) {
     return (
       <div
         style={{
           position: 'fixed',
-          bottom: '24px',
-          right: '24px',
+          bottom: '20px',
+          right: '20px',
           zIndex: 9999,
           display: 'flex',
           alignItems: 'center',
-          gap: '10px',
-          padding: '8px 16px',
+          gap: '9px',
+          padding: '7px 14px',
           borderRadius: '9999px',
           backgroundColor: 'var(--bg-card, #ffffff)',
           border: '1px solid var(--border-default, #e2e8f0)',
-          boxShadow: '0 10px 25px -4px rgba(15, 23, 42, 0.15)',
+          boxShadow: '0 10px 25px -4px rgba(15, 23, 42, 0.12), 0 2px 8px -2px rgba(15, 23, 42, 0.04)',
           cursor: 'pointer',
-          transition: 'all 0.2s ease',
+          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
         }}
         onClick={() => setIsDockMinimized(false)}
         role="button"
         tabIndex={0}
-        aria-label="Expand Ingestion Dock"
+        aria-label="Buka Ingestion Pipeline"
       >
         {hasActive ? (
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Loader2 size={16} color="#2563eb" style={{ animation: 'spin 1s linear infinite' }} />
-          </div>
+          <Loader2 size={14} color="#2563eb" style={{ animation: 'spin 1s linear infinite' }} />
         ) : errorCount > 0 ? (
-          <AlertCircle size={16} color="#ef4444" />
+          <AlertCircle size={14} color="#ef4444" />
         ) : (
-          <CheckCircle2 size={16} color="#10b981" />
+          <CheckCircle2 size={14} color="#10b981" />
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary, #0f172a)' }}>
             {hasActive
               ? language === 'en'
-                ? `Processing ${activeTaskCount} document${activeTaskCount > 1 ? 's' : ''}`
-                : `Memproses ${activeTaskCount} dokumen...`
+                ? `Ingesting ${activeTaskCount} file${activeTaskCount > 1 ? 's' : ''}`
+                : `Memproses ${activeTaskCount} file...`
               : language === 'en'
-              ? `${completedCount} document${completedCount > 1 ? 's' : ''} ready`
-              : `${completedCount} dokumen selesai`}
+              ? `${completedCount} file${completedCount > 1 ? 's' : ''} ready`
+              : `${completedCount} file selesai`}
           </span>
-          {hasActive && (
-            <span style={{ fontSize: '10px', color: 'var(--text-muted, #94a3b8)', fontFamily: 'var(--font-mono, monospace)' }}>
-              {language === 'en' ? 'Running in background' : 'Berjalan di latar belakang'}
-            </span>
-          )}
         </div>
 
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsDockMinimized(false);
-          }}
-          title={language === 'en' ? 'Expand' : 'Buka detail'}
-          style={{
-            padding: '3px',
-            color: 'var(--text-muted, #94a3b8)',
-            border: 'none',
-            background: 'transparent',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            marginLeft: '4px',
-          }}
-        >
-          <ChevronUp size={16} />
-        </button>
+        <ChevronUp size={14} style={{ color: 'var(--text-muted, #94a3b8)', marginLeft: '2px' }} />
 
         {!hasActive && (
           <button
@@ -247,7 +220,7 @@ export default function IngestionDock() {
             }}
             title={language === 'en' ? 'Dismiss' : 'Tutup pemberitahuan'}
             style={{
-              padding: '3px',
+              padding: '2px',
               color: 'var(--text-muted, #94a3b8)',
               border: 'none',
               background: 'transparent',
@@ -263,38 +236,38 @@ export default function IngestionDock() {
               e.currentTarget.style.color = 'var(--text-muted, #94a3b8)';
             }}
           >
-            <X size={14} />
+            <X size={13} />
           </button>
         )}
       </div>
     );
   }
 
-  // Expanded Floating Card Mode (Bottom Right)
+  // ── Expanded Mode: Ultra-Clean Floating Card ──
   return (
     <div
       style={{
         position: 'fixed',
-        bottom: '24px',
-        right: '24px',
+        bottom: '20px',
+        right: '20px',
         zIndex: 9999,
-        width: '390px',
+        width: '360px',
         maxWidth: 'calc(100vw - 32px)',
         backgroundColor: 'var(--bg-card, #ffffff)',
         border: '1px solid var(--border-default, #e2e8f0)',
-        borderRadius: '16px',
-        boxShadow: '0 20px 40px -10px rgba(15, 23, 42, 0.22), 0 4px 12px -2px rgba(15, 23, 42, 0.08)',
+        borderRadius: '14px',
+        boxShadow: '0 16px 36px -6px rgba(15, 23, 42, 0.14), 0 4px 12px -2px rgba(15, 23, 42, 0.05)',
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
-        maxHeight: '520px',
+        maxHeight: '480px',
         animation: 'fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
       }}
     >
-      {/* Header */}
+      {/* ── 1. Clean Header ── */}
       <div
         style={{
-          padding: '12px 16px',
+          padding: '11px 14px',
           backgroundColor: 'var(--bg-subtle, #f8fafc)',
           borderBottom: '1px solid var(--border-default, #e2e8f0)',
           display: 'flex',
@@ -302,12 +275,12 @@ export default function IngestionDock() {
           justifyContent: 'space-between',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div
             style={{
-              width: '30px',
-              height: '30px',
-              borderRadius: '8px',
+              width: '26px',
+              height: '26px',
+              borderRadius: '7px',
               backgroundColor: 'rgba(37, 99, 235, 0.1)',
               display: 'flex',
               alignItems: 'center',
@@ -315,13 +288,27 @@ export default function IngestionDock() {
               color: '#2563eb',
             }}
           >
-            <Layers size={16} />
+            <Layers size={14} />
           </div>
           <div>
-            <h3 style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--text-primary, #0f172a)', margin: 0 }}>
-              {language === 'en' ? 'Ingestion Pipeline' : 'Pipeline Ingestion Vektor'}
-            </h3>
-            <p style={{ fontSize: '11px', color: 'var(--text-secondary, #64748b)', margin: '1px 0 0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <h3 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary, #0f172a)', margin: 0 }}>
+                {language === 'en' ? 'Ingestion Pipeline' : 'Pipeline Ingestion'}
+              </h3>
+              {hasActive && (
+                <span
+                  style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    backgroundColor: '#2563eb',
+                    display: 'inline-block',
+                    animation: 'pulse 1.5s infinite',
+                  }}
+                />
+              )}
+            </div>
+            <p style={{ fontSize: '10.5px', color: 'var(--text-secondary, #64748b)', margin: 0 }}>
               {hasActive
                 ? language === 'en'
                   ? `${activeTaskCount} active processing`
@@ -333,18 +320,18 @@ export default function IngestionDock() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
           {completedCount > 0 && (
             <button
               type="button"
               onClick={clearCompletedTasks}
               title={language === 'en' ? 'Clear completed' : 'Bersihkan yang selesai'}
               style={{
-                padding: '6px',
+                padding: '5px',
                 color: 'var(--text-muted, #94a3b8)',
                 border: 'none',
                 background: 'transparent',
-                borderRadius: '6px',
+                borderRadius: '5px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -360,7 +347,7 @@ export default function IngestionDock() {
                 e.currentTarget.style.backgroundColor = 'transparent';
               }}
             >
-              <Trash2 size={14} />
+              <Trash2 size={13} />
             </button>
           )}
 
@@ -369,11 +356,11 @@ export default function IngestionDock() {
             onClick={() => setIsDockMinimized(true)}
             title={language === 'en' ? 'Minimize' : 'Kecilkan'}
             style={{
-              padding: '6px',
+              padding: '5px',
               color: 'var(--text-muted, #94a3b8)',
               border: 'none',
               background: 'transparent',
-              borderRadius: '6px',
+              borderRadius: '5px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -389,20 +376,20 @@ export default function IngestionDock() {
               e.currentTarget.style.backgroundColor = 'transparent';
             }}
           >
-            <ChevronDown size={16} />
+            <ChevronDown size={15} />
           </button>
 
           {!hasActive && (
             <button
               type="button"
               onClick={clearCompletedTasks}
-              title={language === 'en' ? 'Close & dismiss' : 'Tutup pemberitahuan'}
+              title={language === 'en' ? 'Close & dismiss' : 'Tutup'}
               style={{
-                padding: '6px',
+                padding: '5px',
                 color: 'var(--text-muted, #94a3b8)',
                 border: 'none',
                 background: 'transparent',
-                borderRadius: '6px',
+                borderRadius: '5px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -418,20 +405,20 @@ export default function IngestionDock() {
                 e.currentTarget.style.backgroundColor = 'transparent';
               }}
             >
-              <X size={15} />
+              <X size={14} />
             </button>
           )}
         </div>
       </div>
 
-      {/* Task List */}
+      {/* ── 2. Task Cards Stream ── */}
       <div
         style={{
-          padding: '12px',
+          padding: '10px',
           overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
-          gap: '10px',
+          gap: '8px',
           flex: 1,
         }}
       >
@@ -444,22 +431,31 @@ export default function IngestionDock() {
             <div
               key={task.id}
               style={{
-                borderRadius: '12px',
-                padding: '10px 12px',
-                backgroundColor: isActive ? 'rgba(37, 99, 235, 0.03)' : 'var(--bg-card, #ffffff)',
+                borderRadius: '10px',
+                padding: '9px 11px',
+                backgroundColor: isActive ? 'rgba(37, 99, 235, 0.02)' : 'var(--bg-card, #ffffff)',
                 border: isActive
-                  ? '1px solid rgba(37, 99, 235, 0.2)'
+                  ? '1px solid rgba(37, 99, 235, 0.18)'
                   : '1px solid var(--border-default, #e2e8f0)',
                 transition: 'all 0.15s ease',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', minWidth: 0 }}>
+              {/* Row 1: File Info & Status Badge */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  justifyContent: 'space-between',
+                  gap: '8px',
+                  marginBottom: '7px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '7px', minWidth: 0, flex: 1 }}>
                   <div
                     style={{
                       marginTop: '2px',
-                      padding: '5px',
-                      borderRadius: '8px',
+                      padding: '4px',
+                      borderRadius: '6px',
                       flexShrink: 0,
                       backgroundColor: isDone
                         ? 'rgba(16, 185, 129, 0.1)'
@@ -472,31 +468,37 @@ export default function IngestionDock() {
                       justifyContent: 'center',
                     }}
                   >
-                    <FileText size={14} />
+                    <FileText size={13} />
                   </div>
-                  <div style={{ minWidth: 0 }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
                     <p
                       style={{
-                        fontSize: '12px',
+                        fontSize: '11.5px',
                         fontWeight: 600,
                         color: 'var(--text-primary, #0f172a)',
                         margin: 0,
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
-                        maxWidth: '200px',
                       }}
                       title={task.fileName}
                     >
                       {task.fileName}
                     </p>
-                    <p style={{ fontSize: '10.5px', color: 'var(--text-muted, #94a3b8)', fontFamily: 'var(--font-mono, monospace)', margin: '2px 0 0' }}>
+                    <p
+                      style={{
+                        fontSize: '10px',
+                        color: 'var(--text-muted, #94a3b8)',
+                        fontFamily: 'var(--font-mono, monospace)',
+                        margin: '1px 0 0',
+                      }}
+                    >
                       {formatFileSize(task.fileSize)}
                     </p>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
                   {getStageBadge(task.status, task)}
                   {(isDone || isErr) && (
                     <button
@@ -504,7 +506,7 @@ export default function IngestionDock() {
                       onClick={() => clearTask(task.id)}
                       title={language === 'en' ? 'Remove' : 'Hapus'}
                       style={{
-                        padding: '4px',
+                        padding: '3px',
                         color: 'var(--text-muted, #94a3b8)',
                         border: 'none',
                         background: 'transparent',
@@ -512,6 +514,7 @@ export default function IngestionDock() {
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
+                        justifyContent: 'center',
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.color = '#ef4444';
@@ -526,106 +529,119 @@ export default function IngestionDock() {
                 </div>
               </div>
 
-              {/* Progress bar */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', margin: '6px 0' }}>
+              {/* Row 2: Slim Smooth Progress Bar */}
+              <div
+                style={{
+                  width: '100%',
+                  backgroundColor: 'var(--bg-subtle, #f1f5f9)',
+                  borderRadius: '9999px',
+                  height: '4px',
+                  overflow: 'hidden',
+                  margin: '6px 0 5px',
+                }}
+              >
                 <div
                   style={{
-                    width: '100%',
-                    backgroundColor: 'var(--bg-subtle, #f1f5f9)',
+                    height: '100%',
                     borderRadius: '9999px',
-                    height: '5px',
-                    overflow: 'hidden',
+                    transition: 'width 0.3s ease',
+                    width: `${Math.min(100, Math.max(5, task.progressPercent))}%`,
+                    background: isDone
+                      ? '#10b981'
+                      : isErr
+                      ? '#ef4444'
+                      : 'linear-gradient(90deg, #2563eb, #6366f1)',
                   }}
-                >
-                  <div
-                    style={{
-                      height: '100%',
-                      borderRadius: '9999px',
-                      transition: 'width 0.3s ease',
-                      width: `${Math.min(100, Math.max(5, task.progressPercent))}%`,
-                      background: isDone
-                        ? '#10b981'
-                        : isErr
-                        ? '#ef4444'
-                        : 'linear-gradient(90deg, #2563eb, #6366f1)',
-                    }}
-                  />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '10.5px', color: 'var(--text-secondary, #64748b)' }}>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '240px' }}>
-                    {task.message}
-                  </span>
-                  <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600, marginLeft: '4px' }}>
-                    {task.progressPercent}%
-                  </span>
-                </div>
+                />
               </div>
 
-              {/* View Detail Button */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingTop: '4px' }}>
-                <button
-                  type="button"
-                  onClick={() => openDetail(task.id)}
+              {/* Row 3: Progress Message & Percentage */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  fontSize: '10.5px',
+                  color: 'var(--text-secondary, #64748b)',
+                }}
+              >
+                <span
                   style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '3px 8px',
-                    fontSize: '11px',
-                    fontWeight: 500,
-                    color: '#2563eb',
-                    backgroundColor: 'rgba(37, 99, 235, 0.06)',
-                    border: '1px solid rgba(37, 99, 235, 0.15)',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    maxWidth: '240px',
                   }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'rgba(37, 99, 235, 0.12)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'rgba(37, 99, 235, 0.06)';
+                  title={task.message}
+                >
+                  {task.message}
+                </span>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono, monospace)',
+                    fontWeight: 600,
+                    fontSize: '10.5px',
+                    marginLeft: '6px',
+                    color: isDone ? '#059669' : isErr ? '#dc2626' : '#2563eb',
                   }}
                 >
-                  <Maximize2 size={11} />
-                  <span>{language === 'en' ? 'Live Visualizer' : 'Visualizer Pipeline'}</span>
-                </button>
+                  {task.progressPercent}%
+                </span>
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* Footer Info */}
+      {/* ── 3. Ultra-Clean Minimal Footer ── */}
       <div
         style={{
-          padding: '8px 16px',
+          padding: '8px 14px',
           backgroundColor: 'var(--bg-subtle, #f8fafc)',
           borderTop: '1px solid var(--border-default, #e2e8f0)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          fontSize: '11px',
-          color: 'var(--text-muted, #94a3b8)',
+          fontSize: '10.5px',
+          color: 'var(--text-secondary, #64748b)',
         }}
       >
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {language === 'en'
-            ? 'Background processing is active'
-            : '🛡️ Berjalan di background'}
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+          <span
+            style={{
+              width: '5px',
+              height: '5px',
+              borderRadius: '50%',
+              backgroundColor: hasActive ? '#2563eb' : '#10b981',
+            }}
+          />
+          {hasActive
+            ? language === 'en'
+              ? 'Background processing active'
+              : 'Proses latar belakang aktif'
+            : language === 'en'
+            ? 'Knowledge Base ready'
+            : 'Dokumen tersimpan di Knowledge Base'}
         </span>
+
         <button
           type="button"
           onClick={() => setIsDockMinimized(true)}
           style={{
-            color: '#2563eb',
-            border: 'none',
-            background: 'transparent',
-            cursor: 'pointer',
-            fontWeight: 600,
             fontSize: '11px',
-            marginLeft: '8px',
-            flexShrink: 0,
+            fontWeight: 500,
+            color: '#2563eb',
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '2px 4px',
+            borderRadius: '4px',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.textDecoration = 'underline';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.textDecoration = 'none';
           }}
         >
           {language === 'en' ? 'Minimize' : 'Kecilkan'}

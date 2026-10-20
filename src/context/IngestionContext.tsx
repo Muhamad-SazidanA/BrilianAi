@@ -50,9 +50,6 @@ interface IngestionContextType {
   activeTaskCount: number;
   isDockMinimized: boolean;
   setIsDockMinimized: (minimized: boolean) => void;
-  activeDetailTaskId: string | null;
-  openDetail: (taskId: string) => void;
-  closeDetail: () => void;
   enqueueFiles: (files: File[], options: IngestionOptions) => Promise<void>;
   clearTask: (taskId: string) => void;
   clearCompletedTasks: () => void;
@@ -66,7 +63,6 @@ export function IngestionProvider({ children }: { children: React.ReactNode }) {
   const { language } = useLanguage();
   const [tasks, setTasks] = useState<IngestionTask[]>([]);
   const [isDockMinimized, setIsDockMinimized] = useState<boolean>(false);
-  const [activeDetailTaskId, setActiveDetailTaskId] = useState<string | null>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const tasksRef = useRef<IngestionTask[]>(tasks);
   tasksRef.current = tasks;
@@ -267,31 +263,16 @@ export function IngestionProvider({ children }: { children: React.ReactNode }) {
     }
 
     setTasks((prev) => [...prev, ...newTasks]);
-    // Automatically focus the first newly enqueued task in detail modal
-    if (newTasks.length > 0) {
-      setActiveDetailTaskId(newTasks[0].id);
-    }
-    // Make sure dock is visible
+    // Make sure dock is visible when new files are enqueued
     setIsDockMinimized(false);
   }, [language]);
 
   const clearTask = useCallback((taskId: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
-    if (activeDetailTaskId === taskId) {
-      setActiveDetailTaskId(null);
-    }
-  }, [activeDetailTaskId]);
+  }, []);
 
   const clearCompletedTasks = useCallback(() => {
     setTasks((prev) => prev.filter((t) => t.status !== 'completed' && t.status !== 'error'));
-  }, []);
-
-  const openDetail = useCallback((taskId: string) => {
-    setActiveDetailTaskId(taskId);
-  }, []);
-
-  const closeDetail = useCallback(() => {
-    setActiveDetailTaskId(null);
   }, []);
 
   const activeTaskCount = tasks.filter((t) => t.status !== 'completed' && t.status !== 'error').length;
@@ -303,9 +284,6 @@ export function IngestionProvider({ children }: { children: React.ReactNode }) {
         activeTaskCount,
         isDockMinimized,
         setIsDockMinimized,
-        activeDetailTaskId,
-        openDetail,
-        closeDetail,
         enqueueFiles,
         clearTask,
         clearCompletedTasks,
