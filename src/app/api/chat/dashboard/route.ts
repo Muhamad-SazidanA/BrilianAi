@@ -2,9 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@lib/auth/serverAuth';
 import { saveDashboard, getDashboardByMessageId } from '@lib/db/dashboardStore';
 import { generateDashboardData } from '@lib/ai/dashboardClient';
+import { checkRateLimit, recordRateLimitHit } from '@lib/security/rateLimiter';
 import { DashboardData } from '@/types/dashboard';
 
 export const dynamic = 'force-dynamic';
+
+const MAX_ANSWER_LENGTH = 50000;
+const MAX_QUERY_LENGTH = 2000;
+const RATE_LIMIT_ATTEMPTS = 10;
+const RATE_LIMIT_WINDOW_SECONDS = 60;
 
 /**
  * POST /api/chat/dashboard
@@ -19,8 +25,34 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized: Harap login terlebih dahulu.' }, { status: 401 });
   }
 
+  // Rate Limiting (10 pembuatan dashboard per menit per user)
+  const rateLimitKey = `dashboard_build:${user.id}`;
+  const rateCheck = checkRateLimit(rateLimitKey, {
+    maxAttempts: RATE_LIMIT_ATTEMPTS,
+    windowSeconds: RATE_LIMIT_WINDOW_SECONDS,
+  });
+
+  if (!rateCheck.allowed) {
+    return NextResponse.json(
+      {
+        error: `Batas pembuatan dashboard tercapai (${RATE_LIMIT_ATTEMPTS}/menit). Silakan tunggu ${rateCheck.retryAfterSeconds} detik.`,
+        retryAfterSeconds: rateCheck.retryAfterSeconds,
+      },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': String(rateCheck.retryAfterSeconds),
+        },
+      }
+    );
+  }
+
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json({ error: 'Payload tidak valid.' }, { status: 400 });
+    }
+
     const { messageId, sessionId, answerText, queryText, forceRegenerate } = body as {
       messageId?: string;
       sessionId?: string;
@@ -29,12 +61,21 @@ export async function POST(request: NextRequest) {
       forceRegenerate?: boolean;
     };
 
-    if (!answerText || !messageId) {
+    if (!answerText || typeof answerText !== 'string' || !messageId || typeof messageId !== 'string') {
       return NextResponse.json(
         { error: 'Field answerText dan messageId wajib diisi.' },
         { status: 400 }
       );
     }
+
+    if (answerText.length > MAX_ANSWER_LENGTH) {
+      return NextResponse.json(
+        { error: `Teks jawaban terlalu panjang (maksimal ${MAX_ANSWER_LENGTH} karakter).` },
+        { status: 400 }
+      );
+    }
+
+    const cleanQuery = typeof queryText === 'string' ? queryText.slice(0, MAX_QUERY_LENGTH) : undefined;
 
     // Return existing dashboard if already created and user didn't request forceRegenerate
     if (!forceRegenerate) {
@@ -46,9 +87,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Record rate limit hit on actual LLM generation
+    recordRateLimitHit(rateLimitKey, RATE_LIMIT_WINDOW_SECONDS);
+
     // Generate dashboard using Multi-Tier Cloud API (Gemini -> OpenAI -> DeepSeek -> Ollama)
     const dashboardData = await generateDashboardData({
-      queryText,
+      queryText: cleanQuery,
       answerText,
       messageId,
     });

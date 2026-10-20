@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Sparkles,
   MessageSquare,
@@ -14,8 +15,11 @@ import {
   Lightbulb,
   CheckCircle2,
   TrendingUp,
+  LogIn,
+  AlertCircle,
 } from 'lucide-react';
 import { DashboardData } from '@/types/dashboard';
+import { useUserSession } from '@/context/UserSessionContext';
 import { toast } from 'sonner';
 
 interface Message {
@@ -43,6 +47,8 @@ export default function DashboardCopilot({
   dashboardData,
   onMorphWidget,
 }: DashboardCopilotProps) {
+  const router = useRouter();
+  const { currentUser, isLoading: isUserLoading } = useUserSession();
   const [isOpen, setIsOpen] = useState(false);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -96,6 +102,14 @@ export default function DashboardCopilot({
 
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
+          if (res.status === 401) {
+            toast.error('Harap login terlebih dahulu untuk menggunakan AI Copilot.');
+            throw new Error('Sesi tidak terautentikasi. Silakan login terlebih dahulu.');
+          }
+          if (res.status === 429) {
+            toast.error(errData.error || 'Terlalu banyak permintaan. Silakan tunggu beberapa detik.');
+            throw new Error(errData.error || 'Batas frekuensi permintaan tercapai.');
+          }
           throw new Error(errData.error || 'Gagal memproses pesan.');
         }
 
@@ -491,6 +505,46 @@ export default function DashboardCopilot({
             ))}
           </div>
 
+          {/* Unauthenticated User Banner */}
+          {!currentUser && !isUserLoading && (
+            <div
+              style={{
+                padding: '8px 12px',
+                backgroundColor: 'var(--color-primary-subtle, #eff6ff)',
+                borderTop: '1px solid var(--color-primary-border, #bfdbfe)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+                fontSize: '11px',
+                color: 'var(--color-primary, #1d4ed8)',
+              }}
+            >
+              <span>Login untuk berinteraksi dengan AI Copilot</span>
+              <button
+                type="button"
+                onClick={() => router.push(`/login?redirect=/dashboard/${dashboardId}`)}
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  backgroundColor: 'var(--color-primary, #2563eb)',
+                  color: '#ffffff',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: '10.5px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <LogIn size={10} />
+                <span>Login</span>
+              </button>
+            </div>
+          )}
+
           {/* Input Box */}
           <div
             style={{
@@ -498,57 +552,78 @@ export default function DashboardCopilot({
               backgroundColor: 'var(--bg-card, #ffffff)',
               borderTop: '1px solid var(--border-default, #e2e8f0)',
               display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
+              flexDirection: 'column',
+              gap: '4px',
             }}
           >
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage();
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                ref={inputRef}
+                type="text"
+                value={inputMessage}
+                maxLength={1000}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+                placeholder={
+                  !currentUser
+                    ? 'Silakan login untuk bertanya ke Copilot...'
+                    : 'Tanya data ini atau minta ubah grafik...'
                 }
-              }}
-              placeholder="Tanya data ini atau minta ubah grafik..."
-              disabled={isLoading}
-              style={{
-                flex: 1,
-                padding: '8px 12px',
-                borderRadius: '8px',
-                border: '1px solid var(--border-default, #e2e8f0)',
-                backgroundColor: 'var(--bg-subtle, #f8fafc)',
-                fontSize: '12px',
-                color: 'var(--text-primary, #0f172a)',
-                outline: 'none',
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => handleSendMessage()}
-              disabled={isLoading || !inputMessage.trim()}
-              style={{
-                padding: '8px 10px',
-                borderRadius: '8px',
-                backgroundColor: inputMessage.trim() ? '#2563eb' : '#94a3b8',
-                color: '#ffffff',
-                border: 'none',
-                cursor: inputMessage.trim() && !isLoading ? 'pointer' : 'not-allowed',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              {isLoading ? (
-                <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
-              ) : (
-                <Send size={14} />
-              )}
-            </button>
+                disabled={isLoading || !currentUser}
+                style={{
+                  flex: 1,
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-default, #e2e8f0)',
+                  backgroundColor: !currentUser ? 'var(--bg-muted, #f1f5f9)' : 'var(--bg-subtle, #f8fafc)',
+                  fontSize: '12px',
+                  color: 'var(--text-primary, #0f172a)',
+                  outline: 'none',
+                  cursor: !currentUser ? 'not-allowed' : 'text',
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => handleSendMessage()}
+                disabled={isLoading || !currentUser || !inputMessage.trim()}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: '8px',
+                  backgroundColor: currentUser && inputMessage.trim() ? '#2563eb' : '#94a3b8',
+                  color: '#ffffff',
+                  border: 'none',
+                  cursor: currentUser && inputMessage.trim() && !isLoading ? 'pointer' : 'not-allowed',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {isLoading ? (
+                  <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                ) : (
+                  <Send size={14} />
+                )}
+              </button>
+            </div>
+            {inputMessage.length > 800 && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', paddingRight: '4px' }}>
+                <span
+                  style={{
+                    fontSize: '10px',
+                    color: inputMessage.length >= 1000 ? 'var(--color-danger, #ef4444)' : 'var(--text-muted, #64748b)',
+                    fontWeight: inputMessage.length >= 1000 ? 600 : 400,
+                  }}
+                >
+                  {inputMessage.length}/1000
+                </span>
+              </div>
+            )}
           </div>
         </div>
       )}
