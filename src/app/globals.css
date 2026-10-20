@@ -2424,36 +2424,78 @@ thead::-webkit-scrollbar {
   border-color: var(--color-primary);
 }
 
-/* ── Floating Pill & Copilot (Image 3) ── */
-.db-floating-copilot-wrap {
-  position: absolute;
-  top: 38px;
-  left: 8px;
-  right: 8px;
-  z-index: 50;
+/* ── Bottom Floating Dock Copilot ── */
+.db-bottom-dock-wrapper {
+  position: sticky;
+  bottom: 14px;
+  left: 0;
+  right: 0;
+  width: calc(100% - 24px);
+  max-width: 660px;
+  margin: 16px auto 10px;
+  z-index: 90;
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse;
   align-items: center;
-  animation: dbSlideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  gap: 8px;
+  animation: dbDockSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: auto;
 }
-.db-floating-pill {
+
+@keyframes dbDockSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.db-dock-pill {
   display: flex;
   align-items: center;
   width: 100%;
-  max-width: 520px;
   background: var(--bg-card, #FFFFFF);
   border: 1px solid var(--border-default, #E2E8F0);
   border-radius: 9999px;
-  box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  padding: 5px 6px 5px 16px;
+  box-shadow: 0 16px 36px -4px rgba(15, 23, 42, 0.16), 0 4px 12px -2px rgba(15, 23, 42, 0.08);
+  padding: 5px 6px 5px 12px;
   gap: 8px;
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  backdrop-filter: blur(16px);
 }
-.db-floating-pill:focus-within {
+.db-dock-pill:focus-within {
   border-color: var(--color-primary, #3B82F6);
-  box-shadow: 0 12px 28px -3px rgba(59, 130, 246, 0.18), 0 4px 8px -2px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 18px 40px -4px rgba(59, 130, 246, 0.22), 0 4px 12px -2px rgba(59, 130, 246, 0.1);
 }
-.db-floating-pill-input {
+
+.db-dock-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  background: rgba(59, 130, 246, 0.09);
+  border: 1px solid rgba(59, 130, 246, 0.22);
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #2563EB;
+  max-width: 140px;
+  flex-shrink: 0;
+}
+.db-dock-badge-sparkle {
+  color: #2563EB;
+  flex-shrink: 0;
+}
+.db-dock-badge-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.db-dock-input {
   flex: 1;
   border: none;
   outline: none;
@@ -2462,10 +2504,11 @@ thead::-webkit-scrollbar {
   color: var(--text-primary, #0F172A);
   min-width: 0;
 }
-.db-floating-pill-input::placeholder {
+.db-dock-input::placeholder {
   color: var(--text-muted, #94A3B8);
 }
-.db-floating-pill-mic {
+
+.db-dock-btn-mic {
   width: 30px;
   height: 30px;
   border-radius: 50%;
@@ -2479,15 +2522,16 @@ thead::-webkit-scrollbar {
   transition: all 0.15s ease;
   flex-shrink: 0;
 }
-.db-floating-pill-mic:hover {
+.db-dock-btn-mic:hover {
   color: var(--text-primary, #0F172A);
   background: var(--bg-muted, #F1F5F9);
 }
-.db-floating-pill-mic.recording {
+.db-dock-btn-mic.recording {
   color: #EF4444;
   animation: dbPulse 1s infinite;
 }
-.db-floating-pill-send {
+
+.db-dock-btn-send {
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -2502,15 +2546,16 @@ thead::-webkit-scrollbar {
   flex-shrink: 0;
   box-shadow: 0 2px 6px rgba(59, 130, 246, 0.35);
 }
-.db-floating-pill-send:hover:not(:disabled) {
+.db-dock-btn-send:hover:not(:disabled) {
   background: #2563EB;
   transform: scale(1.05);
 }
-.db-floating-pill-send:disabled {
+.db-dock-btn-send:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
-.db-floating-pill-close {
+
+.db-dock-btn-close {
   width: 24px;
   height: 24px;
   border-radius: 50%;
@@ -2525,23 +2570,49 @@ thead::-webkit-scrollbar {
   transition: all 0.15s ease;
   flex-shrink: 0;
 }
-.db-floating-pill-close:hover {
+.db-dock-btn-close:hover {
   color: var(--text-primary, #0F172A);
   background: var(--bg-muted, #F1F5F9);
+}
 
-.db-floating-popover-card {
-  width: 100%;
-  max-width: 520px;
-  margin-top: 8px;
+.db-dock-suggestions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+  animation: dbPopIn 0.2s ease;
+}
+.db-dock-suggestion-chip {
   background: var(--bg-card, #FFFFFF);
   border: 1px solid var(--border-default, #E2E8F0);
-  border-radius: 12px;
-  box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.14), 0 4px 12px -2px rgba(0, 0, 0, 0.06);
-  padding: 12px 14px;
+  border-radius: 9999px;
+  padding: 3px 10px;
+  font-size: 11px;
+  color: var(--text-secondary, #475569);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+.db-dock-suggestion-chip:hover {
+  background: var(--bg-muted, #F8FAFC);
+  border-color: var(--color-primary, #3B82F6);
+  color: var(--color-primary, #2563EB);
+  transform: translateY(-1px);
+}
+
+.db-dock-response-card {
+  width: 100%;
+  background: var(--bg-card, #FFFFFF);
+  border: 1px solid var(--border-default, #E2E8F0);
+  border-radius: 14px;
+  box-shadow: 0 18px 40px -4px rgba(15, 23, 42, 0.16), 0 4px 12px -2px rgba(15, 23, 42, 0.06);
+  padding: 12px 16px;
   animation: dbPopIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  max-height: 280px;
+  max-height: 300px;
   overflow-y: auto;
 }
+
 .db-popover-header {
   display: flex;
   align-items: center;
@@ -2578,10 +2649,13 @@ thead::-webkit-scrollbar {
   font-weight: 500;
 }
 
-@keyframes dbSlideDown {
-  from { opacity: 0; transform: translateY(-8px); }
-  to { opacity: 1; transform: translateY(0); }
+/* Active Highlight on the Card being analyzed */
+.db-widget.db-widget-copilot-active {
+  border-color: #3B82F6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18), 0 8px 20px -4px rgba(59, 130, 246, 0.12) !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
 @keyframes dbPopIn {
   from { opacity: 0; transform: scale(0.96) translateY(-4px); }
   to { opacity: 1; transform: scale(1) translateY(0); }

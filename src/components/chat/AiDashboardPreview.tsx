@@ -124,23 +124,14 @@ function WidgetCardHeader({
 
 interface WidgetCommonProps {
   originalIndex: number;
-  dashboardId: string;
-  dashboardData: DashboardData;
   onOpenCopilot?: () => void;
   isCopilotOpen?: boolean;
-  onMorphWidget?: (index: number, targetType: 'bar_chart' | 'table') => void;
-  onCloseCopilot: () => void;
 }
 
 function StatCard({
   widget,
-  originalIndex,
-  dashboardId,
-  dashboardData,
   onOpenCopilot,
   isCopilotOpen,
-  onMorphWidget,
-  onCloseCopilot,
 }: { widget: StatCardWidget } & WidgetCommonProps) {
   const color = widget.color || 'blue';
   const palette = CARD_COLORS[color] || CARD_COLORS.blue;
@@ -177,16 +168,6 @@ function StatCard({
           <span>{widget.trendLabel || widget.trend}</span>
         </div>
       )}
-      {isCopilotOpen && (
-        <CardFloatingCopilot
-          dashboardId={dashboardId}
-          dashboardData={dashboardData}
-          widget={widget}
-          widgetIndex={originalIndex}
-          onMorphWidget={onMorphWidget}
-          onClose={onCloseCopilot}
-        />
-      )}
     </div>
   );
 }
@@ -194,13 +175,8 @@ function StatCard({
 function BarChart({
   widget,
   onMorph,
-  originalIndex,
-  dashboardId,
-  dashboardData,
   onOpenCopilot,
   isCopilotOpen,
-  onMorphWidget,
-  onCloseCopilot,
 }: { widget: BarChartWidget; onMorph?: () => void } & WidgetCommonProps) {
   const max = Math.max(...widget.items.map(i => i.value), 1);
   return (
@@ -214,16 +190,6 @@ function BarChart({
         onOpenCopilot={onOpenCopilot}
         isCopilotOpen={isCopilotOpen}
       />
-      {isCopilotOpen && (
-        <CardFloatingCopilot
-          dashboardId={dashboardId}
-          dashboardData={dashboardData}
-          widget={widget}
-          widgetIndex={originalIndex}
-          onMorphWidget={onMorphWidget}
-          onClose={onCloseCopilot}
-        />
-      )}
       <div className="db-barchart-rows">
         {widget.items.map((item, i) => (
           <div key={i} className="db-barchart-row">
@@ -246,13 +212,8 @@ function BarChart({
 
 function ListWidgetComp({
   widget,
-  originalIndex,
-  dashboardId,
-  dashboardData,
   onOpenCopilot,
   isCopilotOpen,
-  onMorphWidget,
-  onCloseCopilot,
 }: { widget: ListWidget } & WidgetCommonProps) {
   return (
     <div className={`db-widget db-list ${isCopilotOpen ? 'db-widget-copilot-active' : ''}`}>
@@ -262,16 +223,6 @@ function ListWidgetComp({
         onOpenCopilot={onOpenCopilot}
         isCopilotOpen={isCopilotOpen}
       />
-      {isCopilotOpen && (
-        <CardFloatingCopilot
-          dashboardId={dashboardId}
-          dashboardData={dashboardData}
-          widget={widget}
-          widgetIndex={originalIndex}
-          onMorphWidget={onMorphWidget}
-          onClose={onCloseCopilot}
-        />
-      )}
       <ul className="db-list-items">
         {widget.items.map((item, i) => {
           const badgeColor = item.badgeColor ? BADGE_COLORS[item.badgeColor] : BADGE_COLORS.blue;
@@ -309,13 +260,8 @@ function ListWidgetComp({
 function TableWidgetComp({
   widget,
   onMorph,
-  originalIndex,
-  dashboardId,
-  dashboardData,
   onOpenCopilot,
   isCopilotOpen,
-  onMorphWidget,
-  onCloseCopilot,
 }: { widget: TableWidget; onMorph?: () => void } & WidgetCommonProps) {
   return (
     <div className={`db-widget db-table-widget ${isCopilotOpen ? 'db-widget-copilot-active' : ''}`}>
@@ -328,16 +274,6 @@ function TableWidgetComp({
         onOpenCopilot={onOpenCopilot}
         isCopilotOpen={isCopilotOpen}
       />
-      {isCopilotOpen && (
-        <CardFloatingCopilot
-          dashboardId={dashboardId}
-          dashboardData={dashboardData}
-          widget={widget}
-          widgetIndex={originalIndex}
-          onMorphWidget={onMorphWidget}
-          onClose={onCloseCopilot}
-        />
-      )}
       <div className="db-table-wrap">
         <table className="db-table">
           <thead>
@@ -364,13 +300,8 @@ function TableWidgetComp({
 
 function TimelineWidgetComp({
   widget,
-  originalIndex,
-  dashboardId,
-  dashboardData,
   onOpenCopilot,
   isCopilotOpen,
-  onMorphWidget,
-  onCloseCopilot,
 }: { widget: TimelineWidget } & WidgetCommonProps) {
   const STATUS_COLORS = {
     done:    { dot: 'var(--color-success)', bg: 'var(--color-success-subtle)' },
@@ -385,16 +316,6 @@ function TimelineWidgetComp({
         onOpenCopilot={onOpenCopilot}
         isCopilotOpen={isCopilotOpen}
       />
-      {isCopilotOpen && (
-        <CardFloatingCopilot
-          dashboardId={dashboardId}
-          dashboardData={dashboardData}
-          widget={widget}
-          widgetIndex={originalIndex}
-          onMorphWidget={onMorphWidget}
-          onClose={onCloseCopilot}
-        />
-      )}
       <div className="db-timeline-events">
         {widget.events.map((ev, i) => {
           const s = ev.status || 'done';
@@ -420,13 +341,8 @@ function TimelineWidgetComp({
 
 function ComparisonWidgetComp({
   widget,
-  originalIndex,
-  dashboardId,
-  dashboardData,
   onOpenCopilot,
   isCopilotOpen,
-  onMorphWidget,
-  onCloseCopilot,
 }: { widget: ComparisonWidget } & WidgetCommonProps) {
   return (
     <div className={`db-widget db-comparison ${isCopilotOpen ? 'db-widget-copilot-active' : ''}`}>
@@ -436,16 +352,6 @@ function ComparisonWidgetComp({
         onOpenCopilot={onOpenCopilot}
         isCopilotOpen={isCopilotOpen}
       />
-      {isCopilotOpen && (
-        <CardFloatingCopilot
-          dashboardId={dashboardId}
-          dashboardData={dashboardData}
-          widget={widget}
-          widgetIndex={originalIndex}
-          onMorphWidget={onMorphWidget}
-          onClose={onCloseCopilot}
-        />
-      )}
       <div className="db-table-wrap">
         <table className="db-table">
           <thead>
@@ -471,13 +377,8 @@ function ComparisonWidgetComp({
 
 function TextSummaryWidgetComp({
   widget,
-  originalIndex,
-  dashboardId,
-  dashboardData,
   onOpenCopilot,
   isCopilotOpen,
-  onMorphWidget,
-  onCloseCopilot,
 }: { widget: TextSummaryWidget } & WidgetCommonProps) {
   return (
     <div className={`db-widget db-text-summary ${isCopilotOpen ? 'db-widget-copilot-active' : ''}`}>
@@ -487,16 +388,6 @@ function TextSummaryWidgetComp({
         onOpenCopilot={onOpenCopilot}
         isCopilotOpen={isCopilotOpen}
       />
-      {isCopilotOpen && (
-        <CardFloatingCopilot
-          dashboardId={dashboardId}
-          dashboardData={dashboardData}
-          widget={widget}
-          widgetIndex={originalIndex}
-          onMorphWidget={onMorphWidget}
-          onClose={onCloseCopilot}
-        />
-      )}
       {widget.highlight && (
         <div className="db-text-highlight">{widget.highlight}</div>
       )}
@@ -627,14 +518,10 @@ export function AiDashboardPreview({
                 key={i}
                 widget={w}
                 originalIndex={originalIndex}
-                dashboardId={dashboardId}
-                dashboardData={data}
                 onOpenCopilot={() =>
                   setActiveCopilotWidgetIndex((prev) => (prev === originalIndex ? null : originalIndex))
                 }
                 isCopilotOpen={activeCopilotWidgetIndex === originalIndex}
-                onMorphWidget={onMorphWidget}
-                onCloseCopilot={() => setActiveCopilotWidgetIndex(null)}
               />
             );
           })}
@@ -658,15 +545,11 @@ export function AiDashboardPreview({
                 key={i}
                 widget={w}
                 originalIndex={originalIndex}
-                dashboardId={dashboardId}
-                dashboardData={data}
                 onMorph={handleMorph}
                 onOpenCopilot={() =>
                   setActiveCopilotWidgetIndex((prev) => (prev === originalIndex ? null : originalIndex))
                 }
                 isCopilotOpen={activeCopilotWidgetIndex === originalIndex}
-                onMorphWidget={onMorphWidget}
-                onCloseCopilot={() => setActiveCopilotWidgetIndex(null)}
               />
             );
           })}
@@ -684,6 +567,18 @@ export function AiDashboardPreview({
           <ExternalLink size={11} />
         </button>
       </div>
+
+      {/* ── Floating Bottom Dock Copilot ── */}
+      {activeCopilotWidgetIndex !== null && data.widgets[activeCopilotWidgetIndex] && (
+        <CardFloatingCopilot
+          dashboardId={dashboardId}
+          dashboardData={data}
+          widget={data.widgets[activeCopilotWidgetIndex]}
+          widgetIndex={activeCopilotWidgetIndex}
+          onMorphWidget={onMorphWidget}
+          onClose={() => setActiveCopilotWidgetIndex(null)}
+        />
+      )}
     </div>
   );
 }
