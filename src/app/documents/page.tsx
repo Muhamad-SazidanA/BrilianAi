@@ -113,26 +113,31 @@ function DocumentsContent() {
     );
   };
 
-  const handleToggleActive = async (batchId: string, currentActive: boolean) => {
-    const nextActive = !currentActive;
+  const handleToggleActive = async (batchId: string, targetActive: boolean) => {
     toast.promise(
       async () => {
         const res = await fetch(`/api/documents/${batchId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ is_active_knowledge: nextActive }),
+          body: JSON.stringify({
+            isActiveKnowledge: targetActive,
+            is_active_knowledge: targetActive,
+          }),
         });
+        const data = await res.json();
         if (!res.ok) {
-          const data = await res.json();
           throw new Error(data.error || 'Gagal mengubah status aktif dokumen');
         }
         await fetchBatches();
+        return data;
       },
       {
         loading: language === 'en' ? 'Updating status...' : 'Memperbarui status...',
-        success: nextActive
-          ? (language === 'en' ? 'Document activated for AI Chatbot.' : 'Dokumen diaktifkan untuk AI Chatbot.')
-          : (language === 'en' ? 'Document deactivated from AI Chatbot.' : 'Dokumen dinonaktifkan dari AI Chatbot.'),
+        success: (data) =>
+          data?.message ||
+          (targetActive
+            ? (language === 'en' ? 'Document activated for AI Chatbot.' : 'Dokumen diaktifkan untuk AI Chatbot.')
+            : (language === 'en' ? 'Document deactivated from AI Chatbot.' : 'Dokumen dinonaktifkan dari AI Chatbot.')),
         error: (err) => err.message,
       }
     );
@@ -146,15 +151,20 @@ function DocumentsContent() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ activateAll: true }),
         });
+        const data = await res.json();
         if (!res.ok) {
-          const data = await res.json();
           throw new Error(data.error || 'Gagal mengaktifkan seluruh dokumen');
         }
         await fetchBatches();
+        return data;
       },
       {
-        loading: language === 'en' ? 'Activating all documents...' : 'Mengaktifkan seluruh dokumen...',
-        success: language === 'en' ? 'All documents activated for AI Chatbot!' : 'Seluruh dokumen berhasil diaktifkan untuk AI Chatbot!',
+        loading: language === 'en' ? 'Activating curated documents...' : 'Mengaktifkan dokumen terkurasi...',
+        success: (data) =>
+          data?.message ||
+          (language === 'en'
+            ? 'All curated documents activated for AI Chatbot!'
+            : 'Seluruh dokumen terkurasi berhasil diaktifkan untuk AI Chatbot!'),
         error: (err) => err.message,
       }
     );

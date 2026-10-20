@@ -44,7 +44,7 @@ describe('vectorStore (PostgreSQL + pgvector Store)', () => {
     expect(params[1]).toBe(12);
     expect(params[3]).toBe('General');
     expect(params[4]).toBe('Internal');
-    expect(params[5]).toBe('Aktif');
+    expect(params[5]).toBe('Menunggu Kurasi');
     expect(params[6]).toBe('1.0');
   });
 

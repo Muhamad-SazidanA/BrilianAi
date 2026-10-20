@@ -54,7 +54,9 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json(
         {
           message: activateAll
-            ? `Berhasil mengaktifkan seluruh ${count} dokumen untuk AI Chatbot.`
+            ? (count > 0
+                ? `Berhasil mengaktifkan ${count} dokumen terkurasi untuk AI Chatbot.`
+                : `Tidak ada dokumen terkurasi yang dapat diaktifkan. Silakan kurasi dokumen terlebih dahulu.`)
             : `Seluruh dokumen dinonaktifkan dari AI Chatbot.`,
           count,
         },

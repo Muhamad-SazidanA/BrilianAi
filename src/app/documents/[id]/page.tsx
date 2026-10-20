@@ -14,6 +14,7 @@ import {
   XCircle,
   Lock,
   Users,
+  Sparkles,
 } from 'lucide-react';
 import AppShell from '@/components/layout/AppShell';
 import CuratedInsightsTab from '@/components/studio/CuratedInsightsTab';
@@ -87,12 +88,24 @@ export default function DocumentStudioPage() {
     if (!batch) return;
     const newStatus = !batch.is_active_knowledge;
 
+    if (newStatus && (!batch.curated_count || batch.curated_count === 0)) {
+      toast.warning(
+        language === 'en'
+          ? 'Document cannot be activated before being curated. Please curate at least 1 insight in the AI Curation tab.'
+          : 'Dokumen belum memiliki insight terkurasi. Lakukan kurasi setidaknya 1 insight pada tab "Kurasi AI" sebelum mengaktifkannya.'
+      );
+      return;
+    }
+
     toast.promise(
       async () => {
         const res = await fetch(`/api/documents/${batch.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ isActiveKnowledge: newStatus }),
+          body: JSON.stringify({
+            isActiveKnowledge: newStatus,
+            is_active_knowledge: newStatus,
+          }),
         });
         if (!res.ok) {
           const data = await res.json();
@@ -315,7 +328,21 @@ export default function DocumentStudioPage() {
                 {/* AI Knowledge Base Status and Action Button */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {batch.is_active_knowledge ? (
+                    {(batch.curated_count || 0) === 0 ? (
+                      <span
+                        style={{
+                          fontSize: '11.5px',
+                          fontWeight: 700,
+                          color: '#b45309',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                        }}
+                      >
+                        <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#f59e0b', boxShadow: '0 0 6px #f59e0b' }} />
+                        STATUS: MENUNGGU KURASI (BELUM TERKURASI)
+                      </span>
+                    ) : batch.is_active_knowledge ? (
                       <span
                         style={{
                           fontSize: '11.5px',
@@ -347,29 +374,53 @@ export default function DocumentStudioPage() {
                   </div>
 
                   {hasPermission('documents:toggle_active') && (
-                    <button
-                      onClick={handleToggleActive}
-                      className={`btn btn-xs ${batch.is_active_knowledge ? 'btn-ghost-danger' : 'btn-outline'}`}
-                      style={{
-                        padding: '3px 10px',
-                        fontSize: '11.5px',
-                        borderRadius: 'var(--radius-xs)',
-                        fontWeight: 600,
-                      }}
-                      title="Klik untuk mengubah status dokumen dalam basis pencarian RAG Chat"
-                    >
-                      {batch.is_active_knowledge ? (
-                        <>
-                          <XCircle size={12} />
-                          <span>Nonaktifkan dari Chat</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 size={12} />
-                          <span>Aktifkan untuk Chat</span>
-                        </>
-                      )}
-                    </button>
+                    (batch.curated_count || 0) === 0 ? (
+                      <button
+                        onClick={() => {
+                          setActiveTab('insights');
+                          toast.info('Lakukan kurasi insight dokumen terlebih dahulu sebelum mengaktifkannya.');
+                        }}
+                        className="btn btn-xs btn-outline"
+                        style={{
+                          padding: '3px 10px',
+                          fontSize: '11.5px',
+                          borderRadius: 'var(--radius-xs)',
+                          fontWeight: 600,
+                          color: '#b45309',
+                          borderColor: '#fde68a',
+                          backgroundColor: '#fffbeb',
+                          gap: '4px',
+                        }}
+                        title="Buka tab Kurasi AI untuk mengkurasi dokumen ini"
+                      >
+                        <Sparkles size={12} />
+                        <span>Mulai Kurasi AI</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleToggleActive}
+                        className={`btn btn-xs ${batch.is_active_knowledge ? 'btn-ghost-danger' : 'btn-outline'}`}
+                        style={{
+                          padding: '3px 10px',
+                          fontSize: '11.5px',
+                          borderRadius: 'var(--radius-xs)',
+                          fontWeight: 600,
+                        }}
+                        title="Klik untuk mengubah status dokumen dalam basis pencarian RAG Chat"
+                      >
+                        {batch.is_active_knowledge ? (
+                          <>
+                            <XCircle size={12} />
+                            <span>Nonaktifkan dari Chat</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 size={12} />
+                            <span>Aktifkan untuk Chat</span>
+                          </>
+                        )}
+                      </button>
+                    )
                   )}
                 </div>
               </div>

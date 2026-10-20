@@ -30,14 +30,16 @@ export async function ensureCompleteDatabaseSchema(): Promise<void> {
           original_filename TEXT NOT NULL,
           chunk_count INT NOT NULL DEFAULT 0,
           page_count INT NOT NULL,
-          is_active_knowledge BOOLEAN DEFAULT true,
+          is_active_knowledge BOOLEAN DEFAULT false,
           uploaded_at TIMESTAMPTZ NOT NULL DEFAULT now()
       );
-      ALTER TABLE upload_batches ADD COLUMN IF NOT EXISTS is_active_knowledge BOOLEAN NOT NULL DEFAULT true;
+      ALTER TABLE upload_batches ADD COLUMN IF NOT EXISTS is_active_knowledge BOOLEAN NOT NULL DEFAULT false;
+      ALTER TABLE upload_batches ALTER COLUMN is_active_knowledge SET DEFAULT false;
       ALTER TABLE upload_batches ADD COLUMN IF NOT EXISTS owner_id UUID;
       ALTER TABLE upload_batches ADD COLUMN IF NOT EXISTS division_id VARCHAR(100) NOT NULL DEFAULT 'General';
       ALTER TABLE upload_batches ADD COLUMN IF NOT EXISTS classification VARCHAR(50) NOT NULL DEFAULT 'Internal';
-      ALTER TABLE upload_batches ADD COLUMN IF NOT EXISTS status VARCHAR(50) NOT NULL DEFAULT 'Aktif';
+      ALTER TABLE upload_batches ADD COLUMN IF NOT EXISTS status VARCHAR(50) NOT NULL DEFAULT 'Menunggu Kurasi';
+      ALTER TABLE upload_batches ALTER COLUMN status SET DEFAULT 'Menunggu Kurasi';
       ALTER TABLE upload_batches ADD COLUMN IF NOT EXISTS version VARCHAR(20) NOT NULL DEFAULT '1.0';
       ALTER TABLE upload_batches ADD COLUMN IF NOT EXISTS supersedes_id UUID;
       ALTER TABLE upload_batches ADD COLUMN IF NOT EXISTS effective_date TIMESTAMPTZ NOT NULL DEFAULT now();
@@ -45,6 +47,14 @@ export async function ensureCompleteDatabaseSchema(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_batches_status ON upload_batches (status);
       CREATE INDEX IF NOT EXISTS idx_batches_division ON upload_batches (division_id);
       CREATE INDEX IF NOT EXISTS idx_batches_classification ON upload_batches (classification);
+
+      -- Sinkronisasi Ketat: Dokumen yang belum memiliki insight terkurasi TIDAK BOLEH aktif untuk AI
+      UPDATE upload_batches
+      SET is_active_knowledge = false, status = 'Menunggu Kurasi'
+      WHERE is_active_knowledge = true
+        AND NOT EXISTS (
+          SELECT 1 FROM curated_insights ci WHERE ci.upload_batch_id = upload_batches.id
+        );
     `).catch((e) => console.warn('[AutoMigration] upload_batches warn:', e?.message));
 
     // 4. Tabel document_chunks

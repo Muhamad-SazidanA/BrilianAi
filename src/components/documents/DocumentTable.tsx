@@ -13,12 +13,16 @@ import {
   MessageSquare,
   UploadCloud,
   X,
+  Sparkles,
+  Loader2,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { UploadBatch } from '@/types/document';
 import RenameModal from './RenameModal';
 import EnterprisePagination from '@/components/ui/EnterprisePagination';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserSession } from '@/context/UserSessionContext';
+import { useIngestion } from '@/context/IngestionContext';
 import { formatDateTime } from '@lib/utils/formatters';
 
 interface DocumentTableProps {
@@ -47,10 +51,21 @@ export default function DocumentTable({
   const { language, t } = useLanguage();
   const { hasPermission } = useUserSession();
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterActive, setFilterActive] = useState<'all' | 'active' | 'inactive'>('all');
+  const [filterActive, setFilterActive] = useState<'all' | 'active' | 'pending' | 'standby'>('all');
   const [selectedForRename, setSelectedForRename] = useState<UploadBatch | null>(null);
   const [isActivatingAll, setIsActivatingAll] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Hook into active background ingestion tasks
+  let activeIngestionTasks: Array<any> = [];
+  try {
+    const ingestion = useIngestion();
+    activeIngestionTasks = (ingestion.tasks || []).filter(
+      (t) => t.status !== 'completed' && t.status !== 'error'
+    );
+  } catch {
+    // Graceful fallback
+  }
 
   // Keyboard shortcut Ctrl+K and /
   useEffect(() => {
@@ -76,15 +91,19 @@ export default function DocumentTable({
     setCurrentPage(1);
   }, [searchQuery, filterActive]);
 
-  const inactiveCount = batches.filter((b) => !b.is_active_knowledge).length;
-  const activeCount = batches.filter((b) => b.is_active_knowledge).length;
+  // Klasifikasi Status Dokumen yang Ketat & Akurat
+  const activeCount = batches.filter((b) => !!b.is_active_knowledge && (b.curated_count || 0) > 0).length;
+  const pendingCount = batches.filter((b) => (b.curated_count || 0) === 0).length;
+  const standbyCount = batches.filter((b) => !b.is_active_knowledge && (b.curated_count || 0) > 0).length;
+  const activatableCount = standbyCount;
 
   // Filter batches
   const filteredBatches = batches.filter((batch) => {
     const matchesSearch = batch.original_filename.toLowerCase().includes(searchQuery.toLowerCase());
     if (!matchesSearch) return false;
-    if (filterActive === 'active') return !!batch.is_active_knowledge;
-    if (filterActive === 'inactive') return !batch.is_active_knowledge;
+    if (filterActive === 'active') return !!batch.is_active_knowledge && (batch.curated_count || 0) > 0;
+    if (filterActive === 'pending') return (batch.curated_count || 0) === 0;
+    if (filterActive === 'standby') return !batch.is_active_knowledge && (batch.curated_count || 0) > 0;
     return true;
   });
 
@@ -181,23 +200,42 @@ export default function DocumentTable({
               {language === 'en' ? 'Active' : 'Aktif'} ({activeCount})
             </button>
             <button
-              onClick={() => setFilterActive('inactive')}
+              onClick={() => setFilterActive('pending')}
               style={{
                 borderRadius: '9999px',
                 padding: '2px 10px',
                 fontSize: '11px',
                 height: '22px',
-                fontWeight: filterActive === 'inactive' ? 600 : 500,
+                fontWeight: filterActive === 'pending' ? 600 : 500,
                 border: 'none',
-                backgroundColor: filterActive === 'inactive' ? 'var(--bg-card, #ffffff)' : 'transparent',
-                color: filterActive === 'inactive' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                boxShadow: filterActive === 'inactive' ? '0 1px 2px rgba(15, 23, 42, 0.06)' : 'none',
+                backgroundColor: filterActive === 'pending' ? 'var(--bg-card, #ffffff)' : 'transparent',
+                color: filterActive === 'pending' ? '#b45309' : 'var(--text-secondary)',
+                boxShadow: filterActive === 'pending' ? '0 1px 2px rgba(15, 23, 42, 0.06)' : 'none',
                 cursor: 'pointer',
                 transition: 'all 0.12s ease',
                 whiteSpace: 'nowrap',
               }}
             >
-              {language === 'en' ? 'Standby' : 'Standby'} ({inactiveCount})
+              {language === 'en' ? 'Pending Curation' : 'Menunggu Kurasi'} ({pendingCount})
+            </button>
+            <button
+              onClick={() => setFilterActive('standby')}
+              style={{
+                borderRadius: '9999px',
+                padding: '2px 10px',
+                fontSize: '11px',
+                height: '22px',
+                fontWeight: filterActive === 'standby' ? 600 : 500,
+                border: 'none',
+                backgroundColor: filterActive === 'standby' ? 'var(--bg-card, #ffffff)' : 'transparent',
+                color: filterActive === 'standby' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                boxShadow: filterActive === 'standby' ? '0 1px 2px rgba(15, 23, 42, 0.06)' : 'none',
+                cursor: 'pointer',
+                transition: 'all 0.12s ease',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {language === 'en' ? 'Standby' : 'Standby'} ({standbyCount})
             </button>
           </div>
         </div>
@@ -270,7 +308,7 @@ export default function DocumentTable({
             )}
           </div>
 
-          {onActivateAll && inactiveCount > 0 && hasPermission('documents:toggle_active') && (
+          {onActivateAll && activatableCount > 0 && hasPermission('documents:toggle_active') && (
             <button
               onClick={async () => {
                 setIsActivatingAll(true);
@@ -283,10 +321,10 @@ export default function DocumentTable({
               disabled={isLoading || isActivatingAll}
               className="btn btn-outline btn-xs"
               style={{ fontWeight: 600, height: '26px', fontSize: '11px', gap: '4px', padding: '0 8px', borderRadius: '9999px' }}
-              title="Aktifkan seluruh dokumen yang masih Standby agar dapat langsung dijawab oleh AI Chatbot"
+              title="Aktifkan seluruh dokumen terkurasi yang masih Standby agar dapat langsung dijawab oleh AI Chatbot"
             >
               <CheckCircle2 size={12} className={isActivatingAll ? 'animate-spin' : ''} />
-              <span>Aktifkan Semua ({inactiveCount})</span>
+              <span>Aktifkan Semua ({activatableCount})</span>
             </button>
           )}
 
@@ -373,8 +411,103 @@ export default function DocumentTable({
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {/* ── Active Background Ingestion Live Progress Rows ── */}
+              {activeIngestionTasks.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', borderBottom: '1px solid #fde68a' }}>
+                  {activeIngestionTasks.map((task) => (
+                    <div
+                      key={`task-${task.id}`}
+                      className="enterprise-list-item"
+                      style={{
+                        backgroundColor: 'rgba(245, 158, 11, 0.05)',
+                        borderBottom: '1px solid var(--border-default)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0, flex: 1, marginRight: '12px' }}>
+                        <div
+                          style={{
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '5px',
+                            backgroundColor: '#fef3c7',
+                            color: '#d97706',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <Loader2 size={13} className="animate-spin" />
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flexWrap: 'wrap' }}>
+                          <span
+                            style={{
+                              fontWeight: 600,
+                              fontSize: '13px',
+                              color: 'var(--text-primary)',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              maxWidth: '280px',
+                            }}
+                            title={task.fileName}
+                          >
+                            {task.fileName}
+                          </span>
+                          <span style={{ fontSize: '11px', color: '#b45309', fontWeight: 500 }}>
+                            · {task.message || 'Memproses OCR & Vektorisasi...'}
+                          </span>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                        <div
+                          style={{
+                            width: '90px',
+                            height: '6px',
+                            borderRadius: '9999px',
+                            backgroundColor: 'var(--bg-subtle, #f1f5f9)',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <div
+                            style={{
+                              height: '100%',
+                              width: `${Math.max(10, task.progressPercent || 0)}%`,
+                              backgroundColor: '#f59e0b',
+                              borderRadius: '9999px',
+                              transition: 'width 0.3s ease',
+                            }}
+                          />
+                        </div>
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            fontSize: '10.5px',
+                            fontWeight: 600,
+                            color: '#b45309',
+                            backgroundColor: '#fffbeb',
+                            padding: '2px 8px',
+                            borderRadius: '9999px',
+                            border: '1px solid #fde68a',
+                          }}
+                        >
+                          <Loader2 size={10} className="animate-spin" />
+                          {task.progressPercent || 0}%
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {paginatedBatches.map((batch, idx) => {
                 const formattedDate = formatDateTime(batch.uploaded_at, language);
+                const isTaskRunning = activeIngestionTasks.some(
+                  (t) => t.result?.upload_batch_id === batch.id || t.fileName === batch.original_filename
+                );
+                const isCurated = (batch.curated_count || 0) > 0;
 
               return (
                 <div
@@ -440,10 +573,10 @@ export default function DocumentTable({
                       <span>· {batch.division_id || 'General'}</span>
                       <span className="font-mono">· v{batch.version || '1.0'}</span>
                       {batch.has_user_grant && <span>· Akses Khusus</span>}
-                      {batch.curated_count ? (
+                      {isCurated ? (
                         <span>· {batch.curated_count} Insight</span>
                       ) : (
-                        <span>· Belum Terkurasi</span>
+                        <span style={{ color: '#b45309', fontWeight: 500 }}>· Belum Terkurasi</span>
                       )}
                       <span>· {formattedDate}</span>
                     </div>
@@ -451,7 +584,44 @@ export default function DocumentTable({
 
                   {/* ── Right: Live Status Dot + Sleek Actions ── */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                    {batch.is_active_knowledge ? (
+                    {isTaskRunning ? (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          color: '#b45309',
+                          backgroundColor: '#fffbeb',
+                          padding: '2px 8px',
+                          borderRadius: '9999px',
+                          border: '1px solid #fde68a',
+                        }}
+                      >
+                        <Loader2 size={10} className="animate-spin" />
+                        Memproses...
+                      </span>
+                    ) : !isCurated ? (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          fontSize: '11px',
+                          fontWeight: 500,
+                          color: '#b45309',
+                          backgroundColor: '#fffbeb',
+                          padding: '2px 8px',
+                          borderRadius: '9999px',
+                          border: '1px solid #fde68a',
+                        }}
+                        title="Dokumen belum memiliki insight terkurasi. Kurasi sekarang agar dapat aktif di AI Chatbot."
+                      >
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#f59e0b' }} />
+                        Menunggu Kurasi
+                      </span>
+                    ) : batch.is_active_knowledge ? (
                       <span
                         style={{
                           display: 'inline-flex',
@@ -483,7 +653,30 @@ export default function DocumentTable({
                     <div style={{ width: '1px', height: '14px', backgroundColor: 'var(--border-default)', margin: '0 2px' }} />
 
                     {/* Subtle Action Buttons */}
-                    {hasPermission('documents:toggle_active') && (
+                    {!isCurated ? (
+                      <Link
+                        href={`/documents/${batch.id}?tab=insights`}
+                        className="btn btn-outline btn-xs"
+                        style={{
+                          fontSize: '10.5px',
+                          height: '22px',
+                          padding: '0 8px',
+                          borderRadius: '9999px',
+                          color: '#b45309',
+                          borderColor: '#fde68a',
+                          backgroundColor: '#fffbeb',
+                          gap: '4px',
+                          fontWeight: 600,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          textDecoration: 'none',
+                        }}
+                        title="Buka Document Studio untuk mengkurasi insight dokumen ini"
+                      >
+                        <Sparkles size={11} />
+                        <span>Kurasi</span>
+                      </Link>
+                    ) : hasPermission('documents:toggle_active') ? (
                       <button
                         onClick={() => onToggleActive(batch.id, !batch.is_active_knowledge)}
                         className="btn btn-ghost btn-xs"
@@ -491,14 +684,14 @@ export default function DocumentTable({
                           fontSize: '10.5px',
                           padding: '2px 6px',
                           borderRadius: '4px',
-                          color: 'var(--text-secondary)',
+                          color: batch.is_active_knowledge ? 'var(--text-secondary)' : '#2563eb',
                           fontWeight: 500,
                         }}
                         title={batch.is_active_knowledge ? 'Nonaktifkan dari RAG AI' : 'Aktifkan untuk RAG AI'}
                       >
                         {batch.is_active_knowledge ? 'Nonaktifkan' : 'Aktifkan'}
                       </button>
-                    )}
+                    ) : null}
 
                     {hasPermission('chat:query') && (
                       <Link

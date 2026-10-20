@@ -70,7 +70,7 @@ export async function createUploadBatch(
   const pool = getPool();
   const divisionId = options?.divisionId || 'General';
   const classification = options?.classification || 'Internal';
-  const status = options?.status || 'Aktif';
+  const status = options?.status || 'Menunggu Kurasi';
   const version = options?.version || '1.0';
   const ownerId = options?.ownerId || null;
   const supersedesId = options?.supersedesId || null;
@@ -90,7 +90,7 @@ export async function createUploadBatch(
         supersedes_id,
         review_due_date
       )
-      VALUES ($1, $2, true, $3, $4, $5, $6, $7, $8, $9)
+      VALUES ($1, $2, false, $3, $4, $5, $6, $7, $8, $9)
       RETURNING id;
     `;
     const result = await pool.query<{ id: string }>(sql, [
@@ -108,7 +108,7 @@ export async function createUploadBatch(
   } catch {
     const fallbackSql = `
       INSERT INTO upload_batches (original_filename, page_count, is_active_knowledge)
-      VALUES ($1, $2, true)
+      VALUES ($1, $2, false)
       RETURNING id;
     `;
     try {
@@ -218,11 +218,14 @@ export async function listBatches(): Promise<UploadBatch[]> {
         b.chunk_count, 
         b.page_count, 
         b.uploaded_at, 
-        COALESCE(b.is_active_knowledge, false) AS is_active_knowledge,
+        (COALESCE(b.is_active_knowledge, false) AND COALESCE(ci.curated_count, 0) > 0) AS is_active_knowledge,
         b.owner_id,
         COALESCE(b.division_id, 'General') AS division_id,
         COALESCE(b.classification, 'Internal') AS classification,
-        COALESCE(b.status, 'Aktif') AS status,
+        CASE 
+          WHEN COALESCE(ci.curated_count, 0) = 0 THEN 'Menunggu Kurasi'
+          ELSE COALESCE(b.status, 'Aktif')
+        END AS status,
         COALESCE(b.version, '1.0') AS version,
         b.effective_date,
         b.review_due_date,
@@ -275,11 +278,14 @@ export async function getBatchById(batchId: string): Promise<UploadBatch | null>
         b.chunk_count, 
         b.page_count, 
         b.uploaded_at, 
-        COALESCE(b.is_active_knowledge, false) AS is_active_knowledge,
+        (COALESCE(b.is_active_knowledge, false) AND COALESCE(ci.curated_count, 0) > 0) AS is_active_knowledge,
         b.owner_id,
         COALESCE(b.division_id, 'General') AS division_id,
         COALESCE(b.classification, 'Internal') AS classification,
-        COALESCE(b.status, 'Aktif') AS status,
+        CASE 
+          WHEN COALESCE(ci.curated_count, 0) = 0 THEN 'Menunggu Kurasi'
+          ELSE COALESCE(b.status, 'Aktif')
+        END AS status,
         COALESCE(b.version, '1.0') AS version,
         b.effective_date,
         b.review_due_date,
@@ -336,13 +342,27 @@ export async function toggleBatchKnowledgeBase(
     console.warn('[VectorStore] ALTER TABLE ensure is_active_knowledge warning:', err);
   }
 
+  // Aturan Ketat: Dokumen HANYA boleh diaktifkan jika telah memiliki minimal 1 insight terkurasi
+  if (isActive) {
+    const curRes = await pool.query<{ count: number }>(
+      `SELECT COUNT(*)::int AS count FROM curated_insights WHERE upload_batch_id = $1`,
+      [batchId]
+    );
+    if ((curRes.rows[0]?.count || 0) === 0) {
+      throw new Error(
+        'Dokumen belum memiliki insight terkurasi. Lakukan kurasi dokumen terlebih dahulu sebelum mengaktifkannya sebagai basis pengetahuan AI.'
+      );
+    }
+  }
+
   const sql = `
     UPDATE upload_batches
-    SET is_active_knowledge = $1
-    WHERE id = $2
-    RETURNING id, original_filename, chunk_count, page_count, uploaded_at, is_active_knowledge;
+    SET is_active_knowledge = $1, status = $2
+    WHERE id = $3
+    RETURNING id, original_filename, chunk_count, page_count, uploaded_at, is_active_knowledge, status;
   `;
-  const result = await pool.query<UploadBatch>(sql, [isActive, batchId]);
+  const nextStatus = isActive ? 'Aktif' : 'Standby';
+  const result = await pool.query<UploadBatch>(sql, [isActive, nextStatus, batchId]);
   if (result.rowCount === 0) {
     throw new Error(`Upload batch with ID ${batchId} not found.`);
   }
@@ -368,6 +388,17 @@ export async function updateBatchMetadata(
   let idx = 1;
 
   if (metadata.status) {
+    if (metadata.status === 'Aktif') {
+      const curRes = await pool.query<{ count: number }>(
+        `SELECT COUNT(*)::int AS count FROM curated_insights WHERE upload_batch_id = $1`,
+        [batchId]
+      );
+      if ((curRes.rows[0]?.count || 0) === 0) {
+        throw new Error(
+          'Dokumen belum memiliki insight terkurasi. Silakan lakukan kurasi dokumen terlebih dahulu sebelum menyetel status Aktif.'
+        );
+      }
+    }
     fields.push(`status = $${idx++}`);
     values.push(metadata.status);
     // Jika status diset bukan 'Aktif', otomatis is_active_knowledge = false
@@ -421,12 +452,18 @@ export async function updateBatchMetadata(
 export async function activateAllBatches(active: boolean = true): Promise<number> {
   const pool = getPool();
   try {
-    const sql = `
-      UPDATE upload_batches
-      SET is_active_knowledge = $1
-      WHERE chunk_count > 0;
-    `;
-    const res = await pool.query(sql, [active]);
+    const sql = active
+      ? `
+        UPDATE upload_batches
+        SET is_active_knowledge = true, status = 'Aktif'
+        WHERE chunk_count > 0
+          AND EXISTS (SELECT 1 FROM curated_insights ci WHERE ci.upload_batch_id = upload_batches.id);
+      `
+      : `
+        UPDATE upload_batches
+        SET is_active_knowledge = false, status = 'Standby';
+      `;
+    const res = await pool.query(sql);
     return res.rowCount || 0;
   } catch (err) {
     console.error('[VectorStore] Error activateAllBatches:', err);
@@ -607,7 +644,7 @@ export async function searchSimilarChunks(
   const limit = options?.limit ?? 5;
   const batchId = options?.batchId || null;
   const activeCondition = options?.onlyActiveKnowledge
-    ? 'AND (COALESCE(b.is_active_knowledge, false) = true OR NOT EXISTS (SELECT 1 FROM upload_batches ub WHERE COALESCE(ub.is_active_knowledge, false) = true))'
+    ? 'AND COALESCE(b.is_active_knowledge, false) = true AND EXISTS (SELECT 1 FROM curated_insights ci WHERE ci.upload_batch_id = b.id)'
     : '';
 
   const results: SimilarChunkResult[] = [];
@@ -893,7 +930,7 @@ export async function searchSimilarCuratedInsights(
   const limit = options?.limit ?? 5;
   const batchId = options?.batchId || null;
   const activeCondition = options?.onlyActiveKnowledge
-    ? 'AND (COALESCE(b.is_active_knowledge, false) = true OR NOT EXISTS (SELECT 1 FROM upload_batches ub WHERE COALESCE(ub.is_active_knowledge, false) = true))'
+    ? 'AND COALESCE(b.is_active_knowledge, false) = true'
     : '';
 
   const results: SimilarCuratedResult[] = [];

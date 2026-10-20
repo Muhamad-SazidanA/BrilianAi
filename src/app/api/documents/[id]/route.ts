@@ -118,10 +118,29 @@ export async function PATCH(
       );
     }
     const body = await request.json();
-    const { filename, isActiveKnowledge, status, classification, divisionId, version, reviewDueDate } = body;
+    const { filename, status, classification, divisionId, version, reviewDueDate } = body;
+    const targetActiveKnowledge =
+      typeof body.isActiveKnowledge === 'boolean'
+        ? body.isActiveKnowledge
+        : typeof body.is_active_knowledge === 'boolean'
+        ? body.is_active_knowledge
+        : undefined;
 
     // 1. Update lifecycle status atau metadata ABAC jika ada
     if (status || classification || divisionId || version || reviewDueDate !== undefined) {
+      if (status === 'Aktif') {
+        const batch = await getBatchById(id);
+        if (!batch) {
+          return NextResponse.json({ error: 'Dokumen tidak ditemukan.' }, { status: 404 });
+        }
+        if ((batch.curated_count || 0) === 0) {
+          return NextResponse.json(
+            { error: 'Dokumen belum memiliki insight terkurasi. Lakukan kurasi dokumen terlebih dahulu sebelum menyetel status Aktif.' },
+            { status: 400 }
+          );
+        }
+      }
+
       const updated = await updateBatchMetadata(id, {
         status,
         classification,
@@ -138,22 +157,31 @@ export async function PATCH(
       );
     }
 
-    // 1. Aktivasi / Nonaktifkan dokumen sebagai Basis Pengetahuan AI Chatbot
-    if (typeof isActiveKnowledge === 'boolean') {
-      if (isActiveKnowledge) {
-        const rawChunks = await listChunks(id);
-        if (rawChunks.length === 0) {
+    // 2. Aktivasi / Nonaktifkan dokumen sebagai Basis Pengetahuan AI Chatbot
+    if (typeof targetActiveKnowledge === 'boolean') {
+      if (targetActiveKnowledge) {
+        const batch = await getBatchById(id);
+        if (!batch) {
+          return NextResponse.json({ error: 'Dokumen tidak ditemukan.' }, { status: 404 });
+        }
+        if ((batch.chunk_count || 0) === 0) {
           return NextResponse.json(
             { error: 'Dokumen tidak memiliki potongan teks (chunk) yang valid untuk diaktifkan.' },
             { status: 400 }
           );
         }
+        if ((batch.curated_count || 0) === 0) {
+          return NextResponse.json(
+            { error: 'Dokumen belum memiliki insight terkurasi. Lakukan kurasi dokumen terlebih dahulu sebelum mengaktifkannya sebagai Basis Pengetahuan AI.' },
+            { status: 400 }
+          );
+        }
       }
 
-      const updated = await toggleBatchKnowledgeBase(id, isActiveKnowledge);
+      const updated = await toggleBatchKnowledgeBase(id, targetActiveKnowledge);
       return NextResponse.json(
         {
-          message: isActiveKnowledge
+          message: targetActiveKnowledge
             ? 'Dokumen berhasil diaktifkan sebagai Basis Pengetahuan AI Chatbot.'
             : 'Dokumen dinonaktifkan dari Basis Pengetahuan AI Chatbot.',
           data: updated,

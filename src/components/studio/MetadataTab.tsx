@@ -42,6 +42,15 @@ export default function MetadataTab({ batch, chunks, onBatchUpdated }: MetadataT
   });
 
   const handleSaveGovernance = async () => {
+    if (editStatus === 'Aktif' && (batch.curated_count || 0) === 0) {
+      toast.error(
+        language === 'en'
+          ? 'Document cannot be activated before being curated. Please curate at least 1 insight first.'
+          : 'Dokumen belum memiliki insight terkurasi. Silakan lakukan kurasi dokumen terlebih dahulu sebelum menyetel status Aktif.'
+      );
+      return;
+    }
+
     setIsSaving(true);
     try {
       const res = await fetch(`/api/documents/${batch.id}`, {
@@ -208,7 +217,9 @@ export default function MetadataTab({ batch, chunks, onBatchUpdated }: MetadataT
                 className="input-text"
                 style={{ width: '100%', fontSize: '13px' }}
               >
-                <option value="Aktif">Aktif (Terindeks AI Chatbot)</option>
+                <option value="Aktif" disabled={!batch.curated_count}>
+                  Aktif {batch.curated_count ? '(Terindeks AI Chatbot)' : '(Terkunci: Wajib Kurasi Dahulu)'}
+                </option>
                 <option value="Draft">Draft (Belum diindeks)</option>
                 <option value="Review">Review (Menunggu tinjauan)</option>
                 <option value="Superseded">Superseded (Digantikan versi baru)</option>
