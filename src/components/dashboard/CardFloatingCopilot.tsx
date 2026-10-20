@@ -228,10 +228,6 @@ export function CardFloatingCopilot({
         </button>
       </div>
 
-      {/* ── Subtitle (Matching Image 3) ── */}
-      <p className="db-floating-pill-subtitle">
-        Apps Brilian answers strictly from uploaded internal documents with zero external leaks.
-      </p>
 
       {/* ── Response Popover Bubble (Floating right below) ── */}
       {(response || error) && (

@@ -2528,15 +2528,7 @@ thead::-webkit-scrollbar {
 .db-floating-pill-close:hover {
   color: var(--text-primary, #0F172A);
   background: var(--bg-muted, #F1F5F9);
-}
-.db-floating-pill-subtitle {
-  font-size: 11px;
-  color: #64748B;
-  margin: 6px 0 0;
-  text-align: center;
-  line-height: 1.4;
-  user-select: none;
-}
+
 .db-floating-popover-card {
   width: 100%;
   max-width: 520px;
