@@ -2295,6 +2295,25 @@ thead::-webkit-scrollbar {
   color: var(--text-muted);
   border-color: var(--border-default);
 }
+.db-build-btn-ready {
+  background: var(--color-primary-subtle);
+  border-color: var(--color-primary-border);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+.db-build-btn-ready:hover:not(:disabled) {
+  background: var(--color-primary);
+  color: #ffffff;
+  border-color: var(--color-primary);
+}
+.db-build-btn-subtle {
+  font-size: 11px;
+  padding: 3px 8px;
+  opacity: 0.85;
+}
+.db-build-btn-subtle:hover:not(:disabled) {
+  opacity: 1;
+}
 .db-build-btn-spinner { animation: dbSpin 1s linear infinite; }
 @keyframes dbSpin { to { transform: rotate(360deg); } }
 

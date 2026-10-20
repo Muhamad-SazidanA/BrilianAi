@@ -1233,6 +1233,7 @@ export default function ChatWorkspace({
                 <React.Fragment key={msg.id}>
                   <ChatMessageItem
                     message={msg}
+                    sessionId={sessionId}
                     animateEntrance={msg.id === animatingMessageId}
                     onSelectCitation={(source) => setInspectingSource(source)}
                     onSwitchVariant={(newIndex) => {
@@ -1257,6 +1258,13 @@ export default function ChatWorkspace({
                         ? (newText) => handleEditUserPrompt(idx, newText)
                         : undefined
                     }
+                    onUpdateMessage={(updatedMsg) => {
+                      setMessages((prev) => {
+                        const next = prev.map((m) => (m.id === updatedMsg.id ? updatedMsg : m));
+                        scheduleSave(next);
+                        return next;
+                      });
+                    }}
                   />
 
                   {/* Privacy Divider: Titik pemisah pesan yang telah dibagikan ke publik */}

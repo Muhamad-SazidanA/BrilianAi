@@ -135,3 +135,19 @@ export async function updateDashboardData(
 
   return result.rows[0] || null;
 }
+
+/**
+ * Get latest dashboard by message ID.
+ */
+export async function getDashboardByMessageId(messageId: string): Promise<DashboardRecord | null> {
+  await ensureTableExists();
+  const pool = getPool();
+
+  const result = await pool.query<DashboardRecord>(
+    `SELECT * FROM ai_dashboards WHERE message_id = $1 ORDER BY created_at DESC LIMIT 1`,
+    [messageId]
+  );
+
+  return result.rows[0] || null;
+}
+

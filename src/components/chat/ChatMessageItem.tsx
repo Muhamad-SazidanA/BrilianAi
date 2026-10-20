@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Copy,
   Check,
@@ -17,29 +17,36 @@ import {
   Send,
   X,
   Pencil,
+  LayoutDashboard,
+  Loader2,
 } from 'lucide-react';
 import { ChatMessage, ChatSource } from '@/types/chat';
 import { DashboardData } from '@/types/dashboard';
 import MarkdownContent from '@/components/ui/MarkdownContent';
 import { BuildDashboardButton, AiDashboardPreview } from '@/components/chat/AiDashboardPreview';
+import { morphWidget } from '@/lib/utils/dashboardMorph';
 import { useLanguage } from '@/context/LanguageContext';
 import { toast } from 'sonner';
 
 interface ChatMessageItemProps {
   message: ChatMessage;
+  sessionId?: string;
   onSelectCitation: (_source: ChatSource) => void;
   onRetry?: () => void;
   onSwitchVariant?: (_newIndex: number) => void;
   onEditPrompt?: (_newText: string) => void;
+  onUpdateMessage?: (_updatedMessage: ChatMessage) => void;
   animateEntrance?: boolean;
 }
 
 export default function ChatMessageItem({
   message,
+  sessionId,
   onSelectCitation,
   onRetry,
   onSwitchVariant,
   onEditPrompt,
+  onUpdateMessage,
   animateEntrance = false,
 }: ChatMessageItemProps) {
   const { language, t } = useLanguage();
@@ -52,16 +59,98 @@ export default function ChatMessageItem({
   const [editText, setEditText] = useState(message.text);
   const [isPromptHovered, setIsPromptHovered] = useState(false);
 
-  // Dashboard state
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
-  const [dashboardId, setDashboardId] = useState<string | null>(null);
+  // Dashboard state initialized from message if available
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(
+    message.dashboardData || null
+  );
+  const [dashboardId, setDashboardId] = useState<string | null>(
+    message.dashboardId || null
+  );
   const [showDashboard, setShowDashboard] = useState(false);
+  const [isLoadingDashboard, setIsLoadingDashboard] = useState(false);
 
-  const handleDashboardReady = (data: DashboardData, id: string) => {
+  React.useEffect(() => {
+    if (message.dashboardId && message.dashboardId !== dashboardId) {
+      setDashboardId(message.dashboardId);
+    }
+    if (message.dashboardData && !dashboardData) {
+      setDashboardData(message.dashboardData);
+    }
+  }, [message.dashboardId, message.dashboardData, dashboardId, dashboardData]);
+
+  const handleDashboardReady = useCallback((data: DashboardData, id: string) => {
     setDashboardData(data);
     setDashboardId(id);
     setShowDashboard(true);
-  };
+    if (onUpdateMessage) {
+      onUpdateMessage({
+        ...message,
+        dashboardId: id,
+        dashboardData: data,
+      });
+    }
+  }, [message, onUpdateMessage]);
+
+  const handleOpenExistingDashboard = useCallback(async () => {
+    if (!dashboardId) return;
+    if (dashboardData) {
+      setShowDashboard(true);
+      return;
+    }
+    setIsLoadingDashboard(true);
+    try {
+      const res = await fetch(`/api/dashboard/${dashboardId}`);
+      if (!res.ok) throw new Error('Gagal memuat data dashboard');
+      const resp = await res.json();
+      setDashboardData(resp.data);
+      setShowDashboard(true);
+      if (onUpdateMessage) {
+        onUpdateMessage({
+          ...message,
+          dashboardId,
+          dashboardData: resp.data,
+        });
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Gagal memuat data dashboard');
+    } finally {
+      setIsLoadingDashboard(false);
+    }
+  }, [dashboardId, dashboardData, message, onUpdateMessage]);
+
+  const handleMorphWidget = useCallback(
+    async (index: number, targetType: 'bar_chart' | 'table') => {
+      if (!dashboardData || !dashboardId) return;
+      const currentWidget = dashboardData.widgets[index];
+      if (!currentWidget) return;
+      const morphed = morphWidget(currentWidget, targetType);
+      if (!morphed) return;
+
+      const nextWidgets = [...dashboardData.widgets];
+      nextWidgets[index] = morphed;
+      const nextData: DashboardData = { ...dashboardData, widgets: nextWidgets };
+
+      setDashboardData(nextData);
+      if (onUpdateMessage) {
+        onUpdateMessage({
+          ...message,
+          dashboardId,
+          dashboardData: nextData,
+        });
+      }
+
+      try {
+        await fetch(`/api/dashboard/${dashboardId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: nextData }),
+        });
+      } catch {
+        // silent
+      }
+    },
+    [dashboardData, dashboardId, message, onUpdateMessage]
+  );
 
   React.useEffect(() => {
     setEditText(message.text);
@@ -682,23 +771,58 @@ export default function ChatMessageItem({
                 <ThumbsDown size={13} />
               </button>
 
-              {/* 6. Buat Dashboard — convert AI answer to interactive dashboard */}
+              {/* 6. Buat / Buka Dashboard — convert AI answer to interactive dashboard */}
               {!message.isError && (
                 <>
                   {/* Separator */}
                   <div style={{ width: '1px', height: '14px', background: 'var(--border-default)', margin: '0 2px' }} />
-                  {showDashboard && dashboardData && dashboardId ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowDashboard(false)}
-                      className="db-build-btn db-build-btn-active"
-                      title={language === 'en' ? 'Hide dashboard' : 'Sembunyikan dashboard'}
-                    >
-                      <span>{language === 'en' ? 'Hide Dashboard' : 'Sembunyikan'}</span>
-                    </button>
+                  {dashboardId ? (
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      {showDashboard ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowDashboard(false)}
+                          className="db-build-btn db-build-btn-active"
+                          title={language === 'en' ? 'Hide dashboard' : 'Sembunyikan dashboard'}
+                        >
+                          <LayoutDashboard size={13} />
+                          <span>{language === 'en' ? 'Hide Dashboard' : 'Sembunyikan'}</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleOpenExistingDashboard}
+                          disabled={isLoadingDashboard}
+                          className="db-build-btn db-build-btn-ready"
+                          title={language === 'en' ? 'Open interactive dashboard' : 'Buka dashboard interaktif'}
+                        >
+                          {isLoadingDashboard ? (
+                            <Loader2 size={13} className="db-build-btn-spinner" />
+                          ) : (
+                            <LayoutDashboard size={13} />
+                          )}
+                          <span>{language === 'en' ? 'Open Dashboard' : 'Buka Dashboard'}</span>
+                        </button>
+                      )}
+
+                      {/* Opsi Sekunder: Buat Ulang (Regenerate dari awal) */}
+                      <BuildDashboardButton
+                        messageId={message.id}
+                        sessionId={sessionId}
+                        answerText={activeAiText}
+                        queryText={undefined}
+                        forceRegenerate={true}
+                        label={language === 'en' ? 'Rebuild' : 'Buat Ulang'}
+                        title={language === 'en' ? 'Rebuild dashboard from scratch' : 'Buat ulang dashboard dari awal'}
+                        icon={<RefreshCw size={11} />}
+                        className="db-build-btn db-build-btn-subtle"
+                        onDashboardReady={handleDashboardReady}
+                      />
+                    </div>
                   ) : (
                     <BuildDashboardButton
                       messageId={message.id}
+                      sessionId={sessionId}
                       answerText={activeAiText}
                       queryText={undefined}
                       onDashboardReady={handleDashboardReady}
@@ -850,6 +974,7 @@ export default function ChatMessageItem({
                 dashboardId={dashboardId}
                 onClose={() => setShowDashboard(false)}
                 compact={true}
+                onMorphWidget={handleMorphWidget}
               />
             </div>
           )}

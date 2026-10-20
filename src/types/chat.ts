@@ -1,3 +1,5 @@
+import type { DashboardData } from './dashboard';
+
 export interface ChatSource {
   chunkId: number | string;
   uploadBatchId: string;
@@ -25,6 +27,8 @@ export interface ChatMessage {
   isError?: boolean;
   variants?: ChatMessageVariant[];
   currentVariantIndex?: number;
+  dashboardId?: string;
+  dashboardData?: DashboardData;
 }
 
 export interface ChatRequestPayload {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@lib/auth/serverAuth';
-import { saveDashboard } from '@lib/db/dashboardStore';
+import { saveDashboard, getDashboardByMessageId } from '@lib/db/dashboardStore';
 import { generateDashboardData } from '@lib/ai/dashboardClient';
 import { DashboardData } from '@/types/dashboard';
 
@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
  * Transform an AI answer text into a structured interactive dashboard.
  * Uses Multi-Tier Cloud API (Gemini Flash -> OpenAI -> DeepSeek -> Ollama fallback).
  *
- * Body: { messageId, sessionId?, answerText, queryText }
+ * Body: { messageId, sessionId?, answerText, queryText, forceRegenerate? }
  */
 export async function POST(request: NextRequest) {
   const user = await getAuthenticatedUser(request);
@@ -21,11 +21,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { messageId, sessionId, answerText, queryText } = body as {
+    const { messageId, sessionId, answerText, queryText, forceRegenerate } = body as {
       messageId?: string;
       sessionId?: string;
       answerText?: string;
       queryText?: string;
+      forceRegenerate?: boolean;
     };
 
     if (!answerText || !messageId) {
@@ -33,6 +34,16 @@ export async function POST(request: NextRequest) {
         { error: 'Field answerText dan messageId wajib diisi.' },
         { status: 400 }
       );
+    }
+
+    // Return existing dashboard if already created and user didn't request forceRegenerate
+    if (!forceRegenerate) {
+      const existing = await getDashboardByMessageId(messageId);
+      if (existing) {
+        const existingData: DashboardData =
+          typeof existing.data === 'string' ? JSON.parse(existing.data) : (existing.data as DashboardData);
+        return buildShareResponse(request, existing, existingData);
+      }
     }
 
     // Generate dashboard using Multi-Tier Cloud API (Gemini -> OpenAI -> DeepSeek -> Ollama)

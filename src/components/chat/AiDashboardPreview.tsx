@@ -463,6 +463,11 @@ interface BuildDashboardButtonProps {
   sessionId?: string;
   answerText: string;
   queryText?: string;
+  forceRegenerate?: boolean;
+  label?: string;
+  title?: string;
+  icon?: React.ReactNode;
+  className?: string;
   onDashboardReady: (data: DashboardData, dashboardId: string) => void;
 }
 
@@ -471,6 +476,11 @@ export function BuildDashboardButton({
   sessionId,
   answerText,
   queryText,
+  forceRegenerate = false,
+  label,
+  title,
+  icon,
+  className,
   onDashboardReady,
 }: BuildDashboardButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
@@ -483,7 +493,7 @@ export function BuildDashboardButton({
       const res = await fetch('/api/chat/dashboard', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messageId, sessionId, answerText, queryText }),
+        body: JSON.stringify({ messageId, sessionId, answerText, queryText, forceRegenerate }),
       });
 
       if (!res.ok) {
@@ -501,33 +511,36 @@ export function BuildDashboardButton({
       onDashboardReady(dashboardResp.data, result.dashboardId);
       toast.success(
         language === 'en'
-          ? `Dashboard created with ${result.widgetCount} widgets!`
-          : `Dashboard dibuat dengan ${result.widgetCount} widget!`
+          ? `Dashboard ready with ${result.widgetCount} widgets!`
+          : `Dashboard siap dengan ${result.widgetCount} widget!`
       );
     } catch (err: any) {
       toast.error(err?.message || 'Gagal membuat dashboard');
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, messageId, sessionId, answerText, queryText, onDashboardReady, language]);
+  }, [isLoading, messageId, sessionId, answerText, queryText, forceRegenerate, onDashboardReady, language]);
+
+  const defaultTitle = language === 'en' ? 'Convert to interactive dashboard' : 'Ubah menjadi dashboard interaktif';
+  const defaultLabel = language === 'en' ? 'Dashboard' : 'Dashboard';
 
   return (
     <button
       type="button"
       onClick={handleBuild}
       disabled={isLoading}
-      className="db-build-btn"
-      title={language === 'en' ? 'Convert to interactive dashboard' : 'Ubah menjadi dashboard interaktif'}
+      className={className || "db-build-btn"}
+      title={title || defaultTitle}
     >
       {isLoading ? (
         <Loader2 size={13} className="db-build-btn-spinner" />
       ) : (
-        <LayoutDashboard size={13} />
+        icon || <LayoutDashboard size={13} />
       )}
       <span>
         {isLoading
           ? (language === 'en' ? 'Building...' : 'Membuat...')
-          : (language === 'en' ? 'Dashboard' : 'Dashboard')}
+          : (label || defaultLabel)}
       </span>
     </button>
   );
