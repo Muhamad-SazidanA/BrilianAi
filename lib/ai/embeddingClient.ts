@@ -41,8 +41,85 @@ export async function embedTexts(
     return [queryEmbeddingCache.get(cacheKey)!];
   }
 
+  const geminiApiKey = process.env.GEMINI_API_KEY;
   const apiKey = process.env.OPENAI_API_KEY;
-  const useOllamaExplicit = process.env.EMBEDDING_PROVIDER === 'ollama';
+  const embeddingProvider = process.env.EMBEDDING_PROVIDER || (geminiApiKey ? 'gemini' : 'ollama');
+
+  // Helper: Google Gemini Cloud Embedding (Dimensi 1024 native MRL, 100% didanai Kredit Google Cloud)
+  const runGeminiEmbedding = async (): Promise<number[][] | null> => {
+    if (!geminiApiKey) return null;
+    const geminiModel = process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-001';
+    const BATCH_SIZE = 100;
+    const allEmbeddings: number[][] = [];
+
+    for (let i = 0; i < texts.length; i += BATCH_SIZE) {
+      const chunkBatch = texts.slice(i, i + BATCH_SIZE);
+      const sanitizedBatch = chunkBatch.map((t) => (t || ' ').replace(/\r\n|\r|\n/g, ' ').trim() || ' ');
+
+      const requests = sanitizedBatch.map((text) => ({
+        model: `models/${geminiModel}`,
+        content: {
+          parts: [{ text }],
+        },
+        outputDimensionality: dimensions,
+      }));
+
+      let attempt = 0;
+      const maxRetries = 2;
+      let delay = 1000;
+      let success = false;
+
+      while (attempt <= maxRetries && !success) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+          const res = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:batchEmbedContents?key=${geminiApiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ requests }),
+              signal: controller.signal,
+            }
+          );
+
+          clearTimeout(timeoutId);
+
+          if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`Gemini Embedding API HTTP ${res.status}: ${errText}`);
+          }
+
+          const data = await res.json();
+          if (data && Array.isArray(data.embeddings)) {
+            const vectors = data.embeddings.map((e: any) => e.values as number[]);
+            allEmbeddings.push(...vectors);
+            success = true;
+          } else {
+            throw new Error('Format response Gemini embedding tidak terduga.');
+          }
+        } catch (error: any) {
+          attempt++;
+          if (attempt <= maxRetries) {
+            console.warn(
+              `[Agent 2: Embedding] Percobaan Gemini ${attempt}/${maxRetries} gagal: ${error?.message}. Menunggu ${delay}ms...`
+            );
+            await new Promise((resolve) => setTimeout(resolve, delay));
+            delay *= 2;
+          } else {
+            console.warn(`[Agent 2: Embedding] Gemini embedding gagal: ${error?.message}`);
+            return null;
+          }
+        }
+      }
+    }
+
+    if (allEmbeddings.length === texts.length) {
+      return allEmbeddings;
+    }
+    return null;
+  };
 
   const runOllamaFallback = async (): Promise<number[][]> => {
     try {
@@ -64,11 +141,27 @@ export async function embedTexts(
     }
   };
 
-  if (!apiKey || useOllamaExplicit) {
+  // 1. TIER 1: Google Gemini Cloud Embedding (Hemat RAM VPS, Bebas Kuota Lokal)
+  if (embeddingProvider === 'gemini' || (geminiApiKey && embeddingProvider !== 'ollama' && embeddingProvider !== 'openai')) {
+    const geminiVectors = await runGeminiEmbedding();
+    if (geminiVectors) {
+      if (isSingleQuery && geminiVectors[0]) {
+        if (queryEmbeddingCache.size >= MAX_QUERY_EMBED_CACHE) {
+          const oldestKey = queryEmbeddingCache.keys().next().value;
+          if (oldestKey) queryEmbeddingCache.delete(oldestKey);
+        }
+        queryEmbeddingCache.set(cacheKey, geminiVectors[0]);
+      }
+      return geminiVectors;
+    }
+  }
+
+  // 2. TIER 2: Ollama jika eksplisit dipilih
+  if (embeddingProvider === 'ollama' || !apiKey) {
     return await runOllamaFallback();
   }
 
-  // OpenAI supports max 2048 inputs per batch
+  // 3. TIER 3: OpenAI text-embedding-3-small (jika apiKey tersedia)
   const BATCH_SIZE = 100;
   const allEmbeddings: number[][] = [];
 
@@ -106,11 +199,13 @@ export async function embedTexts(
 
         if (!response.ok) {
           const errText = await response.text();
-          // Jika kuota OpenAI habis (429) atau API Key kedaluwarsa (401), langsung alihkan ke Ollama bge-m3
+          // Jika kuota OpenAI habis (429) atau API Key kedaluwarsa (401), langsung alihkan ke Gemini/Ollama
           if (response.status === 429 || response.status === 401) {
             console.warn(
-              `[Agent 2: Embedding] OpenAI kuota habis/error (HTTP ${response.status}). Mengalihkan otomatis ke Ollama bge-m3...`
+              `[Agent 2: Embedding] OpenAI kuota habis/error (HTTP ${response.status}). Mengalihkan ke Gemini/Ollama...`
             );
+            const geminiFallback = await runGeminiEmbedding();
+            if (geminiFallback) return geminiFallback;
             return await runOllamaFallback();
           }
           throw new Error(`OpenAI Embedding API error HTTP ${response.status}: ${errText}`);
@@ -135,7 +230,9 @@ export async function embedTexts(
           await new Promise((resolve) => setTimeout(resolve, delay));
           delay *= 2;
         } else {
-          console.warn(`[Agent 2: Embedding] OpenAI gagal (${error?.message}). Mengalihkan otomatis ke Ollama bge-m3...`);
+          console.warn(`[Agent 2: Embedding] OpenAI gagal (${error?.message}). Mengalihkan ke Gemini/Ollama...`);
+          const geminiFallback = await runGeminiEmbedding();
+          if (geminiFallback) return geminiFallback;
           return await runOllamaFallback();
         }
       }
