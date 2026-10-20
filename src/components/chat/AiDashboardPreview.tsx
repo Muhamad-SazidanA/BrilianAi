@@ -18,7 +18,10 @@ import {
   Check,
   Share2,
   X,
+  Sparkles,
+  LucideIcon,
 } from 'lucide-react';
+import CardFloatingCopilot from '@/components/dashboard/CardFloatingCopilot';
 import {
   DashboardData,
   DashboardWidget,
@@ -53,18 +56,117 @@ const CARD_COLORS: Record<string, { gradient: string; icon: string; border: stri
 };
 
 // ─────────────────────────────────────────────────────────────
+// Common Widget Header with Morph and Open/Ask AI Button
+// ─────────────────────────────────────────────────────────────
+
+function WidgetCardHeader({
+  icon: Icon,
+  title,
+  onMorph,
+  morphLabel,
+  MorphIcon,
+  onOpenCopilot,
+  isCopilotOpen,
+}: {
+  icon: LucideIcon;
+  title: string;
+  onMorph?: () => void;
+  morphLabel?: string;
+  MorphIcon?: LucideIcon;
+  onOpenCopilot?: () => void;
+  isCopilotOpen?: boolean;
+}) {
+  return (
+    <div
+      className="db-widget-title"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: '10px',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flex: 1, marginRight: '8px' }}>
+        <Icon size={14} style={{ flexShrink: 0 }} />
+        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+        {onMorph && (
+          <button
+            type="button"
+            onClick={onMorph}
+            className="db-card-morph-btn"
+            title={`Ubah visualisasi menjadi ${morphLabel || 'Visualisasi Lain'}`}
+          >
+            {MorphIcon && <MorphIcon size={11} />}
+            <span>{morphLabel}</span>
+          </button>
+        )}
+        {onOpenCopilot && (
+          <button
+            type="button"
+            onClick={onOpenCopilot}
+            className={`db-card-open-btn ${isCopilotOpen ? 'active' : ''}`}
+            title={isCopilotOpen ? 'Tutup Copilot' : 'Open AI Copilot'}
+          >
+            <Sparkles size={11} />
+            <span>{isCopilotOpen ? 'Tutup' : 'Open'}</span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // Individual Widget Components
 // ─────────────────────────────────────────────────────────────
 
-function StatCard({ widget }: { widget: StatCardWidget }) {
+interface WidgetCommonProps {
+  originalIndex: number;
+  dashboardId: string;
+  dashboardData: DashboardData;
+  onOpenCopilot?: () => void;
+  isCopilotOpen?: boolean;
+  onMorphWidget?: (index: number, targetType: 'bar_chart' | 'table') => void;
+  onCloseCopilot: () => void;
+}
+
+function StatCard({
+  widget,
+  originalIndex,
+  dashboardId,
+  dashboardData,
+  onOpenCopilot,
+  isCopilotOpen,
+  onMorphWidget,
+  onCloseCopilot,
+}: { widget: StatCardWidget } & WidgetCommonProps) {
   const color = widget.color || 'blue';
   const palette = CARD_COLORS[color] || CARD_COLORS.blue;
   const TrendIcon = widget.trend === 'up' ? TrendingUp : widget.trend === 'down' ? TrendingDown : Minus;
   const trendColor = widget.trend === 'up' ? 'var(--color-success)' : widget.trend === 'down' ? 'var(--color-danger)' : 'var(--text-muted)';
 
   return (
-    <div className="db-widget db-stat-card" style={{ background: palette.gradient, borderColor: palette.border }}>
-      <div className="db-stat-label">{widget.title}</div>
+    <div
+      className={`db-widget db-stat-card ${isCopilotOpen ? 'db-widget-copilot-active' : ''}`}
+      style={{ background: palette.gradient, borderColor: palette.border }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+        <div className="db-stat-label">{widget.title}</div>
+        {onOpenCopilot && (
+          <button
+            type="button"
+            onClick={onOpenCopilot}
+            className={`db-card-open-btn ${isCopilotOpen ? 'active' : ''}`}
+            title={isCopilotOpen ? 'Tutup Copilot' : 'Open AI Copilot'}
+            style={{ padding: '1px 6px', fontSize: '10px' }}
+          >
+            <Sparkles size={10} />
+            <span>{isCopilotOpen ? 'Tutup' : 'Open'}</span>
+          </button>
+        )}
+      </div>
       <div className="db-stat-value" style={{ color: palette.icon }}>
         {widget.value}
         {widget.unit && <span className="db-stat-unit">{widget.unit}</span>}
@@ -75,44 +177,53 @@ function StatCard({ widget }: { widget: StatCardWidget }) {
           <span>{widget.trendLabel || widget.trend}</span>
         </div>
       )}
+      {isCopilotOpen && (
+        <CardFloatingCopilot
+          dashboardId={dashboardId}
+          dashboardData={dashboardData}
+          widget={widget}
+          widgetIndex={originalIndex}
+          onMorphWidget={onMorphWidget}
+          onClose={onCloseCopilot}
+        />
+      )}
     </div>
   );
 }
 
-function BarChart({ widget, onMorph }: { widget: BarChartWidget; onMorph?: () => void }) {
+function BarChart({
+  widget,
+  onMorph,
+  originalIndex,
+  dashboardId,
+  dashboardData,
+  onOpenCopilot,
+  isCopilotOpen,
+  onMorphWidget,
+  onCloseCopilot,
+}: { widget: BarChartWidget; onMorph?: () => void } & WidgetCommonProps) {
   const max = Math.max(...widget.items.map(i => i.value), 1);
   return (
-    <div className="db-widget db-barchart">
-      <div className="db-widget-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <BarChart2 size={14} />
-          <span>{widget.title}</span>
-        </div>
-        {onMorph && (
-          <button
-            type="button"
-            onClick={onMorph}
-            title="Ubah visualisasi menjadi Tabel"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px',
-              padding: '2px 8px',
-              fontSize: '11px',
-              fontWeight: 500,
-              color: 'var(--color-primary)',
-              background: 'var(--color-primary-subtle)',
-              border: '1px solid var(--color-primary-border)',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            <Table2 size={11} />
-            <span>Tabel</span>
-          </button>
-        )}
-      </div>
+    <div className={`db-widget db-barchart ${isCopilotOpen ? 'db-widget-copilot-active' : ''}`}>
+      <WidgetCardHeader
+        icon={BarChart2}
+        title={widget.title}
+        onMorph={onMorph}
+        morphLabel="Tabel"
+        MorphIcon={Table2}
+        onOpenCopilot={onOpenCopilot}
+        isCopilotOpen={isCopilotOpen}
+      />
+      {isCopilotOpen && (
+        <CardFloatingCopilot
+          dashboardId={dashboardId}
+          dashboardData={dashboardData}
+          widget={widget}
+          widgetIndex={originalIndex}
+          onMorphWidget={onMorphWidget}
+          onClose={onCloseCopilot}
+        />
+      )}
       <div className="db-barchart-rows">
         {widget.items.map((item, i) => (
           <div key={i} className="db-barchart-row">
@@ -133,13 +244,34 @@ function BarChart({ widget, onMorph }: { widget: BarChartWidget; onMorph?: () =>
   );
 }
 
-function ListWidgetComp({ widget }: { widget: ListWidget }) {
+function ListWidgetComp({
+  widget,
+  originalIndex,
+  dashboardId,
+  dashboardData,
+  onOpenCopilot,
+  isCopilotOpen,
+  onMorphWidget,
+  onCloseCopilot,
+}: { widget: ListWidget } & WidgetCommonProps) {
   return (
-    <div className="db-widget db-list">
-      <div className="db-widget-title">
-        <List size={14} />
-        <span>{widget.title}</span>
-      </div>
+    <div className={`db-widget db-list ${isCopilotOpen ? 'db-widget-copilot-active' : ''}`}>
+      <WidgetCardHeader
+        icon={List}
+        title={widget.title}
+        onOpenCopilot={onOpenCopilot}
+        isCopilotOpen={isCopilotOpen}
+      />
+      {isCopilotOpen && (
+        <CardFloatingCopilot
+          dashboardId={dashboardId}
+          dashboardData={dashboardData}
+          widget={widget}
+          widgetIndex={originalIndex}
+          onMorphWidget={onMorphWidget}
+          onClose={onCloseCopilot}
+        />
+      )}
       <ul className="db-list-items">
         {widget.items.map((item, i) => {
           const badgeColor = item.badgeColor ? BADGE_COLORS[item.badgeColor] : BADGE_COLORS.blue;
@@ -174,39 +306,38 @@ function ListWidgetComp({ widget }: { widget: ListWidget }) {
   );
 }
 
-function TableWidgetComp({ widget, onMorph }: { widget: TableWidget; onMorph?: () => void }) {
+function TableWidgetComp({
+  widget,
+  onMorph,
+  originalIndex,
+  dashboardId,
+  dashboardData,
+  onOpenCopilot,
+  isCopilotOpen,
+  onMorphWidget,
+  onCloseCopilot,
+}: { widget: TableWidget; onMorph?: () => void } & WidgetCommonProps) {
   return (
-    <div className="db-widget db-table-widget">
-      <div className="db-widget-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Table2 size={14} />
-          <span>{widget.title}</span>
-        </div>
-        {onMorph && (
-          <button
-            type="button"
-            onClick={onMorph}
-            title="Ubah visualisasi menjadi Bar Chart"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px',
-              padding: '2px 8px',
-              fontSize: '11px',
-              fontWeight: 500,
-              color: 'var(--color-primary)',
-              background: 'var(--color-primary-subtle)',
-              border: '1px solid var(--color-primary-border)',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            <BarChart2 size={11} />
-            <span>Bar Chart</span>
-          </button>
-        )}
-      </div>
+    <div className={`db-widget db-table-widget ${isCopilotOpen ? 'db-widget-copilot-active' : ''}`}>
+      <WidgetCardHeader
+        icon={Table2}
+        title={widget.title}
+        onMorph={onMorph}
+        morphLabel="Bar Chart"
+        MorphIcon={BarChart2}
+        onOpenCopilot={onOpenCopilot}
+        isCopilotOpen={isCopilotOpen}
+      />
+      {isCopilotOpen && (
+        <CardFloatingCopilot
+          dashboardId={dashboardId}
+          dashboardData={dashboardData}
+          widget={widget}
+          widgetIndex={originalIndex}
+          onMorphWidget={onMorphWidget}
+          onClose={onCloseCopilot}
+        />
+      )}
       <div className="db-table-wrap">
         <table className="db-table">
           <thead>
@@ -231,18 +362,39 @@ function TableWidgetComp({ widget, onMorph }: { widget: TableWidget; onMorph?: (
   );
 }
 
-function TimelineWidgetComp({ widget }: { widget: TimelineWidget }) {
+function TimelineWidgetComp({
+  widget,
+  originalIndex,
+  dashboardId,
+  dashboardData,
+  onOpenCopilot,
+  isCopilotOpen,
+  onMorphWidget,
+  onCloseCopilot,
+}: { widget: TimelineWidget } & WidgetCommonProps) {
   const STATUS_COLORS = {
     done:    { dot: 'var(--color-success)', bg: 'var(--color-success-subtle)' },
     active:  { dot: 'var(--color-primary)', bg: 'var(--color-primary-subtle)' },
     pending: { dot: 'var(--text-muted)', bg: 'var(--bg-subtle)' },
   };
   return (
-    <div className="db-widget db-timeline">
-      <div className="db-widget-title">
-        <Clock size={14} />
-        <span>{widget.title}</span>
-      </div>
+    <div className={`db-widget db-timeline ${isCopilotOpen ? 'db-widget-copilot-active' : ''}`}>
+      <WidgetCardHeader
+        icon={Clock}
+        title={widget.title}
+        onOpenCopilot={onOpenCopilot}
+        isCopilotOpen={isCopilotOpen}
+      />
+      {isCopilotOpen && (
+        <CardFloatingCopilot
+          dashboardId={dashboardId}
+          dashboardData={dashboardData}
+          widget={widget}
+          widgetIndex={originalIndex}
+          onMorphWidget={onMorphWidget}
+          onClose={onCloseCopilot}
+        />
+      )}
       <div className="db-timeline-events">
         {widget.events.map((ev, i) => {
           const s = ev.status || 'done';
@@ -266,13 +418,34 @@ function TimelineWidgetComp({ widget }: { widget: TimelineWidget }) {
   );
 }
 
-function ComparisonWidgetComp({ widget }: { widget: ComparisonWidget }) {
+function ComparisonWidgetComp({
+  widget,
+  originalIndex,
+  dashboardId,
+  dashboardData,
+  onOpenCopilot,
+  isCopilotOpen,
+  onMorphWidget,
+  onCloseCopilot,
+}: { widget: ComparisonWidget } & WidgetCommonProps) {
   return (
-    <div className="db-widget db-comparison">
-      <div className="db-widget-title">
-        <GitCompare size={14} />
-        <span>{widget.title}</span>
-      </div>
+    <div className={`db-widget db-comparison ${isCopilotOpen ? 'db-widget-copilot-active' : ''}`}>
+      <WidgetCardHeader
+        icon={GitCompare}
+        title={widget.title}
+        onOpenCopilot={onOpenCopilot}
+        isCopilotOpen={isCopilotOpen}
+      />
+      {isCopilotOpen && (
+        <CardFloatingCopilot
+          dashboardId={dashboardId}
+          dashboardData={dashboardData}
+          widget={widget}
+          widgetIndex={originalIndex}
+          onMorphWidget={onMorphWidget}
+          onClose={onCloseCopilot}
+        />
+      )}
       <div className="db-table-wrap">
         <table className="db-table">
           <thead>
@@ -296,13 +469,34 @@ function ComparisonWidgetComp({ widget }: { widget: ComparisonWidget }) {
   );
 }
 
-function TextSummaryWidgetComp({ widget }: { widget: TextSummaryWidget }) {
+function TextSummaryWidgetComp({
+  widget,
+  originalIndex,
+  dashboardId,
+  dashboardData,
+  onOpenCopilot,
+  isCopilotOpen,
+  onMorphWidget,
+  onCloseCopilot,
+}: { widget: TextSummaryWidget } & WidgetCommonProps) {
   return (
-    <div className="db-widget db-text-summary">
-      <div className="db-widget-title">
-        <FileText size={14} />
-        <span>{widget.title}</span>
-      </div>
+    <div className={`db-widget db-text-summary ${isCopilotOpen ? 'db-widget-copilot-active' : ''}`}>
+      <WidgetCardHeader
+        icon={FileText}
+        title={widget.title}
+        onOpenCopilot={onOpenCopilot}
+        isCopilotOpen={isCopilotOpen}
+      />
+      {isCopilotOpen && (
+        <CardFloatingCopilot
+          dashboardId={dashboardId}
+          dashboardData={dashboardData}
+          widget={widget}
+          widgetIndex={originalIndex}
+          onMorphWidget={onMorphWidget}
+          onClose={onCloseCopilot}
+        />
+      )}
       {widget.highlight && (
         <div className="db-text-highlight">{widget.highlight}</div>
       )}
@@ -312,18 +506,26 @@ function TextSummaryWidgetComp({ widget }: { widget: TextSummaryWidget }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────
 // Widget Router
 // ─────────────────────────────────────────────────────────────
-function WidgetRenderer({ widget, onMorph }: { widget: DashboardWidget; onMorph?: () => void }) {
+interface WidgetRendererProps extends WidgetCommonProps {
+  widget: DashboardWidget;
+  onMorph?: () => void;
+}
+
+function WidgetRenderer({
+  widget,
+  onMorph,
+  ...commonProps
+}: WidgetRendererProps) {
   switch (widget.type) {
-    case 'stat_card':   return <StatCard widget={widget} />;
-    case 'bar_chart':   return <BarChart widget={widget} onMorph={onMorph} />;
-    case 'list':        return <ListWidgetComp widget={widget} />;
-    case 'table':       return <TableWidgetComp widget={widget} onMorph={onMorph} />;
-    case 'timeline':    return <TimelineWidgetComp widget={widget} />;
-    case 'comparison':  return <ComparisonWidgetComp widget={widget} />;
-    case 'text_summary':return <TextSummaryWidgetComp widget={widget} />;
+    case 'stat_card':   return <StatCard widget={widget} {...commonProps} />;
+    case 'bar_chart':   return <BarChart widget={widget} onMorph={onMorph} {...commonProps} />;
+    case 'list':        return <ListWidgetComp widget={widget} {...commonProps} />;
+    case 'table':       return <TableWidgetComp widget={widget} onMorph={onMorph} {...commonProps} />;
+    case 'timeline':    return <TimelineWidgetComp widget={widget} {...commonProps} />;
+    case 'comparison':  return <ComparisonWidgetComp widget={widget} {...commonProps} />;
+    case 'text_summary':return <TextSummaryWidgetComp widget={widget} {...commonProps} />;
     default:            return null;
   }
 }
@@ -347,6 +549,7 @@ export function AiDashboardPreview({
   onMorphWidget,
 }: AiDashboardPreviewProps) {
   const [copiedLink, setCopiedLink] = useState(false);
+  const [activeCopilotWidgetIndex, setActiveCopilotWidgetIndex] = useState<number | null>(null);
   const { language } = useLanguage();
 
   const dashboardUrl = `/dashboard/${dashboardId}`;
@@ -417,9 +620,24 @@ export function AiDashboardPreview({
       {/* Stat cards row */}
       {statCards.length > 0 && (
         <div className="db-stat-grid">
-          {statCards.map((w, i) => (
-            <WidgetRenderer key={i} widget={w} />
-          ))}
+          {statCards.map((w, i) => {
+            const originalIndex = data.widgets.indexOf(w);
+            return (
+              <WidgetRenderer
+                key={i}
+                widget={w}
+                originalIndex={originalIndex}
+                dashboardId={dashboardId}
+                dashboardData={data}
+                onOpenCopilot={() =>
+                  setActiveCopilotWidgetIndex((prev) => (prev === originalIndex ? null : originalIndex))
+                }
+                isCopilotOpen={activeCopilotWidgetIndex === originalIndex}
+                onMorphWidget={onMorphWidget}
+                onCloseCopilot={() => setActiveCopilotWidgetIndex(null)}
+              />
+            );
+          })}
         </div>
       )}
 
@@ -435,7 +653,22 @@ export function AiDashboardPreview({
                   onMorphWidget(originalIndex, targetType);
                 }
               : undefined;
-            return <WidgetRenderer key={i} widget={w} onMorph={handleMorph} />;
+            return (
+              <WidgetRenderer
+                key={i}
+                widget={w}
+                originalIndex={originalIndex}
+                dashboardId={dashboardId}
+                dashboardData={data}
+                onMorph={handleMorph}
+                onOpenCopilot={() =>
+                  setActiveCopilotWidgetIndex((prev) => (prev === originalIndex ? null : originalIndex))
+                }
+                isCopilotOpen={activeCopilotWidgetIndex === originalIndex}
+                onMorphWidget={onMorphWidget}
+                onCloseCopilot={() => setActiveCopilotWidgetIndex(null)}
+              />
+            );
           })}
         </div>
       )}

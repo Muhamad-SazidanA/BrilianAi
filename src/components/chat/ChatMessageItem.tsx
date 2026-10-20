@@ -93,26 +93,33 @@ export default function ChatMessageItem({
 
   const handleOpenExistingDashboard = useCallback(async () => {
     if (!dashboardId) return;
+
+    // Show immediately if we already have local data to prevent delay, then refresh in background
     if (dashboardData) {
       setShowDashboard(true);
-      return;
+    } else {
+      setIsLoadingDashboard(true);
     }
-    setIsLoadingDashboard(true);
+
     try {
       const res = await fetch(`/api/dashboard/${dashboardId}`);
       if (!res.ok) throw new Error('Gagal memuat data dashboard');
       const resp = await res.json();
-      setDashboardData(resp.data);
-      setShowDashboard(true);
-      if (onUpdateMessage) {
-        onUpdateMessage({
-          ...message,
-          dashboardId,
-          dashboardData: resp.data,
-        });
+      if (resp.data) {
+        setDashboardData(resp.data);
+        setShowDashboard(true);
+        if (onUpdateMessage) {
+          onUpdateMessage({
+            ...message,
+            dashboardId,
+            dashboardData: resp.data,
+          });
+        }
       }
     } catch (err: any) {
-      toast.error(err?.message || 'Gagal memuat data dashboard');
+      if (!dashboardData) {
+        toast.error(err?.message || 'Gagal memuat data dashboard');
+      }
     } finally {
       setIsLoadingDashboard(false);
     }
@@ -120,36 +127,39 @@ export default function ChatMessageItem({
 
   const handleMorphWidget = useCallback(
     async (index: number, targetType: 'bar_chart' | 'table') => {
-      if (!dashboardData || !dashboardId) return;
-      const currentWidget = dashboardData.widgets[index];
-      if (!currentWidget) return;
-      const morphed = morphWidget(currentWidget, targetType);
-      if (!morphed) return;
+      if (!dashboardId) return;
 
-      const nextWidgets = [...dashboardData.widgets];
-      nextWidgets[index] = morphed;
-      const nextData: DashboardData = { ...dashboardData, widgets: nextWidgets };
+      setDashboardData((prevData) => {
+        if (!prevData) return prevData;
+        const currentWidget = prevData.widgets[index];
+        if (!currentWidget) return prevData;
+        const morphed = morphWidget(currentWidget, targetType);
+        if (!morphed) return prevData;
 
-      setDashboardData(nextData);
-      if (onUpdateMessage) {
-        onUpdateMessage({
-          ...message,
-          dashboardId,
-          dashboardData: nextData,
-        });
-      }
+        const nextWidgets = [...prevData.widgets];
+        nextWidgets[index] = morphed;
+        const nextData: DashboardData = { ...prevData, widgets: nextWidgets };
 
-      try {
-        await fetch(`/api/dashboard/${dashboardId}`, {
+        if (onUpdateMessage) {
+          onUpdateMessage({
+            ...message,
+            dashboardId,
+            dashboardData: nextData,
+          });
+        }
+
+        fetch(`/api/dashboard/${dashboardId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ data: nextData }),
+        }).catch((err) => {
+          console.warn('[ChatMessageItem] Failed to persist morphed widget:', err);
         });
-      } catch {
-        // silent
-      }
+
+        return nextData;
+      });
     },
-    [dashboardData, dashboardId, message, onUpdateMessage]
+    [dashboardId, message, onUpdateMessage]
   );
 
   React.useEffect(() => {

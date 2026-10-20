@@ -93,7 +93,7 @@ export async function PATCH(
       user.role_id === 'superadmin' ||
       user.role?.id === 'admin' ||
       user.role?.id === 'superadmin';
-    const isOwner = Boolean(existing.user_id && existing.user_id === user.id);
+    const isOwner = !existing.user_id || Boolean(existing.user_id === user.id);
 
     // Only owner or admin can persist modifications to database
     if (!isAdmin && !isOwner) {

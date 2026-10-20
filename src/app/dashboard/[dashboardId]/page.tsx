@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import { DashboardData } from '@/types/dashboard';
 import { AiDashboardPreview } from '@/components/chat/AiDashboardPreview';
-import DashboardCopilot from '@/components/dashboard/DashboardCopilot';
 import { morphWidget } from '@/lib/utils/dashboardMorph';
 import { toast } from 'sonner';
 
@@ -252,13 +251,6 @@ export default function DashboardPage() {
           onMorphWidget={handleMorphWidget}
         />
       </main>
-
-      {/* Interactive Floating AI Copilot */}
-      <DashboardCopilot
-        dashboardId={pageData.dashboardId}
-        dashboardData={pageData.data}
-        onMorphWidget={handleMorphWidget}
-      />
 
       {/* Footer */}
       <footer className="db-page-footer">
