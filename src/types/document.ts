@@ -54,19 +54,3 @@ export interface DocumentChunk {
   embedding?: string | number[];
   created_at: string;
 }
-
-export interface IngestionResult {
-  upload_batch_id: string;
-  original_filename: string;
-  page_count: number;
-  chunk_count: number;
-}
-
-export type PipelineStepStatus = 'idle' | 'running' | 'done' | 'error';
-
-export interface PipelineStep {
-  number: string;
-  title: string;
-  description: string;
-  status: PipelineStepStatus;
-}

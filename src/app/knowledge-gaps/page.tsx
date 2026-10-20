@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import {
   FileQuestion,
@@ -79,7 +79,7 @@ export default function KnowledgeGapsPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const fetchGaps = async () => {
+  const fetchGaps = useCallback(async () => {
     setIsLoading(true);
     try {
       const res = await fetch(`/api/knowledge-gaps?status=${statusFilter}&limit=100`);
@@ -95,11 +95,11 @@ export default function KnowledgeGapsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [statusFilter]);
 
   useEffect(() => {
     fetchGaps();
-  }, [statusFilter]);
+  }, [fetchGaps]);
 
   const handleOpenResolveModal = (gap: KnowledgeGapItem) => {
     setResolvingGap(gap);

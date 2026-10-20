@@ -143,7 +143,7 @@ export default function DocumentDashboardView({
           </div>
         ) : batches.length === 0 ? (
           <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
-            Belum ada file diunggah. Silakan klik "Upload PDF" untuk memulai pemindaian AI Vision OCR.
+            Belum ada file diunggah. Silakan klik &quot;Upload PDF&quot; untuk memulai pemindaian AI Vision OCR.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column' }}>

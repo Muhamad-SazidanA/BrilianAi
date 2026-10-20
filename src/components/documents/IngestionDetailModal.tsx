@@ -39,7 +39,7 @@ export default function IngestionDetailModal() {
     if (activeTask && terminalEndRef.current) {
       terminalEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [activeTask?.message, activeTask?.progressPercent]);
+  }, [activeTask, activeTask?.message, activeTask?.progressPercent]);
 
   if (!activeTask) {
     return null;

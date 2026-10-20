@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import {
   X,
@@ -127,6 +127,13 @@ export default function DocumentUploadModal({
       .catch((err) => console.error('Error fetching users:', err));
   }, [isOpen]);
 
+  const handleModalClose = useCallback(() => {
+    if (isSubmitting) return;
+    setSelectedFiles([]);
+    setUploadError(null);
+    onClose();
+  }, [isSubmitting, onClose]);
+
   // Handle ESC key to dismiss modal
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -136,14 +143,7 @@ export default function DocumentUploadModal({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, isSubmitting]);
-
-  const handleModalClose = () => {
-    if (isSubmitting) return;
-    setSelectedFiles([]);
-    setUploadError(null);
-    onClose();
-  };
+  }, [isOpen, isSubmitting, handleModalClose]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();

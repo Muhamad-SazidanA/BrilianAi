@@ -302,7 +302,7 @@ export default function ChatWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [sessionId, shareId, router]);
+  }, [sessionId, shareId, router, currentUser, language]);
 
   // Otomatis arahkan pemilik asli ke room chat pribadinya jika sesi baru selesai dimuat
   useEffect(() => {
