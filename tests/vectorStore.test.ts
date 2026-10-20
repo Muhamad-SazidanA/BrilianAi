@@ -6,6 +6,8 @@ import {
   listChunks,
   deleteUploadBatch,
   updateUploadBatchFilename,
+  createManualCuratedInsight,
+  deleteCuratedInsight,
   ChunkInput,
 } from '../lib/db/vectorStore';
 import * as dbClient from '../lib/db/dbClient';
@@ -153,6 +155,48 @@ describe('vectorStore (PostgreSQL + pgvector Store)', () => {
     const result = await updateUploadBatchFilename('b1', 'nama_baru.pdf');
     expect(result.original_filename).toBe('nama_baru.pdf');
     expect(mockPool.query).toHaveBeenCalledWith(expect.stringContaining('UPDATE upload_batches'), ['nama_baru.pdf', 'b1']);
+  });
+
+  it('7. createManualCuratedInsight() should insert manual insight with source_chunk_id NULL', async () => {
+    mockPool.query.mockResolvedValueOnce({
+      rows: [{ id: 10, title: 'Manual Insight', content: 'Konten Manual', importance: 'high' }],
+      rowCount: 1,
+    });
+
+    const res = await createManualCuratedInsight('b1', {
+      title: 'Manual Insight',
+      content: 'Konten Manual',
+      importance: 'high',
+      category: 'track1_financial',
+      tags: ['Manual', 'Keuangan'],
+      embedding: [0.1, 0.2, 0.3],
+    });
+
+    expect(res.id).toBe(10);
+    expect(mockPool.query).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO curated_insights'),
+      expect.arrayContaining(['b1', 'Manual Insight', 'Konten Manual', 'high', 'track1_financial'])
+    );
+  });
+
+  it('8. deleteCuratedInsight() when remaining count is 0 should auto-deactivate batch to Menunggu Kurasi', async () => {
+    mockClient.query
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({ rows: [{ upload_batch_id: 'b-target' }], rowCount: 1 }) // DELETE RETURNING
+      .mockResolvedValueOnce({ rows: [{ count: 0 }], rowCount: 1 }) // COUNT
+      .mockResolvedValueOnce({ rowCount: 1 }) // UPDATE upload_batches
+      .mockResolvedValueOnce({}); // COMMIT
+
+    const res = await deleteCuratedInsight(42);
+
+    expect(res.deleted).toBe(true);
+    expect(res.batchId).toBe('b-target');
+    expect(res.remainingCount).toBe(0);
+    expect(res.wasDeactivated).toBe(true);
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringContaining("SET is_active_knowledge = false, status = 'Menunggu Kurasi'"),
+      ['b-target']
+    );
   });
 });
 

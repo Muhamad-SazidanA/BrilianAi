@@ -121,7 +121,7 @@ export function canUserAccessDocument(
     return true;
   }
   const userDept = user.department?.trim();
-  if (!userDept || userDept === 'General' || userDept.toLowerCase() === doc.division_id.toLowerCase()) {
+  if (userDept && userDept.toLowerCase() === doc.division_id.toLowerCase()) {
     return true;
   }
 

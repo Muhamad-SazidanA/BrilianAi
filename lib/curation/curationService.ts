@@ -1,3 +1,4 @@
+import { getPool } from '../db/dbClient';
 import { embedTexts } from '../ai/embeddingClient';
 import {
   listChunks,
@@ -378,11 +379,26 @@ export async function curateBatch(batchId: string, limit: number = 25): Promise<
  */
 export async function curateAllChunks(
   batchId: string,
-  microBatchSize: number = 20
+  microBatchSize: number = 20,
+  options?: { recurate?: boolean }
 ): Promise<number> {
   if (activeCurationBatches.has(batchId)) {
     console.log(`[CurationService] Batch ${batchId} sedang dalam proses kurasi aktif. Mengabaikan pemicu duplikat.`);
     return 0;
+  }
+
+  // Jika mode recurate aktif: reset/hapus insight AI lama (insight manual tetap dipertahankan)
+  if (options?.recurate) {
+    try {
+      const pool = getPool();
+      await pool.query(
+        `DELETE FROM curated_insights WHERE upload_batch_id = $1 AND source_chunk_id IS NOT NULL;`,
+        [batchId]
+      );
+      console.log(`[CurationService] Reset insight AI lama untuk batch ${batchId} (insight manual dipertahankan).`);
+    } catch (cleanErr: any) {
+      console.warn('[CurationService] Gagal membersihkan insight AI lama:', cleanErr?.message);
+    }
   }
 
   activeCurationBatches.add(batchId);

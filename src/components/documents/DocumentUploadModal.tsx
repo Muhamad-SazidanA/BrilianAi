@@ -72,7 +72,7 @@ export default function DocumentUploadModal({
   const [classification, setClassification] = useState<DocumentClassification>('Internal');
 
   // Advanced Settings
-  const [docStatus, setDocStatus] = useState<DocumentStatus>('Aktif');
+  const [docStatus, setDocStatus] = useState<DocumentStatus>('Menunggu Kurasi');
   const [version, setVersion] = useState<string>('1.0');
   const defaultNextYear = new Date();
   defaultNextYear.setFullYear(defaultNextYear.getFullYear() + 1);
@@ -737,7 +737,7 @@ export default function DocumentUploadModal({
                     value={docStatus}
                     onChange={(val) => setDocStatus(val as DocumentStatus)}
                     options={[
-                      { value: 'Aktif', label: 'Aktif (Masuk RAG)' },
+                      { value: 'Menunggu Kurasi', label: 'Menunggu Kurasi' },
                       { value: 'Draft', label: 'Draft' },
                       { value: 'Review', label: 'Review' },
                     ]}

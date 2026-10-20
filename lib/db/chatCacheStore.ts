@@ -78,11 +78,24 @@ export async function ensureChatCacheTable(): Promise<void> {
   }
 }
 
+export interface ChatCacheOptions {
+  documentId?: string;
+  divisionId?: string;
+  allowedClassifications?: string[];
+  userId?: string;
+  grantedBatchIds?: string[];
+}
+
 /**
- * Menghasilkan cache key unik berdasarkan normalisasi teks pertanyaan
- * dan instruksi format khusus (dari Pertanyaan.md jika ada).
+ * Menghasilkan cache key unik berdasarkan normalisasi teks pertanyaan,
+ * instruksi format khusus (dari Pertanyaan.md jika ada), dan partisi keamanan ABAC
+ * (divisi, klasifikasi akses, dan direct grant) agar jawaban dokumen rahasia
+ * TIDAK PERNAH bocor ke pengguna dengan hak akses lebih rendah.
  */
-export function generateChatCacheKey(query: string, documentId?: string): string {
+export function generateChatCacheKey(
+  query: string,
+  optionsOrDocId?: string | ChatCacheOptions
+): string {
   const normText = query
     .toLowerCase()
     .replace(/[^\w\s]/g, '')
@@ -94,8 +107,22 @@ export function generateChatCacheKey(query: string, documentId?: string): string
     ? `fmt:${inst.format || 'none'}:${inst.count || 'any'}:${inst.lengthModifier || 'none'}:${inst.clarityModifier ? 'clr' : 'no'}:${inst.summaryAtEnd ? 'sum' : 'no'}:${inst.noBullets ? 'nobullet' : 'bullet'}`
     : 'fmt:default';
 
-  const docKey = documentId ? `doc:${documentId}` : 'doc:all';
-  return `${docKey}::${fmtKey}::${normText}`;
+  const opts: ChatCacheOptions =
+    typeof optionsOrDocId === 'string'
+      ? { documentId: optionsOrDocId }
+      : optionsOrDocId || {};
+
+  const docKey = opts.documentId ? `doc:${opts.documentId}` : 'doc:all';
+  const divKey = opts.divisionId && opts.divisionId !== 'all' ? `div:${opts.divisionId}` : 'div:all';
+  const clsList = opts.allowedClassifications && opts.allowedClassifications.length > 0
+    ? [...opts.allowedClassifications].sort().join(',')
+    : 'Publik,Internal';
+  const clsKey = `cls:${clsList}`;
+  const grantsKey = opts.grantedBatchIds && opts.grantedBatchIds.length > 0
+    ? `grants:${[...opts.grantedBatchIds].sort().join(',')}`
+    : 'grants:none';
+
+  return `${docKey}::${divKey}::${clsKey}::${grantsKey}::${fmtKey}::${normText}`;
 }
 
 /**

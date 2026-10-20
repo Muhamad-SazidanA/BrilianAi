@@ -51,7 +51,7 @@ export default function Dropzone({ onUpload, isUploading, uploadError }: Dropzon
   const [divisionId, setDivisionId] = useState<string>('General');
   const [customDivision, setCustomDivision] = useState<string>('');
   const [classification, setClassification] = useState<DocumentClassification>('Internal');
-  const [docStatus, setDocStatus] = useState<DocumentStatus>('Aktif');
+  const [docStatus, setDocStatus] = useState<DocumentStatus>('Menunggu Kurasi');
   const [version, setVersion] = useState<string>('1.0');
 
   // Default review date: 1 year from today (YYYY-MM-DD)
@@ -360,14 +360,14 @@ export default function Dropzone({ onUpload, isUploading, uploadError }: Dropzon
               value={docStatus}
               onChange={(val) => setDocStatus(val as DocumentStatus)}
               options={[
-                { value: 'Aktif', label: 'Aktif (Langsung terindeks ke AI RAG)' },
+                { value: 'Menunggu Kurasi', label: 'Menunggu Kurasi (Wajib kurasi sebelum aktif di AI)' },
                 { value: 'Draft', label: 'Draft (Tersimpan di Studio, belum di RAG)' },
                 { value: 'Review', label: 'Review (Menunggu validasi reviewer)' },
               ]}
               size="sm"
             />
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-              {docStatus === 'Aktif' ? 'Siap dijawab oleh Chatbot AI.' : 'Tidak akan muncul di pencarian AI sampai berstatus Aktif.'}
+              Dokumen baru wajib melalui proses kurasi AI atau kurasi manual di Document Studio sebelum dapat diaktifkan ke Chatbot RAG.
             </div>
           </div>
 

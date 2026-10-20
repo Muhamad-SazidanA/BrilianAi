@@ -436,5 +436,22 @@ describe('AI Chatbot Service (Llama 3.2 3B & pgvector RAG)', () => {
       expect(stdKey).not.toBe(fourListKey);
       expect(stdKey).not.toBe(shortKey);
     });
+
+    it('should generate distinct cache keys for different ABAC classifications and divisions to prevent data leakage', () => {
+      const adminKey = generateChatCacheKey('berapa anggaran bonus?', {
+        allowedClassifications: ['Publik', 'Internal', 'Rahasia', 'Sangat Rahasia'],
+        divisionId: 'Direksi',
+      });
+      const memberKey = generateChatCacheKey('berapa anggaran bonus?', {
+        allowedClassifications: ['Publik', 'Internal'],
+        divisionId: 'Operasional',
+      });
+
+      expect(adminKey).toContain('div:Direksi');
+      expect(adminKey).toContain('cls:Internal,Publik,Rahasia,Sangat Rahasia');
+      expect(memberKey).toContain('div:Operasional');
+      expect(memberKey).toContain('cls:Internal,Publik');
+      expect(adminKey).not.toBe(memberKey);
+    });
   });
 });

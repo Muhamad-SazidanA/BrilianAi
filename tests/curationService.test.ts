@@ -9,9 +9,10 @@ import {
 } from '../lib/db/vectorStore';
 import { curateBatch, isBatchCurating } from '../lib/curation/curationService';
 import { GET as handleGetCurated, POST as handlePostCurate } from '../src/app/api/documents/[id]/curate/route';
-import { PUT as handlePutCuratedItem } from '../src/app/api/documents/[id]/curate/[insightId]/route';
+import { PUT as handlePutCuratedItem, DELETE as handleDeleteCuratedItem } from '../src/app/api/documents/[id]/curate/[insightId]/route';
 import { GET as handleExport } from '../src/app/api/documents/[id]/export/route';
 import { NextRequest } from 'next/server';
+import * as serverAuthModule from '../lib/auth/serverAuth';
 
 describe('Dual-Chunk & Curation Service (Konten Mentah vs Insight Kurasi)', () => {
   const mockClient = {
@@ -27,6 +28,22 @@ describe('Dual-Chunk & Curation Service (Konten Mentah vs Insight Kurasi)', () =
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(dbClient, 'getPool').mockReturnValue(mockPool as any);
+    vi.spyOn(serverAuthModule, 'getAuthenticatedUser').mockResolvedValue({
+      id: 'test-admin',
+      name: 'Admin',
+      email: 'admin@test.com',
+      role_id: 'admin',
+      status: 'active',
+      department: 'IT',
+      role: {
+        id: 'admin',
+        name: 'Admin',
+        description: '',
+        is_system: true,
+        permissions: ['curation:edit', 'curation:delete', 'curation:trigger', 'documents:read'],
+      },
+    } as any);
+    vi.spyOn(serverAuthModule, 'hasServerPermission').mockResolvedValue(true);
   });
 
   describe('1. vectorStore curated_insights CRUD', () => {
@@ -222,6 +239,25 @@ describe('Dual-Chunk & Curation Service (Konten Mentah vs Insight Kurasi)', () =
       expect(data.curatedInsightsCount).toBe(1);
       expect(data.rawChunks[0].content).toBe('raw');
       expect(data.curatedInsights[0].title).toBe('Insight');
+    });
+
+    it('DELETE /api/documents/[id]/curate/[insightId] should delete insight and return remaining count', async () => {
+      mockClient.query
+        .mockResolvedValueOnce({}) // BEGIN
+        .mockResolvedValueOnce({ rows: [{ upload_batch_id: 'b1' }], rowCount: 1 }) // delete
+        .mockResolvedValueOnce({ rows: [{ count: 2 }], rowCount: 1 }) // remaining count
+        .mockResolvedValueOnce({}); // COMMIT
+
+      const req = new NextRequest('http://localhost:3000/api/documents/b1/curate/10', {
+        method: 'DELETE',
+      });
+      const res = await handleDeleteCuratedItem(req, { params: { id: 'b1', insightId: '10' } });
+      const data = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(data.data.deleted).toBe(true);
+      expect(data.data.remainingCount).toBe(2);
+      expect(data.data.wasDeactivated).toBe(false);
     });
   });
 });

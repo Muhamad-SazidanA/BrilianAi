@@ -146,7 +146,13 @@ export async function askDocumentChat(
     }
   }
 
-  const cacheKey = generateChatCacheKey(trimmedQuery, options?.documentId);
+  const cacheKey = generateChatCacheKey(trimmedQuery, {
+    documentId: options?.documentId,
+    divisionId: options?.divisionId,
+    allowedClassifications: options?.allowedClassifications,
+    userId: options?.userId,
+    grantedBatchIds: options?.grantedBatchIds,
+  });
 
   // 0b. Deterministic Response Cache (dilewati jika bypassCache aktif, misal saat user klik Try Again)
   if (!options?.bypassCache) {
@@ -418,7 +424,13 @@ export async function askDocumentChatStream(
   }
 
   // 0c. Deterministic Response Cache
-  const cacheKey = generateChatCacheKey(trimmedQuery, options?.documentId);
+  const cacheKey = generateChatCacheKey(trimmedQuery, {
+    documentId: options?.documentId,
+    divisionId: options?.divisionId,
+    allowedClassifications: options?.allowedClassifications,
+    userId: options?.userId,
+    grantedBatchIds: options?.grantedBatchIds,
+  });
   if (!options?.bypassCache) {
     const cached = await getCachedChatResponse(cacheKey);
     if (cached) {

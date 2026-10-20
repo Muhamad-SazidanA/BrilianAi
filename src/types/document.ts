@@ -1,5 +1,12 @@
 export type DocumentClassification = 'Publik' | 'Internal' | 'Rahasia' | 'Sangat Rahasia';
-export type DocumentStatus = 'Draft' | 'Review' | 'Aktif' | 'Superseded' | 'Arsip';
+export type DocumentStatus =
+  | 'Menunggu Kurasi'
+  | 'Draft'
+  | 'Review'
+  | 'Aktif'
+  | 'Standby'
+  | 'Superseded'
+  | 'Arsip';
 
 export interface UploadBatch {
   id: string;

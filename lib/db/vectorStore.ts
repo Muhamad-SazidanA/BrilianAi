@@ -70,7 +70,8 @@ export async function createUploadBatch(
   const pool = getPool();
   const divisionId = options?.divisionId || 'General';
   const classification = options?.classification || 'Internal';
-  const status = options?.status || 'Menunggu Kurasi';
+  const rawStatus = options?.status || 'Menunggu Kurasi';
+  const status = rawStatus === 'Aktif' ? 'Menunggu Kurasi' : rawStatus;
   const version = options?.version || '1.0';
   const ownerId = options?.ownerId || null;
   const supersedesId = options?.supersedesId || null;
@@ -622,7 +623,7 @@ function appendAbacClause(
     explicitGrantCondition = `OR b.id = ANY($${ctx.params.length}::uuid[])`;
   }
 
-  return `AND ((1=1 ${statusCondition} ${divisionCondition} ${classificationCondition}) ${explicitGrantCondition})`;
+  return `${statusCondition} AND ((1=1 ${divisionCondition} ${classificationCondition}) ${explicitGrantCondition})`;
 }
 
 /**
@@ -644,7 +645,7 @@ export async function searchSimilarChunks(
   const limit = options?.limit ?? 5;
   const batchId = options?.batchId || null;
   const activeCondition = options?.onlyActiveKnowledge
-    ? 'AND COALESCE(b.is_active_knowledge, false) = true AND EXISTS (SELECT 1 FROM curated_insights ci WHERE ci.upload_batch_id = b.id)'
+    ? "AND COALESCE(b.is_active_knowledge, false) = true AND (b.status IS NULL OR b.status = 'Aktif') AND EXISTS (SELECT 1 FROM curated_insights ci WHERE ci.upload_batch_id = b.id)"
     : '';
 
   const results: SimilarChunkResult[] = [];
@@ -930,7 +931,7 @@ export async function searchSimilarCuratedInsights(
   const limit = options?.limit ?? 5;
   const batchId = options?.batchId || null;
   const activeCondition = options?.onlyActiveKnowledge
-    ? 'AND COALESCE(b.is_active_knowledge, false) = true'
+    ? "AND COALESCE(b.is_active_knowledge, false) = true AND (b.status IS NULL OR b.status = 'Aktif')"
     : '';
 
   const results: SimilarCuratedResult[] = [];
@@ -1417,4 +1418,111 @@ export async function updateCuratedInsight(
   }
   return result.rows[0];
 }
+
+/**
+ * Creates a manual curated insight for a batch and returns the created insight.
+ */
+export async function createManualCuratedInsight(
+  batchId: string,
+  insight: {
+    title: string;
+    content: string;
+    importance?: string;
+    category?: string;
+    tags?: string[];
+    sourcePages?: string;
+    embedding?: number[];
+  }
+): Promise<CuratedInsight> {
+  const pool = getPool();
+  const importance = insight.importance || 'medium';
+  const category = insight.category || 'track1_financial';
+  const tags = insight.tags || [];
+  const sourcePages = insight.sourcePages || '';
+  const embedding = insight.embedding ? `[${insight.embedding.join(',')}]` : null;
+
+  const sql = `
+    INSERT INTO curated_insights (
+      upload_batch_id,
+      title,
+      content,
+      importance,
+      category,
+      tags,
+      source_pages,
+      source_chunk_id,
+      embedding
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, $8::vector)
+    RETURNING *;
+  `;
+
+  const res = await pool.query<CuratedInsight>(sql, [
+    batchId,
+    insight.title,
+    insight.content,
+    importance,
+    category,
+    tags,
+    sourcePages,
+    embedding,
+  ]);
+  return res.rows[0];
+}
+
+/**
+ * Deletes a curated insight by ID.
+ * If deleting this insight causes the document's total curated insight count to reach 0,
+ * the document is automatically deactivated (is_active_knowledge = false, status = 'Menunggu Kurasi')
+ * to strictly enforce that documents with 0 insights cannot be active for AI grounding.
+ */
+export async function deleteCuratedInsight(
+  insightId: number | string
+): Promise<{ deleted: boolean; batchId: string; remainingCount: number; wasDeactivated: boolean }> {
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const delRes = await client.query<{ upload_batch_id: string }>(
+      `DELETE FROM curated_insights WHERE id = $1 RETURNING upload_batch_id;`,
+      [insightId]
+    );
+
+    if ((delRes.rowCount ?? 0) === 0) {
+      await client.query('ROLLBACK');
+      return { deleted: false, batchId: '', remainingCount: 0, wasDeactivated: false };
+    }
+
+    const batchId = delRes.rows[0].upload_batch_id;
+
+    // Hitung sisa insight untuk batch ini
+    const countRes = await client.query<{ count: number }>(
+      `SELECT COUNT(*)::int AS count FROM curated_insights WHERE upload_batch_id = $1;`,
+      [batchId]
+    );
+    const remainingCount = countRes?.rows?.[0]?.count ?? 0;
+    let wasDeactivated = false;
+
+    // Aturan Otomatis: Jika insight tersisa 0, dokumen WAJIB nonaktif dan status kembali 'Menunggu Kurasi'
+    if (remainingCount === 0) {
+      await client.query(
+        `UPDATE upload_batches
+         SET is_active_knowledge = false, status = 'Menunggu Kurasi'
+         WHERE id = $1;`,
+        [batchId]
+      );
+      wasDeactivated = true;
+    }
+
+    await client.query('COMMIT');
+    return { deleted: true, batchId, remainingCount, wasDeactivated };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 

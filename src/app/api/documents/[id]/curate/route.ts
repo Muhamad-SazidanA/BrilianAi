@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { listCuratedInsights, deduplicateCuratedInsights } from '@lib/db/vectorStore';
+import { listCuratedInsights, deduplicateCuratedInsights, createManualCuratedInsight } from '@lib/db/vectorStore';
 import { curateBatch, curateAllChunks, isBatchCurating, getCurationProgress } from '@lib/curation/curationService';
 import { getAuthenticatedUser, hasServerPermission } from '@lib/auth/serverAuth';
+import { embedTexts } from '@lib/ai/embeddingClient';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,6 +34,63 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized: Session required.' }, { status: 401 });
     }
 
+    const { id } = params;
+    let body: any = null;
+    try {
+      body = await request.json();
+    } catch {
+      // optional body
+    }
+
+    // 1. Penambahan Manual Insight (dari modal "+ Tambah Manual")
+    if (body?.manualInsight) {
+      const canEdit = await hasServerPermission(request, 'curation:edit');
+      if (!canEdit) {
+        return NextResponse.json(
+          { error: 'Forbidden: Hak akses curation:edit diperlukan untuk menambah insight manual.' },
+          { status: 403 }
+        );
+      }
+
+      const { title, content, importance, category, tags, sourcePages } = body.manualInsight;
+      if (!title || !content) {
+        return NextResponse.json(
+          { error: 'Judul (title) dan intisari (content) wajib diisi.' },
+          { status: 400 }
+        );
+      }
+
+      let embedding: number[] | undefined = undefined;
+      const textToEmbed = `${title}\n${content}`.trim();
+      if (textToEmbed) {
+        try {
+          const [vector] = await embedTexts([textToEmbed]);
+          if (vector) embedding = vector;
+        } catch (embErr) {
+          console.warn('[API /curate POST] embedTexts warning for manual insight:', embErr);
+        }
+      }
+
+      const created = await createManualCuratedInsight(id, {
+        title,
+        content,
+        importance,
+        category,
+        tags: Array.isArray(tags) ? tags : [],
+        sourcePages: sourcePages || '',
+        embedding,
+      });
+
+      return NextResponse.json(
+        {
+          message: 'Insight manual berhasil disimpan dan diindeks.',
+          data: created,
+        },
+        { status: 201 }
+      );
+    }
+
+    // 2. Trigger Kurasi AI Otomatis
     const canCurate = await hasServerPermission(request, 'curation:trigger');
     if (!canCurate) {
       return NextResponse.json(
@@ -41,10 +99,10 @@ export async function POST(
       );
     }
 
-    const { id } = params;
     const { searchParams } = new URL(request.url);
     const syncParam = searchParams.get('sync');
     const limitParam = searchParams.get('limit');
+    const recurate = body?.recurate === true || searchParams.get('recurate') === 'true';
 
     // Bersihkan duplikat bila ada
     await deduplicateCuratedInsights(id);
@@ -76,14 +134,14 @@ export async function POST(
     }
 
     // Jalankan kurasi menyeluruh dengan update progres 1-100%
-    curateAllChunks(id).catch((err) => {
+    curateAllChunks(id, 20, { recurate }).catch((err) => {
       console.error(`[API /curate POST] Background curateAllChunks error for batch ${id}:`, err);
     });
 
     const initialProgress = await getCurationProgress(id);
     return NextResponse.json(
       {
-        message: 'Kurasi AI berhasil dimulai.',
+        message: recurate ? 'Kurasi ulang AI berhasil dimulai.' : 'Kurasi AI berhasil dimulai.',
         progress: initialProgress,
       },
       { status: 202 }

@@ -161,20 +161,26 @@ export default function CuratedInsightsTab({
 
   // Trigger AI Auto-Curation manually
   const handleStartCuration = async () => {
+    const isRecurate = totalChunks > 0 && (insights.length > 0 || (progress?.curatedChunks ?? 0) >= totalChunks);
+
     setIsCurating(true);
     setFeedbackMsg(null);
     setProgress((prev) => ({
       batchId,
-      totalChunks: prev?.totalChunks || 0,
-      curatedChunks: prev?.curatedChunks || 0,
+      totalChunks: prev?.totalChunks || totalChunks,
+      curatedChunks: 0,
       currentPercent: 1,
       status: 'running',
-      currentChunkTitle: language === 'en' ? 'Starting AI engine...' : 'Memulai AI engine...',
+      currentChunkTitle: isRecurate
+        ? (language === 'en' ? 'Resetting & regenerating AI insights...' : 'Mereset & meregenerasi intisari AI...')
+        : (language === 'en' ? 'Starting AI engine...' : 'Memulai AI engine...'),
     }));
 
     try {
       const res = await fetch(`/api/documents/${batchId}/curate`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recurate: isRecurate }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -184,9 +190,13 @@ export default function CuratedInsightsTab({
       }
 
       toast.info(
-        language === 'en'
-          ? 'AI curation started. Monitoring progress (1-100%)...'
-          : 'Kurasi AI dimulai. Memantau progres (1-100%)...'
+        isRecurate
+          ? (language === 'en'
+              ? 'AI re-curation started. Regenerating all chunks (1-100%)...'
+              : 'Kurasi ulang AI dimulai. Meregenerasi seluruh halaman (1-100%)...')
+          : (language === 'en'
+              ? 'AI curation started. Monitoring progress (1-100%)...'
+              : 'Kurasi AI dimulai. Memantau progres (1-100%)...')
       );
 
       // Mulai polling progres secara intensif
