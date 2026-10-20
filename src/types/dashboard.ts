@@ -6,11 +6,27 @@
 export type DashboardWidgetType =
   | 'stat_card'
   | 'bar_chart'
+  | 'line_chart'
+  | 'pie_chart'
+  | 'area_chart'
   | 'list'
   | 'table'
   | 'timeline'
   | 'comparison'
   | 'text_summary';
+
+export type MorphableChartType =
+  | 'bar_chart'
+  | 'line_chart'
+  | 'pie_chart'
+  | 'area_chart'
+  | 'table';
+
+export interface ChartItem {
+  label: string;
+  value: number;
+  color?: string;
+}
 
 export interface StatCardWidget {
   type: 'stat_card';
@@ -25,11 +41,28 @@ export interface StatCardWidget {
 export interface BarChartWidget {
   type: 'bar_chart';
   title: string;
-  items: Array<{
-    label: string;
-    value: number;
-    color?: string;
-  }>;
+  items: ChartItem[];
+  unit?: string;
+}
+
+export interface LineChartWidget {
+  type: 'line_chart';
+  title: string;
+  items: ChartItem[];
+  unit?: string;
+}
+
+export interface PieChartWidget {
+  type: 'pie_chart';
+  title: string;
+  items: ChartItem[];
+  unit?: string;
+}
+
+export interface AreaChartWidget {
+  type: 'area_chart';
+  title: string;
+  items: ChartItem[];
   unit?: string;
 }
 
@@ -83,6 +116,9 @@ export interface TextSummaryWidget {
 export type DashboardWidget =
   | StatCardWidget
   | BarChartWidget
+  | LineChartWidget
+  | PieChartWidget
+  | AreaChartWidget
   | ListWidget
   | TableWidget
   | TimelineWidget

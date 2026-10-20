@@ -18,7 +18,7 @@ import {
   LogIn,
   AlertCircle,
 } from 'lucide-react';
-import { DashboardData } from '@/types/dashboard';
+import { DashboardData, MorphableChartType } from '@/types/dashboard';
 import { useUserSession } from '@/context/UserSessionContext';
 import { toast } from 'sonner';
 
@@ -32,7 +32,7 @@ interface Message {
 interface DashboardCopilotProps {
   dashboardId: string;
   dashboardData: DashboardData;
-  onMorphWidget: (index: number, targetType: 'bar_chart' | 'table') => void;
+  onMorphWidget: (index: number, targetType: MorphableChartType) => void;
 }
 
 const STARTER_PROMPTS = [

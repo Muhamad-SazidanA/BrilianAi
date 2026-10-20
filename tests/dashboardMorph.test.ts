@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { convertTableToBarChart, convertBarChartToTable, morphWidget } from '../src/lib/utils/dashboardMorph';
-import { TableWidget, BarChartWidget } from '../src/types/dashboard';
+import {
+  convertTableToBarChart,
+  convertTableToLineChart,
+  convertTableToPieChart,
+  convertTableToAreaChart,
+  convertBarChartToTable,
+  convertChartToTable,
+  morphWidget,
+} from '../src/lib/utils/dashboardMorph';
+import { TableWidget, BarChartWidget, LineChartWidget, PieChartWidget, AreaChartWidget } from '../src/types/dashboard';
 
 describe('dashboardMorph utility', () => {
   const sampleTable: TableWidget = {
@@ -36,6 +44,20 @@ describe('dashboardMorph utility', () => {
     expect(chart.unit).toBe('Jumlah');
   });
 
+  it('should convert TableWidget into LineChartWidget, PieChartWidget, and AreaChartWidget', () => {
+    const lineChart = convertTableToLineChart(sampleTable);
+    expect(lineChart.type).toBe('line_chart');
+    expect(lineChart.items).toHaveLength(3);
+
+    const pieChart = convertTableToPieChart(sampleTable);
+    expect(pieChart.type).toBe('pie_chart');
+    expect(pieChart.items).toHaveLength(3);
+
+    const areaChart = convertTableToAreaChart(sampleTable);
+    expect(areaChart.type).toBe('area_chart');
+    expect(areaChart.items).toHaveLength(3);
+  });
+
   it('should convert BarChartWidget into TableWidget accurately', () => {
     const table = convertBarChartToTable(sampleChart);
     expect(table.type).toBe('table');
@@ -47,12 +69,26 @@ describe('dashboardMorph utility', () => {
     expect(table.rows[2]).toEqual(['Maret', '98']);
   });
 
-  it('should dynamically morph widget using morphWidget dispatcher', () => {
-    const morphedToChart = morphWidget(sampleTable, 'bar_chart');
-    expect(morphedToChart.type).toBe('bar_chart');
+  it('should dynamically morph between all chart types and table using morphWidget dispatcher', () => {
+    // Table -> Bar
+    const toBar = morphWidget(sampleTable, 'bar_chart');
+    expect(toBar.type).toBe('bar_chart');
 
-    const morphedBackToTable = morphWidget(morphedToChart, 'table');
-    expect(morphedBackToTable.type).toBe('table');
+    // Bar -> Line
+    const toLine = morphWidget(toBar, 'line_chart');
+    expect(toLine.type).toBe('line_chart');
+
+    // Line -> Pie
+    const toPie = morphWidget(toLine, 'pie_chart');
+    expect(toPie.type).toBe('pie_chart');
+
+    // Pie -> Area
+    const toArea = morphWidget(toPie, 'area_chart');
+    expect(toArea.type).toBe('area_chart');
+
+    // Area -> Table
+    const backToTable = morphWidget(toArea, 'table');
+    expect(backToTable.type).toBe('table');
   });
 
   it('should handle percentage or currency characters gracefully in numeric columns', () => {

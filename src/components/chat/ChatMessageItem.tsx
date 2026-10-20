@@ -21,7 +21,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { ChatMessage, ChatSource } from '@/types/chat';
-import { DashboardData } from '@/types/dashboard';
+import { DashboardData, MorphableChartType } from '@/types/dashboard';
 import MarkdownContent from '@/components/ui/MarkdownContent';
 import { BuildDashboardButton, AiDashboardPreview } from '@/components/chat/AiDashboardPreview';
 import { morphWidget } from '@/lib/utils/dashboardMorph';
@@ -126,7 +126,7 @@ export default function ChatMessageItem({
   }, [dashboardId, dashboardData, message, onUpdateMessage]);
 
   const handleMorphWidget = useCallback(
-    async (index: number, targetType: 'bar_chart' | 'table') => {
+    async (index: number, targetType: MorphableChartType) => {
       if (!dashboardId) return;
 
       setDashboardData((prevData) => {

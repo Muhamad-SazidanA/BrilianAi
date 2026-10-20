@@ -2424,6 +2424,119 @@ thead::-webkit-scrollbar {
   border-color: var(--color-primary);
 }
 
+/* ── Chart Switcher Toolbar ── */
+.db-chart-switcher-group {
+  display: inline-flex;
+  align-items: center;
+  background: var(--bg-muted, #F1F5F9);
+  border: 1px solid var(--border-default, #E2E8F0);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+.db-chart-switcher-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--text-muted, #64748B);
+  transition: all 0.15s ease;
+}
+.db-chart-switcher-btn:hover {
+  color: var(--text-primary, #0F172A);
+  background: rgba(255, 255, 255, 0.7);
+}
+.db-chart-switcher-btn.active {
+  background: #FFFFFF;
+  color: var(--color-primary, #2563EB);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* ── SVG Charts (Line & Area) ── */
+.db-chart-svg-wrap {
+  width: 100%;
+  overflow: hidden;
+  padding-top: 4px;
+}
+.db-svg-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* ── Donut / Pie Chart ── */
+.db-pie-container {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 0;
+}
+@media (max-width: 480px) {
+  .db-pie-container {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+.db-pie-svg-wrap {
+  width: 140px;
+  height: 140px;
+  flex-shrink: 0;
+}
+.db-pie-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+.db-pie-legend {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.db-pie-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+  cursor: pointer;
+}
+.db-pie-legend-row:hover,
+.db-pie-legend-row.hovered {
+  background: var(--bg-muted, #F1F5F9);
+}
+.db-pie-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.db-pie-legend-label {
+  flex: 1;
+  color: var(--text-primary, #0F172A);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.db-pie-legend-pct {
+  font-weight: 600;
+  color: var(--color-primary, #2563EB);
+  font-size: 11px;
+}
+.db-pie-legend-val {
+  color: var(--text-muted, #94A3B8);
+  font-size: 11px;
+}
+
 /* ── Bottom Floating Dock Copilot ── */
 .db-bottom-dock-wrapper {
   position: sticky;

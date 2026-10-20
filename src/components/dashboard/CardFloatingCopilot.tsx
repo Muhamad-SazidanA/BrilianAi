@@ -10,7 +10,7 @@ import {
   CheckCircle2,
   AlertCircle,
 } from 'lucide-react';
-import { DashboardData, DashboardWidget } from '@/types/dashboard';
+import { DashboardData, DashboardWidget, MorphableChartType } from '@/types/dashboard';
 import { toast } from 'sonner';
 
 interface CardFloatingCopilotProps {
@@ -18,7 +18,7 @@ interface CardFloatingCopilotProps {
   dashboardData: DashboardData;
   widget: DashboardWidget;
   widgetIndex: number;
-  onMorphWidget?: (index: number, targetType: 'bar_chart' | 'table') => void;
+  onMorphWidget?: (index: number, targetType: MorphableChartType) => void;
   onClose: () => void;
 }
 
@@ -171,8 +171,15 @@ export function CardFloatingCopilot({
           const idxToMorph = typeof actionIdx === 'number' ? actionIdx : widgetIndex;
           if (onMorphWidget) {
             onMorphWidget(idxToMorph, targetType);
+            const TARGET_LABELS: Record<string, string> = {
+              bar_chart: 'Bar Chart',
+              line_chart: 'Line Chart',
+              pie_chart: 'Pie / Donut Chart',
+              area_chart: 'Area Chart',
+              table: 'Tabel',
+            };
             actionDone = `Visualisasi widget otomatis diubah ke ${
-              targetType === 'bar_chart' ? 'Bar Chart' : 'Tabel'
+              TARGET_LABELS[targetType] || targetType
             }.`;
             toast.success(actionDone);
           }
@@ -203,8 +210,27 @@ export function CardFloatingCopilot({
 
   // Dynamic quick suggestions based on widget type
   const suggestions: string[] = [];
-  if (widget.type === 'bar_chart') suggestions.push('Ubah ke Tabel');
-  if (widget.type === 'table') suggestions.push('Ubah ke Bar Chart');
+  if (widget.type === 'bar_chart') {
+    suggestions.push('Ubah ke Line Chart');
+    suggestions.push('Ubah ke Pie Chart');
+    suggestions.push('Ubah ke Tabel');
+  } else if (widget.type === 'line_chart') {
+    suggestions.push('Ubah ke Bar Chart');
+    suggestions.push('Ubah ke Area Chart');
+    suggestions.push('Ubah ke Tabel');
+  } else if (widget.type === 'pie_chart') {
+    suggestions.push('Ubah ke Bar Chart');
+    suggestions.push('Ubah ke Line Chart');
+    suggestions.push('Ubah ke Tabel');
+  } else if (widget.type === 'area_chart') {
+    suggestions.push('Ubah ke Line Chart');
+    suggestions.push('Ubah ke Bar Chart');
+    suggestions.push('Ubah ke Tabel');
+  } else if (widget.type === 'table') {
+    suggestions.push('Ubah ke Bar Chart');
+    suggestions.push('Ubah ke Line Chart');
+    suggestions.push('Ubah ke Pie Chart');
+  }
   suggestions.push('Ringkas poin utama');
   suggestions.push('Analisis data ini');
 

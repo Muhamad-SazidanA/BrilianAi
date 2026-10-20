@@ -3,6 +3,9 @@
 import React, { useState, useCallback } from 'react';
 import {
   BarChart2,
+  LineChart,
+  PieChart,
+  AreaChart,
   TrendingUp,
   TrendingDown,
   Minus,
@@ -27,11 +30,15 @@ import {
   DashboardWidget,
   StatCardWidget,
   BarChartWidget,
+  LineChartWidget,
+  PieChartWidget,
+  AreaChartWidget,
   ListWidget,
   TableWidget,
   TimelineWidget,
   ComparisonWidget,
   TextSummaryWidget,
+  MorphableChartType,
 } from '@/types/dashboard';
 import { useLanguage } from '@/context/LanguageContext';
 import { toast } from 'sonner';
@@ -55,24 +62,38 @@ const CARD_COLORS: Record<string, { gradient: string; icon: string; border: stri
   purple: { gradient: 'linear-gradient(135deg, #F3E8FF 0%, #EDE9FE 100%)', icon: '#7C3AED', border: '#DDD6FE' },
 };
 
+const PIE_COLORS = [
+  '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#F97316', '#64748B'
+];
+
+const CHART_SWITCHER_OPTIONS: Array<{
+  type: MorphableChartType;
+  label: string;
+  icon: LucideIcon;
+}> = [
+  { type: 'bar_chart', label: 'Bar', icon: BarChart2 },
+  { type: 'line_chart', label: 'Line', icon: LineChart },
+  { type: 'pie_chart', label: 'Pie', icon: PieChart },
+  { type: 'area_chart', label: 'Area', icon: AreaChart },
+  { type: 'table', label: 'Tabel', icon: Table2 },
+];
+
 // ─────────────────────────────────────────────────────────────
-// Common Widget Header with Morph and Open/Ask AI Button
+// Common Widget Header with Morph Switcher and Open/Ask AI Button
 // ─────────────────────────────────────────────────────────────
 
 function WidgetCardHeader({
   icon: Icon,
   title,
-  onMorph,
-  morphLabel,
-  MorphIcon,
+  currentType,
+  onMorphTo,
   onOpenCopilot,
   isCopilotOpen,
 }: {
   icon: LucideIcon;
   title: string;
-  onMorph?: () => void;
-  morphLabel?: string;
-  MorphIcon?: LucideIcon;
+  currentType?: MorphableChartType;
+  onMorphTo?: (target: MorphableChartType) => void;
   onOpenCopilot?: () => void;
   isCopilotOpen?: boolean;
 }) {
@@ -91,16 +112,24 @@ function WidgetCardHeader({
         <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-        {onMorph && (
-          <button
-            type="button"
-            onClick={onMorph}
-            className="db-card-morph-btn"
-            title={`Ubah visualisasi menjadi ${morphLabel || 'Visualisasi Lain'}`}
-          >
-            {MorphIcon && <MorphIcon size={11} />}
-            <span>{morphLabel}</span>
-          </button>
+        {onMorphTo && (
+          <div className="db-chart-switcher-group" role="group" aria-label="Pilih Jenis Visualisasi">
+            {CHART_SWITCHER_OPTIONS.map((opt) => {
+              const OptIcon = opt.icon;
+              const isActive = currentType === opt.type;
+              return (
+                <button
+                  key={opt.type}
+                  type="button"
+                  onClick={() => onMorphTo(opt.type)}
+                  className={`db-chart-switcher-btn ${isActive ? 'active' : ''}`}
+                  title={`Ubah ke ${opt.label}`}
+                >
+                  <OptIcon size={11} />
+                </button>
+              );
+            })}
+          </div>
         )}
         {onOpenCopilot && (
           <button
@@ -174,19 +203,18 @@ function StatCard({
 
 function BarChart({
   widget,
-  onMorph,
+  onMorphTo,
   onOpenCopilot,
   isCopilotOpen,
-}: { widget: BarChartWidget; onMorph?: () => void } & WidgetCommonProps) {
+}: { widget: BarChartWidget; onMorphTo?: (target: MorphableChartType) => void } & WidgetCommonProps) {
   const max = Math.max(...widget.items.map(i => i.value), 1);
   return (
     <div className={`db-widget db-barchart ${isCopilotOpen ? 'db-widget-copilot-active' : ''}`}>
       <WidgetCardHeader
         icon={BarChart2}
         title={widget.title}
-        onMorph={onMorph}
-        morphLabel="Tabel"
-        MorphIcon={Table2}
+        currentType="bar_chart"
+        onMorphTo={onMorphTo}
         onOpenCopilot={onOpenCopilot}
         isCopilotOpen={isCopilotOpen}
       />
@@ -205,6 +233,429 @@ function BarChart({
             </span>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function LineChartComp({
+  widget,
+  onMorphTo,
+  onOpenCopilot,
+  isCopilotOpen,
+}: { widget: LineChartWidget; onMorphTo?: (target: MorphableChartType) => void } & WidgetCommonProps) {
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const items = widget.items || [];
+  const max = Math.max(...items.map((i) => i.value), 1);
+  const min = Math.min(...items.map((i) => i.value), 0);
+  const range = max - min || 1;
+
+  const width = 460;
+  const height = 175;
+  const padLeft = 36;
+  const padRight = 20;
+  const padTop = 16;
+  const padBottom = 28;
+  const chartW = width - padLeft - padRight;
+  const chartH = height - padTop - padBottom;
+
+  const points = items.map((item, i) => {
+    const x = padLeft + (items.length > 1 ? (i / (items.length - 1)) * chartW : chartW / 2);
+    const y = padTop + chartH - ((item.value - min) / range) * chartH;
+    return { x, y, item };
+  });
+
+  const pathD = points.reduce((acc, pt, i) => {
+    return i === 0 ? `M ${pt.x} ${pt.y}` : `${acc} L ${pt.x} ${pt.y}`;
+  }, '');
+
+  const safeTitle = widget.title.replace(/[^a-zA-Z0-9]/g, '');
+  const gradId = `lineGrad-${safeTitle}`;
+  const areaId = `areaGrad-${safeTitle}`;
+
+  return (
+    <div className={`db-widget db-linechart ${isCopilotOpen ? 'db-widget-copilot-active' : ''}`}>
+      <WidgetCardHeader
+        icon={LineChart}
+        title={widget.title}
+        currentType="line_chart"
+        onMorphTo={onMorphTo}
+        onOpenCopilot={onOpenCopilot}
+        isCopilotOpen={isCopilotOpen}
+      />
+      <div className="db-chart-svg-wrap">
+        <svg viewBox={`0 0 ${width} ${height}`} className="db-svg-chart">
+          <defs>
+            <linearGradient id={gradId} x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#3B82F6" />
+              <stop offset="100%" stopColor="#60A5FA" />
+            </linearGradient>
+            <linearGradient id={areaId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.22" />
+              <stop offset="100%" stopColor="#3B82F6" stopOpacity="0.0" />
+            </linearGradient>
+          </defs>
+
+          {[0, 0.5, 1].map((pct, idx) => {
+            const y = padTop + chartH * (1 - pct);
+            const val = Math.round(min + range * pct);
+            return (
+              <g key={idx}>
+                <line
+                  x1={padLeft}
+                  y1={y}
+                  x2={width - padRight}
+                  y2={y}
+                  stroke="var(--border-subtle, #E2E8F0)"
+                  strokeDasharray="4 4"
+                  strokeWidth="1"
+                />
+                <text x={padLeft - 6} y={y + 3} textAnchor="end" fontSize="9" fill="#94A3B8">
+                  {val}
+                </text>
+              </g>
+            );
+          })}
+
+          {points.length > 1 && (
+            <path
+              d={`${pathD} L ${points[points.length - 1].x} ${padTop + chartH} L ${points[0].x} ${padTop + chartH} Z`}
+              fill={`url(#${areaId})`}
+            />
+          )}
+
+          <path
+            d={pathD}
+            fill="none"
+            stroke={`url(#${gradId})`}
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+
+          {points.map((pt, i) => {
+            const isHov = hoveredIdx === i;
+            return (
+              <g
+                key={i}
+                onMouseEnter={() => setHoveredIdx(i)}
+                onMouseLeave={() => setHoveredIdx(null)}
+                style={{ cursor: 'pointer' }}
+              >
+                <circle
+                  cx={pt.x}
+                  cy={pt.y}
+                  r={isHov ? 6 : 4}
+                  fill={isHov ? '#2563EB' : '#FFFFFF'}
+                  stroke="#3B82F6"
+                  strokeWidth={isHov ? 2.5 : 2}
+                  style={{ transition: 'all 0.15s ease' }}
+                />
+                <text
+                  x={pt.x}
+                  y={height - 8}
+                  textAnchor="middle"
+                  fontSize="9.5"
+                  fill="var(--text-secondary, #64748B)"
+                  fontWeight={isHov ? '600' : '400'}
+                >
+                  {pt.item.label.length > 9 ? `${pt.item.label.slice(0, 8)}…` : pt.item.label}
+                </text>
+                {isHov && (
+                  <g>
+                    <rect
+                      x={Math.max(10, Math.min(width - 90, pt.x - 45))}
+                      y={Math.max(4, pt.y - 28)}
+                      width="90"
+                      height="20"
+                      rx="5"
+                      fill="#0F172A"
+                    />
+                    <text
+                      x={Math.max(10, Math.min(width - 90, pt.x - 45)) + 45}
+                      y={Math.max(4, pt.y - 28) + 13}
+                      textAnchor="middle"
+                      fontSize="9.5"
+                      fill="#FFFFFF"
+                      fontWeight="500"
+                    >
+                      {pt.item.value} {widget.unit || ''}
+                    </text>
+                  </g>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function AreaChartComp({
+  widget,
+  onMorphTo,
+  onOpenCopilot,
+  isCopilotOpen,
+}: { widget: AreaChartWidget; onMorphTo?: (target: MorphableChartType) => void } & WidgetCommonProps) {
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const items = widget.items || [];
+  const max = Math.max(...items.map((i) => i.value), 1);
+  const min = Math.min(...items.map((i) => i.value), 0);
+  const range = max - min || 1;
+
+  const width = 460;
+  const height = 175;
+  const padLeft = 36;
+  const padRight = 20;
+  const padTop = 16;
+  const padBottom = 28;
+  const chartW = width - padLeft - padRight;
+  const chartH = height - padTop - padBottom;
+
+  const points = items.map((item, i) => {
+    const x = padLeft + (items.length > 1 ? (i / (items.length - 1)) * chartW : chartW / 2);
+    const y = padTop + chartH - ((item.value - min) / range) * chartH;
+    return { x, y, item };
+  });
+
+  const pathD = points.reduce((acc, pt, i) => {
+    return i === 0 ? `M ${pt.x} ${pt.y}` : `${acc} L ${pt.x} ${pt.y}`;
+  }, '');
+
+  const safeTitle = widget.title.replace(/[^a-zA-Z0-9]/g, '');
+  const gradId = `areaStroke-${safeTitle}`;
+  const fillId = `areaFill-${safeTitle}`;
+
+  return (
+    <div className={`db-widget db-areachart ${isCopilotOpen ? 'db-widget-copilot-active' : ''}`}>
+      <WidgetCardHeader
+        icon={AreaChart}
+        title={widget.title}
+        currentType="area_chart"
+        onMorphTo={onMorphTo}
+        onOpenCopilot={onOpenCopilot}
+        isCopilotOpen={isCopilotOpen}
+      />
+      <div className="db-chart-svg-wrap">
+        <svg viewBox={`0 0 ${width} ${height}`} className="db-svg-chart">
+          <defs>
+            <linearGradient id={gradId} x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#10B981" />
+              <stop offset="100%" stopColor="#34D399" />
+            </linearGradient>
+            <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#10B981" stopOpacity="0.35" />
+              <stop offset="100%" stopColor="#10B981" stopOpacity="0.02" />
+            </linearGradient>
+          </defs>
+
+          {[0, 0.5, 1].map((pct, idx) => {
+            const y = padTop + chartH * (1 - pct);
+            const val = Math.round(min + range * pct);
+            return (
+              <g key={idx}>
+                <line
+                  x1={padLeft}
+                  y1={y}
+                  x2={width - padRight}
+                  y2={y}
+                  stroke="var(--border-subtle, #E2E8F0)"
+                  strokeDasharray="4 4"
+                  strokeWidth="1"
+                />
+                <text x={padLeft - 6} y={y + 3} textAnchor="end" fontSize="9" fill="#94A3B8">
+                  {val}
+                </text>
+              </g>
+            );
+          })}
+
+          {points.length > 1 && (
+            <path
+              d={`${pathD} L ${points[points.length - 1].x} ${padTop + chartH} L ${points[0].x} ${padTop + chartH} Z`}
+              fill={`url(#${fillId})`}
+            />
+          )}
+
+          <path
+            d={pathD}
+            fill="none"
+            stroke={`url(#${gradId})`}
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+
+          {points.map((pt, i) => {
+            const isHov = hoveredIdx === i;
+            return (
+              <g
+                key={i}
+                onMouseEnter={() => setHoveredIdx(i)}
+                onMouseLeave={() => setHoveredIdx(null)}
+                style={{ cursor: 'pointer' }}
+              >
+                <circle
+                  cx={pt.x}
+                  cy={pt.y}
+                  r={isHov ? 6 : 4}
+                  fill={isHov ? '#059669' : '#FFFFFF'}
+                  stroke="#10B981"
+                  strokeWidth={isHov ? 2.5 : 2}
+                  style={{ transition: 'all 0.15s ease' }}
+                />
+                <text
+                  x={pt.x}
+                  y={height - 8}
+                  textAnchor="middle"
+                  fontSize="9.5"
+                  fill="var(--text-secondary, #64748B)"
+                  fontWeight={isHov ? '600' : '400'}
+                >
+                  {pt.item.label.length > 9 ? `${pt.item.label.slice(0, 8)}…` : pt.item.label}
+                </text>
+                {isHov && (
+                  <g>
+                    <rect
+                      x={Math.max(10, Math.min(width - 90, pt.x - 45))}
+                      y={Math.max(4, pt.y - 28)}
+                      width="90"
+                      height="20"
+                      rx="5"
+                      fill="#064E3B"
+                    />
+                    <text
+                      x={Math.max(10, Math.min(width - 90, pt.x - 45)) + 45}
+                      y={Math.max(4, pt.y - 28) + 13}
+                      textAnchor="middle"
+                      fontSize="9.5"
+                      fill="#FFFFFF"
+                      fontWeight="500"
+                    >
+                      {pt.item.value} {widget.unit || ''}
+                    </text>
+                  </g>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function PieChartComp({
+  widget,
+  onMorphTo,
+  onOpenCopilot,
+  isCopilotOpen,
+}: { widget: PieChartWidget; onMorphTo?: (target: MorphableChartType) => void } & WidgetCommonProps) {
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const items = widget.items || [];
+  const total = items.reduce((sum, item) => sum + Math.max(0, item.value), 0) || 1;
+
+  let accumulatedAngle = 0;
+  const slices = items.map((item, idx) => {
+    const fraction = Math.max(0, item.value) / total;
+    const angle = fraction * 360;
+    const startAngle = accumulatedAngle;
+    accumulatedAngle += angle;
+    const endAngle = accumulatedAngle;
+
+    const rad = (deg: number) => (deg - 90) * (Math.PI / 180);
+    const rOuter = 65;
+    const rInner = 40;
+    const cx = 90;
+    const cy = 90;
+
+    const isFull = angle >= 359.99;
+    let pathD = '';
+    if (isFull) {
+      pathD = `M ${cx} ${cy - rOuter} A ${rOuter} ${rOuter} 0 1 1 ${cx} ${cy + rOuter} A ${rOuter} ${rOuter} 0 1 1 ${cx} ${cy - rOuter} M ${cx} ${cy - rInner} A ${rInner} ${rInner} 0 1 0 ${cx} ${cy + rInner} A ${rInner} ${rInner} 0 1 0 ${cx} ${cy - rInner} Z`;
+    } else {
+      const x1 = cx + rOuter * Math.cos(rad(startAngle));
+      const y1 = cy + rOuter * Math.sin(rad(startAngle));
+      const x2 = cx + rOuter * Math.cos(rad(endAngle));
+      const y2 = cy + rOuter * Math.sin(rad(endAngle));
+      const x3 = cx + rInner * Math.cos(rad(endAngle));
+      const y3 = cy + rInner * Math.sin(rad(endAngle));
+      const x4 = cx + rInner * Math.cos(rad(startAngle));
+      const y4 = cy + rInner * Math.sin(rad(startAngle));
+      const largeArc = angle > 180 ? 1 : 0;
+      pathD = `M ${x1} ${y1} A ${rOuter} ${rOuter} 0 ${largeArc} 1 ${x2} ${y2} L ${x3} ${y3} A ${rInner} ${rInner} 0 ${largeArc} 0 ${x4} ${y4} Z`;
+    }
+
+    const color = item.color || PIE_COLORS[idx % PIE_COLORS.length];
+    const pct = ((item.value / total) * 100).toFixed(1);
+
+    return { item, pathD, color, pct, idx };
+  });
+
+  return (
+    <div className={`db-widget db-piechart ${isCopilotOpen ? 'db-widget-copilot-active' : ''}`}>
+      <WidgetCardHeader
+        icon={PieChart}
+        title={widget.title}
+        currentType="pie_chart"
+        onMorphTo={onMorphTo}
+        onOpenCopilot={onOpenCopilot}
+        isCopilotOpen={isCopilotOpen}
+      />
+      <div className="db-pie-container">
+        <div className="db-pie-svg-wrap">
+          <svg viewBox="0 0 180 180" className="db-pie-svg">
+            {slices.map((slice) => {
+              const isHov = hoveredIdx === slice.idx;
+              return (
+                <path
+                  key={slice.idx}
+                  d={slice.pathD}
+                  fill={slice.color}
+                  opacity={hoveredIdx !== null && !isHov ? 0.45 : 1}
+                  transform={isHov ? 'scale(1.04)' : 'scale(1)'}
+                  style={{
+                    transformOrigin: '90px 90px',
+                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={() => setHoveredIdx(slice.idx)}
+                  onMouseLeave={() => setHoveredIdx(null)}
+                />
+              );
+            })}
+            <text x="90" y="85" textAnchor="middle" fontSize="10" fill="var(--text-muted, #94A3B8)" fontWeight="500">
+              Total
+            </text>
+            <text x="90" y="103" textAnchor="middle" fontSize="14" fill="var(--text-primary, #0F172A)" fontWeight="700">
+              {Math.round(total)}
+            </text>
+          </svg>
+        </div>
+
+        <div className="db-pie-legend">
+          {slices.map((slice) => {
+            const isHov = hoveredIdx === slice.idx;
+            return (
+              <div
+                key={slice.idx}
+                className={`db-pie-legend-row ${isHov ? 'hovered' : ''}`}
+                onMouseEnter={() => setHoveredIdx(slice.idx)}
+                onMouseLeave={() => setHoveredIdx(null)}
+              >
+                <div className="db-pie-legend-dot" style={{ background: slice.color }} />
+                <span className="db-pie-legend-label" title={slice.item.label}>
+                  {slice.item.label}
+                </span>
+                <span className="db-pie-legend-pct">{slice.pct}%</span>
+                <span className="db-pie-legend-val">
+                  {slice.item.value} {widget.unit || ''}
+                </span>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -259,18 +710,17 @@ function ListWidgetComp({
 
 function TableWidgetComp({
   widget,
-  onMorph,
+  onMorphTo,
   onOpenCopilot,
   isCopilotOpen,
-}: { widget: TableWidget; onMorph?: () => void } & WidgetCommonProps) {
+}: { widget: TableWidget; onMorphTo?: (target: MorphableChartType) => void } & WidgetCommonProps) {
   return (
     <div className={`db-widget db-table-widget ${isCopilotOpen ? 'db-widget-copilot-active' : ''}`}>
       <WidgetCardHeader
         icon={Table2}
         title={widget.title}
-        onMorph={onMorph}
-        morphLabel="Bar Chart"
-        MorphIcon={BarChart2}
+        currentType="table"
+        onMorphTo={onMorphTo}
         onOpenCopilot={onOpenCopilot}
         isCopilotOpen={isCopilotOpen}
       />
@@ -401,19 +851,22 @@ function TextSummaryWidgetComp({
 // ─────────────────────────────────────────────────────────────
 interface WidgetRendererProps extends WidgetCommonProps {
   widget: DashboardWidget;
-  onMorph?: () => void;
+  onMorphTo?: (target: MorphableChartType) => void;
 }
 
 function WidgetRenderer({
   widget,
-  onMorph,
+  onMorphTo,
   ...commonProps
 }: WidgetRendererProps) {
   switch (widget.type) {
     case 'stat_card':   return <StatCard widget={widget} {...commonProps} />;
-    case 'bar_chart':   return <BarChart widget={widget} onMorph={onMorph} {...commonProps} />;
+    case 'bar_chart':   return <BarChart widget={widget} onMorphTo={onMorphTo} {...commonProps} />;
+    case 'line_chart':  return <LineChartComp widget={widget} onMorphTo={onMorphTo} {...commonProps} />;
+    case 'pie_chart':   return <PieChartComp widget={widget} onMorphTo={onMorphTo} {...commonProps} />;
+    case 'area_chart':  return <AreaChartComp widget={widget} onMorphTo={onMorphTo} {...commonProps} />;
     case 'list':        return <ListWidgetComp widget={widget} {...commonProps} />;
-    case 'table':       return <TableWidgetComp widget={widget} onMorph={onMorph} {...commonProps} />;
+    case 'table':       return <TableWidgetComp widget={widget} onMorphTo={onMorphTo} {...commonProps} />;
     case 'timeline':    return <TimelineWidgetComp widget={widget} {...commonProps} />;
     case 'comparison':  return <ComparisonWidgetComp widget={widget} {...commonProps} />;
     case 'text_summary':return <TextSummaryWidgetComp widget={widget} {...commonProps} />;
@@ -429,7 +882,7 @@ export interface AiDashboardPreviewProps {
   dashboardId: string;
   onClose?: () => void;
   compact?: boolean;
-  onMorphWidget?: (index: number, targetType: 'bar_chart' | 'table') => void;
+  onMorphWidget?: (index: number, targetType: MorphableChartType) => void;
 }
 
 export function AiDashboardPreview({
@@ -533,19 +986,25 @@ export function AiDashboardPreview({
         <div className="db-widget-grid">
           {otherWidgets.map((w, i) => {
             const originalIndex = data.widgets.indexOf(w);
-            const isMorphable = w.type === 'table' || w.type === 'bar_chart';
-            const handleMorph = onMorphWidget && isMorphable
-              ? () => {
-                  const targetType = w.type === 'table' ? 'bar_chart' : 'table';
+            const isMorphable =
+              w.type === 'table' ||
+              w.type === 'bar_chart' ||
+              w.type === 'line_chart' ||
+              w.type === 'pie_chart' ||
+              w.type === 'area_chart';
+
+            const handleMorphTo = onMorphWidget && isMorphable
+              ? (targetType: MorphableChartType) => {
                   onMorphWidget(originalIndex, targetType);
                 }
               : undefined;
+
             return (
               <WidgetRenderer
                 key={i}
                 widget={w}
                 originalIndex={originalIndex}
-                onMorph={handleMorph}
+                onMorphTo={handleMorphTo}
                 onOpenCopilot={() =>
                   setActiveCopilotWidgetIndex((prev) => (prev === originalIndex ? null : originalIndex))
                 }

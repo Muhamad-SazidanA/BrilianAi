@@ -13,7 +13,7 @@ import {
   Loader2,
   AlertCircle,
 } from 'lucide-react';
-import { DashboardData } from '@/types/dashboard';
+import { DashboardData, MorphableChartType } from '@/types/dashboard';
 import { AiDashboardPreview } from '@/components/chat/AiDashboardPreview';
 import { morphWidget } from '@/lib/utils/dashboardMorph';
 import { toast } from 'sonner';
@@ -111,7 +111,7 @@ export default function DashboardPage() {
   }, [dashboardId, pageData, handleCopyLink]);
 
   const handleMorphWidget = useCallback(
-    (index: number, targetType: 'bar_chart' | 'table') => {
+    (index: number, targetType: MorphableChartType) => {
       setPageData((prev) => {
         if (!prev) return prev;
         const currentWidgets = [...prev.data.widgets];
