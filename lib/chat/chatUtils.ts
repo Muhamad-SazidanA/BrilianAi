@@ -30,7 +30,7 @@ export function isDataNotFoundAnswer(answer: string): boolean {
   // kemungkinan besar ini jawaban positif dengan rincian yang hanya memuat catatan kecil di akhir.
   // Namun jika tidak ada poin peluru, atau teks ringkas (< 400 karakter),
   // maka ini murni respons penolakan / data tidak ditemukan di dokumen.
-  const hasBulletPoints = text.includes('•') || text.includes('\n- ') || text.includes('\n* ');
+  const hasBulletPoints = text.includes('•') || text.includes('\n- ') || text.includes('\n* ') || text.includes('|');
   if (!hasBulletPoints) {
     return true;
   }

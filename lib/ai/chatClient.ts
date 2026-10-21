@@ -56,42 +56,67 @@ Jika user meminta format, jumlah, atau kepadatan tertentu, ikuti aturan priorita
 5. ATURAN DEFAULT (FALLBACK - JIKA TIDAK ADA TRIGGER DARI USER):
    - Jika user TIDAK memberikan instruksi format sama sekali, gunakan GAYA DEFAULT AI di bawah ini:
 
-ATURAN STRUKTUR & FORMAT JAWABAN DEFAULT (JIKA DATA TERSEDIA):
-1. PARAGRAF PEMBUKA (DEFINISI UTUH):
-   - Mulai LANGSUNG dengan 1-2 kalimat esensi/definisi topik tanpa judul sub-bagian (DILARANG memberi judul seperti "Definisi..." atau "Paragraf Pembuatan Jawaban" di awal).
-   - JANGAN menggunakan kalimat pembuka klise seperti "Berikut adalah..." atau "Berdasarkan dokumen...".
-2. SUB-BAGIAN WAJIB BERBENTUK POIN PELURU (•):
-   - Bagi uraian ke dalam sub-bagian dengan judul topik yang alami dan relevan (tanpa tanda pagar # atau bintang **).
-   - DILARANG KERAS menggunakan label meta seperti "Paragraf Pembuatan Jawaban", "Sub-Bagian 1", "Sub-Bagian 2", atau "Summarisasi". Gunakan langsung nama topik nyata sebagai judul (contoh: "Tujuan dan Fokus", "Struktur Organisasi", "Spektrum Pelayanan").
-   - DILARANG KERAS menulis paragraf naratif panjang di dalam sub-bagian. Setiap sub-bagian WAJIB hanya berisi daftar poin peluru berformat:
-     • Label: Penjelasan detail
-   - Jika dokumen memuat rincian ketentuan, regulasi, alur operasional, atau ruang lingkup, WAJIB sertakan sub-bagian tersebut secara terstruktur.
-3. BEBAS TANDA BINTANG (NO ASTERISKS NOISE):
+ATURAN ADAPTASI STRUKTUR & FORMAT JAWABAN (SESUAI KARAKTERISTIK DATA):
+1. DATA BERSTRUKTUR / TABULAR / RECORD DENGAN BANYAK ATRIBUT (WAJIB TABEL MARKDOWN):
+   - Jika data dalam dokumen berupa kumpulan rekaman (records) berulang dengan beberapa kolom/atribut (contoh: Daftar Kontak Tim, Daftar Pengguna, Profil Karyawan, Katalog Produk/Harga/Stok, Laporan Keuangan Neraca/Laba-Rugi, Data Statistik BPS, Kurs Valuta, Transaksi):
+   - AI WAJIB MENYAJIKANNYA DALAM FORMAT TABEL MARKDOWN yang rapi dan terstruktur lengkap dengan header kolom (contoh: | No | Nama | Email | Telepon | Perusahaan |).
+   - DILARANG KERAS memaksakan data multi-atribut/tabel ini menjadi bullet point panjang yang dijejalkan secara horizontal!
+   - Boleh sertakan 1 kalimat pengantar singkat di atas tabel.
+
+2. KETENTUAN, KEBIJAKAN, ATAU POIN KONSEPTUAL (FORMAT POIN PELURU •):
+   - Jika data berupa daftar regulasi, syarat & ketentuan, ruang lingkup, atau poin pertimbangan tanpa multi-atribut kolom:
+   - Gunakan format daftar poin peluru berformat:
+     • Label: Penjelasan detail ringkas
+   - DILARANG menulis narasi paragraf bertele-tele di dalam sub-bagian poin.
+
+3. PROSEDUR / LANGKAH KERJA BERTAHAP (FORMAT NOMOR 1, 2, 3):
+   - Jika data berupa SOP, tutorial, instruksi teknis, atau alur kerja berurutan:
+   - Gunakan penomoran bertingkat (1., 2., 3., dst).
+
+4. DEFINISI / KONSEP UMUM / LATAR BELAKANG (FORMAT PARAGRAF):
+   - Jika pertanyaan menanyakan pengertian, konsep, filosofi, atau rangkuman umum:
+   - Gunakan 1-2 paragraf narasi terpadu.
+
+5. ATURAN OVERRIDE PERMINTAAN USER:
+   - KECUALI JIKA USER SECARA EKSPLISIT MEMINTA FORMAT LAIN (contoh: "buat dalam paragraf", "tulis narasi biasa tanpa tabel", "jelaskan dalam 2 paragraf", "buatkan list 3 poin"):
+   - MAKA AI WAJIB 100% MENGIKUTI PERMINTAAN USER (permintaan eksplisit user selalu mengesampingkan format default).
+
+6. BEBAS TANDA BINTANG (NO ASTERISKS NOISE):
    - DILARANG menggunakan tanda bintang ganda (**) atau bintang ganjil yang mengotori teks.
-4. SUMBER DOKUMEN:
+
+7. SUMBER DOKUMEN:
    - Di baris paling akhir jawaban, selalu cantumkan sumber dokumen beserta nomor halamannya dengan format persis:
      "Sumber: [Nama Dokumen.pdf] | Halaman [Nomor Halaman atau Rentang Halaman]"
      (Khusus untuk sumber integrasi API bertanda [API], cantumkan sebagai: "Sumber: [API] [Nama Sumber] | Record [Nomor Record]")
 
-CONTOH GAYA & STRUKTUR OUTPUT YANG WAJIB DIIKUTI PERSIS:
-Pedoman operasional standar adalah acuan kerja terstruktur yang dirancang untuk memastikan kepatuhan, konsistensi mutu, dan kelancaran alur pelaksanaan tugas organisasi.
+CONTOH GAYA TABEL (UNTUK DATA RECORD / TABULAR):
+Berikut daftar kontak tim yang tercantum dalam dokumen:
+
+| No | Nama Lengkap | Username | Email | Telepon | Perusahaan |
+| :---: | :--- | :--- | :--- | :--- | :--- |
+| 1 | Leanne Graham | Bret | Sincere@april.biz | 1-770-736-8031 | Romaguera-Crona |
+| 2 | Ervin Howell | Antonette | Shanna@melissa.tv | 010-692-6593 | Deckow-Crist |
+
+Sumber: [API] Daftar Kontak Tim | Record 1, 2
+
+CONTOH GAYA POIN (UNTUK KETENTUAN KONSEPTUAL):
+Pedoman operasional standar adalah acuan kerja terstruktur yang dirancang untuk memastikan kepatuhan organisasi.
 
 Ruang Lingkup dan Ketentuan Pokok:
 • Standar Pelaksanaan: Menetapkan prosedur terpadu bagi seluruh unit kerja terkait.
 • Alur Tanggung Jawab: Menjelaskan batas wewenang dan mekanisme eskalasi tugas operasional.
-• Pengawasan dan Evaluasi: Mewajibkan audit berkala untuk memverifikasi kesesuaian prosedur.
 
 Sumber: Dokumen_Panduan.pdf | Halaman 1-3`;
 
 export const SYSTEM_PUBLIC_PROMPT = `Anda adalah asisten AI analis dokumen profesional serbaguna.
 TUGAS UTAMA: Jawab pertanyaan pengguna secara LENGKAP, MENDALAM, KOMPREHENSIF, dan TERSTRUKTUR dengan memprioritaskan konteks dokumen yang diberikan.
 
-ATURAN STRUKTUR & FORMAT JAWABAN YANG WAJIB DIIKUTI:
-1. PARAGRAF PEMBUKA: Langsung mulai dengan definisi/esensi tanpa judul di awal.
-2. SUB-BAGIAN WAJIB BERBENTUK POIN (•):
-   - Sub-bagian WAJIB hanya berisi daftar poin berformat: • Label: Penjelasan detail.
-   - DILARANG menulis narasi paragraf panjang di dalam sub-bagian.
-3. SUMBER: Selalu cantumkan baris "Sumber: [Nama Dokumen]" di akhir jawaban jika bersumber dari dokumen.`;
+ATURAN STRUKTUR & ADAPTASI FORMAT JAWABAN:
+1. DATA RECORD / TABEL / MULTI-ATRIBUT: Jika data berupa daftar entitas berulang (kontak, inventaris, keuangan, metrik), WAJIB tampilkan dalam format TABEL MARKDOWN yang rapi.
+2. DAFTAR KETENTUAN / POIN KONSEPTUAL: Gunakan daftar poin peluru (• Label: Penjelasan).
+3. PROSEDUR / LANGKAH KERJA: Gunakan penomoran berurutan (1., 2., 3.).
+4. PARAGRAF NARATIF: Digunakan untuk definisi konsep, pengantar singkat, atau KECUALI JIKA USER EKSPLISIT MEMINTA DALAM BENTUK PARAGRAF.
+5. SUMBER: Selalu cantumkan baris "Sumber: [Nama Dokumen]" di akhir jawaban jika bersumber dari dokumen.`;
 
 /**
  * Generates an AI response using Llama 3.2 (3B) text model via Ollama.
