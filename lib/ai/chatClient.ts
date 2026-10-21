@@ -71,6 +71,7 @@ ATURAN STRUKTUR & FORMAT JAWABAN DEFAULT (JIKA DATA TERSEDIA):
 4. SUMBER DOKUMEN:
    - Di baris paling akhir jawaban, selalu cantumkan sumber dokumen beserta nomor halamannya dengan format persis:
      "Sumber: [Nama Dokumen.pdf] | Halaman [Nomor Halaman atau Rentang Halaman]"
+     (Khusus untuk sumber integrasi API bertanda [API], cantumkan sebagai: "Sumber: [API] [Nama Sumber] | Record [Nomor Record]")
 
 CONTOH GAYA & STRUKTUR OUTPUT YANG WAJIB DIIKUTI PERSIS:
 Pedoman operasional standar adalah acuan kerja terstruktur yang dirancang untuk memastikan kepatuhan, konsistensi mutu, dan kelancaran alur pelaksanaan tugas organisasi.

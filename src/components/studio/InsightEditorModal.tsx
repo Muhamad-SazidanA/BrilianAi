@@ -11,9 +11,10 @@ interface InsightEditorModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (data: Partial<CuratedInsightItem>) => Promise<void>;
+  isApiBatch?: boolean;
 }
 
-export default function InsightEditorModal({ insight, isOpen, onClose, onSave }: InsightEditorModalProps) {
+export default function InsightEditorModal({ insight, isOpen, onClose, onSave, isApiBatch = false }: InsightEditorModalProps) {
   const { t } = useLanguage();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -32,7 +33,7 @@ export default function InsightEditorModal({ insight, isOpen, onClose, onSave }:
       setCategory(insight.category || 'Ringkasan');
       setTagsStr(Array.isArray(insight.tags) ? insight.tags.join(', ') : '');
       const rawPages = insight.source_pages || '1';
-      setSourcePages(rawPages.replace(/^(halaman|page|hal\.?)\s+/i, '').trim() || '1');
+      setSourcePages(rawPages.replace(/^(halaman|page|hal\.?|record)\s+/i, '').trim() || '1');
     } else {
       setTitle('');
       setContent('');
@@ -141,14 +142,14 @@ export default function InsightEditorModal({ insight, isOpen, onClose, onSave }:
 
             <div>
               <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '5px' }}>
-                {t('insight.source_pages')}
+                {isApiBatch ? 'Nomor Record Sumber' : t('insight.source_pages')}
               </label>
               <input
                 type="text"
                 value={sourcePages}
                 onChange={(e) => setSourcePages(e.target.value)}
                 className="input-text"
-                placeholder="Contoh: 1-3"
+                placeholder={isApiBatch ? 'Contoh: 1 atau 1-3' : 'Contoh: 1-3'}
               />
             </div>
           </div>

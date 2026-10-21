@@ -705,6 +705,7 @@ export default function DocumentStudioPage() {
             totalChunks={chunks.length || batch?.chunk_count || 0}
             isLoading={isLoading}
             onRefresh={loadDocumentData}
+            isApiBatch={Boolean(batch?.original_filename?.startsWith('[API]'))}
           />
         )}
 
@@ -714,6 +715,7 @@ export default function DocumentStudioPage() {
             isLoading={isLoading}
             curatedCount={insights.length}
             onStartCuration={() => setActiveTab('insights')}
+            isApiBatch={Boolean(batch?.original_filename?.startsWith('[API]'))}
           />
         )}
 

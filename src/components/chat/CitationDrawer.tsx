@@ -98,7 +98,9 @@ export default function CitationDrawer({ source, isOpen, onClose }: CitationDraw
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
             <span className="badge badge-accent">
-              {language === 'en' ? 'Page' : 'Halaman'} {source.pageStart === source.pageEnd ? source.pageStart : `${source.pageStart} - ${source.pageEnd}`}
+              {source.filename?.startsWith('[API]')
+                ? `Record ${source.pageStart === source.pageEnd ? source.pageStart : `${source.pageStart} - ${source.pageEnd}`}`
+                : `${language === 'en' ? 'Page' : 'Halaman'} ${source.pageStart === source.pageEnd ? source.pageStart : `${source.pageStart} - ${source.pageEnd}`}`}
             </span>
             <span className="badge badge-neutral font-mono">
               Chunk #{source.chunkId}

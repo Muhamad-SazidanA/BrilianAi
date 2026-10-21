@@ -5,6 +5,7 @@ import {
   insertCuratedInsights,
   listCuratedInsights,
   deduplicateCuratedInsights,
+  getBatchById,
   CuratedInsight,
 } from '../db/vectorStore';
 
@@ -352,6 +353,10 @@ async function curateBatchInternal(
   const results: CuratedInsight[] = [];
   let processedIndex = 0;
 
+  const batch = await getBatchById(batchId);
+  const isApi = Boolean(batch?.original_filename?.startsWith('[API]'));
+  const prefix = isApi ? 'Record' : 'Halaman';
+
   for (const chunk of uncuratedChunks) {
     if (abortedBatches.has(batchId)) {
       console.log(`[CurationService] Kurasi batch ${batchId} dihentikan karena batch dibatalkan/dihapus.`);
@@ -360,8 +365,8 @@ async function curateBatchInternal(
 
     const pageLabel =
       chunk.source_page_start === chunk.source_page_end
-        ? `Halaman ${chunk.source_page_start}`
-        : `Halaman ${chunk.source_page_start}-${chunk.source_page_end}`;
+        ? `${prefix} ${chunk.source_page_start}`
+        : `${prefix} ${chunk.source_page_start}-${chunk.source_page_end}`;
 
     // Ekstrak 1 atau lebih insight dari chunk ini
     const curatedItems = await curateRawTextMultiple(chunk.content, pageLabel);

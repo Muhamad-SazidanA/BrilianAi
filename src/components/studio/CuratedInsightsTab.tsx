@@ -13,6 +13,7 @@ import {
   AlertCircle,
   FileSpreadsheet,
   Sparkles,
+  Globe,
 } from 'lucide-react';
 import { CuratedInsightItem } from '@/types/curation';
 import InsightEditorModal from './InsightEditorModal';
@@ -22,10 +23,10 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useUserSession } from '@/context/UserSessionContext';
 import { toast } from 'sonner';
 
-function formatSourcePages(sourcePages?: string, pageLabel: string = 'Halaman'): string {
+function formatSourcePages(sourcePages?: string, defaultLabel: string = 'Halaman'): string {
   if (!sourcePages || sourcePages.trim() === '' || sourcePages === 'N/A') return 'N/A';
-  const cleaned = sourcePages.replace(/^(halaman|page|hal\.?)\s+/i, '').trim();
-  return `${pageLabel} ${cleaned || sourcePages}`;
+  const cleaned = sourcePages.replace(/^(halaman|page|hal\.?|record)\s+/i, '').trim();
+  return `${defaultLabel} ${cleaned || sourcePages}`;
 }
 
 interface CurationProgressState {
@@ -46,6 +47,7 @@ interface CuratedInsightsTabProps {
   totalChunks?: number;
   isLoading: boolean;
   onRefresh: () => Promise<void>;
+  isApiBatch?: boolean;
 }
 
 export default function CuratedInsightsTab({
@@ -54,6 +56,7 @@ export default function CuratedInsightsTab({
   totalChunks = 0,
   isLoading,
   onRefresh,
+  isApiBatch = false,
 }: CuratedInsightsTabProps) {
   const { language, t } = useLanguage();
   const { hasPermission } = useUserSession();
@@ -845,8 +848,12 @@ export default function CuratedInsightsTab({
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontFamily: 'var(--font-mono)' }}>
-                    <BookOpen size={12} style={{ color: 'var(--text-muted, #94a3b8)' }} />
-                    <span>{formatSourcePages(item.source_pages, 'Hal.')}</span>
+                    {isApiBatch ? (
+                      <Globe size={12} style={{ color: '#2563eb' }} />
+                    ) : (
+                      <BookOpen size={12} style={{ color: 'var(--text-muted, #94a3b8)' }} />
+                    )}
+                    <span>{formatSourcePages(item.source_pages, isApiBatch ? 'Record' : 'Hal.')}</span>
                   </div>
 
                   {item.tags && item.tags.length > 0 && (
@@ -880,6 +887,7 @@ export default function CuratedInsightsTab({
       <InsightEditorModal
         insight={editingInsight}
         isOpen={isModalOpen}
+        isApiBatch={isApiBatch}
         onClose={() => {
           setIsModalOpen(false);
           setEditingInsight(null);

@@ -11,6 +11,7 @@ interface RawChunksTabProps {
   isLoading: boolean;
   curatedCount?: number;
   onStartCuration?: () => void;
+  isApiBatch?: boolean;
 }
 
 export default function RawChunksTab({
@@ -18,6 +19,7 @@ export default function RawChunksTab({
   isLoading,
   curatedCount = 0,
   onStartCuration,
+  isApiBatch = false,
 }: RawChunksTabProps) {
   const { language, t } = useLanguage();
   const [search, setSearch] = useState('');
@@ -182,8 +184,11 @@ export default function RawChunksTab({
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {filteredChunks.map((chunk) => {
-            const pageLabel =
-              chunk.source_page_start === chunk.source_page_end
+            const pageLabel = isApiBatch
+              ? chunk.source_page_start === chunk.source_page_end
+                ? `Record ${chunk.source_page_start}`
+                : `Record ${chunk.source_page_start} - ${chunk.source_page_end}`
+              : chunk.source_page_start === chunk.source_page_end
                 ? `Hal. ${chunk.source_page_start}`
                 : `Hal. ${chunk.source_page_start} - ${chunk.source_page_end}`;
 

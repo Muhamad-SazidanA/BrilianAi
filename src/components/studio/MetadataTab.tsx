@@ -96,15 +96,24 @@ export default function MetadataTab({ batch, chunks, onBatchUpdated }: MetadataT
     }
   };
 
+  const isApiBatch = batch.original_filename.startsWith('[API]');
+
   const metadataItems = [
     { label: t('meta.batch_id'), value: batch.id, mono: true },
     { label: t('meta.filename'), value: batch.original_filename },
     { label: t('meta.completed'), value: formattedDate },
-    { label: t('meta.pages'), value: `${batch.page_count} ${t('studio.pages')}` },
+    {
+      label: isApiBatch ? 'Jumlah Record Data' : t('meta.pages'),
+      value: isApiBatch ? `${batch.page_count} Record` : `${batch.page_count} ${t('studio.pages')}`,
+    },
     { label: t('meta.chunks'), value: `${batch.chunk_count} ${t('studio.chunks')}` },
     {
-      label: t('meta.ratio'),
-      value: language === 'en' ? `~${chunkPerRatio} chunks / page` : `~${chunkPerRatio} chunk / halaman`,
+      label: isApiBatch ? 'Rasio Chunks/Record' : t('meta.ratio'),
+      value: isApiBatch
+        ? `~${chunkPerRatio} chunk / record`
+        : language === 'en'
+        ? `~${chunkPerRatio} chunks / page`
+        : `~${chunkPerRatio} chunk / halaman`,
     },
     {
       label: t('meta.avg_len'),
@@ -113,7 +122,10 @@ export default function MetadataTab({ batch, chunks, onBatchUpdated }: MetadataT
           ? `${avgChars} characters (Sliding Window Target: 800)`
           : `${avgChars} karakter (Sliding Window Target: 800)`,
     },
-    { label: t('meta.vision'), value: 'Vision OCR Engine (In-memory page scan)' },
+    {
+      label: isApiBatch ? 'Metode Ingestion' : t('meta.vision'),
+      value: isApiBatch ? 'REST API Live Ingestion (JSON to Markdown Structure)' : 'Vision OCR Engine (In-memory page scan)',
+    },
     {
       label: t('meta.embedding'),
       value: language === 'en' ? 'Dense Vector · 1024 Dimensions' : 'Vektor Padat · 1024 Dimensi',
