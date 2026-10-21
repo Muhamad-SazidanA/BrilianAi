@@ -17,6 +17,9 @@ import {
   Loader2,
   Globe,
   FileSpreadsheet,
+  Database,
+  TrendingUp,
+  Building2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { UploadBatch } from '@/types/document';
@@ -511,13 +514,72 @@ export default function DocumentTable({
                 const isTaskRunning = activeIngestionTasks.some(
                   (t) => t.result?.upload_batch_id === batch.id || t.fileName === batch.original_filename
                 );
-                const isCurated = (batch.curated_count || 0) > 0;
+                const isFeedBatch = batch.original_filename.startsWith('[FEED]');
+                const isDbBatch = batch.original_filename.startsWith('[DB]');
+                const isSapBatch = batch.original_filename.startsWith('[SAP]');
+                const isCrmBatch = batch.original_filename.startsWith('[CRM]');
+                const isErpBatch = batch.original_filename.startsWith('[ERP]');
                 const isApiBatch = batch.original_filename.startsWith('[API]');
-                const cleanTitle = isApiBatch
-                  ? batch.original_filename.replace(/^\[API\]\s*/, '')
-                  : batch.original_filename;
+                const isCurated = typeof batch.curated_count === 'number' && batch.curated_count > 0;
+
+                const cleanTitle = batch.original_filename.replace(/^\[(API|FEED|DB|SAP|CRM|ERP)\]\s*/, '');
 
                 const getFormatDetails = () => {
+                  if (isFeedBatch) {
+                    return {
+                      badge: 'DATA FEED',
+                      color: '#b45309',
+                      bg: '#fef3c7',
+                      border: '#fde68a',
+                      icon: <TrendingUp size={14} />,
+                      unit: 'Record',
+                      title: 'Sumber: Data Feed Eksternal (Tersinkronisasi)',
+                    };
+                  }
+                  if (isDbBatch) {
+                    return {
+                      badge: 'DATABASE',
+                      color: '#7e22ce',
+                      bg: '#faf5ff',
+                      border: '#e9d5ff',
+                      icon: <Database size={14} />,
+                      unit: 'Baris',
+                      title: 'Sumber: Database Langsung (Read-Only SQL)',
+                    };
+                  }
+                  if (isSapBatch) {
+                    return {
+                      badge: 'SAP ERP',
+                      color: '#4338ca',
+                      bg: '#eef2ff',
+                      border: '#c7d2fe',
+                      icon: <Building2 size={14} />,
+                      unit: 'Entitas',
+                      title: 'Sumber: SAP S/4HANA (OData Connector)',
+                    };
+                  }
+                  if (isCrmBatch) {
+                    return {
+                      badge: 'SALESFORCE',
+                      color: '#0369a1',
+                      bg: '#f0f9ff',
+                      border: '#bae6fd',
+                      icon: <Building2 size={14} />,
+                      unit: 'Entitas',
+                      title: 'Sumber: Salesforce CRM (SOQL Connector)',
+                    };
+                  }
+                  if (isErpBatch) {
+                    return {
+                      badge: 'ENTERPRISE',
+                      color: '#4338ca',
+                      bg: '#eef2ff',
+                      border: '#c7d2fe',
+                      icon: <Building2 size={14} />,
+                      unit: 'Entitas',
+                      title: 'Sumber: Sistem Enterprise (Denodo / Dynamics)',
+                    };
+                  }
                   if (isApiBatch) {
                     return {
                       badge: 'REST API',

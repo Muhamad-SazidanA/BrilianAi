@@ -26,6 +26,8 @@ import {
   Link2,
   Code2,
   Check,
+  Database,
+  TrendingUp,
 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserSession } from '@/context/UserSessionContext';
@@ -34,6 +36,9 @@ import { toast } from 'sonner';
 import EnterpriseSelect from '@/components/ui/EnterpriseSelect';
 import { useIngestion } from '@/context/IngestionContext';
 import { ENTERPRISE_DIVISIONS } from '@lib/constants/divisions';
+import FeedConnectorTab from './connectors/FeedConnectorTab';
+import DatabaseConnectorTab from './connectors/DatabaseConnectorTab';
+import EnterpriseConnectorTab from './connectors/EnterpriseConnectorTab';
 
 export interface UserGrantSelection {
   userId: string;
@@ -73,8 +78,8 @@ export default function DocumentUploadModal({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Ingest Mode: 'pdf' | 'api'
-  const [ingestMode, setIngestMode] = useState<'pdf' | 'api'>('pdf');
+  // Ingest Mode: 'files' | 'api' | 'feeds' | 'database' | 'enterprise'
+  const [ingestMode, setIngestMode] = useState<'files' | 'api' | 'feeds' | 'database' | 'enterprise'>('files');
 
   // REST API Connector State
   const [apiSourceName, setApiSourceName] = useState<string>('');
@@ -126,6 +131,63 @@ export default function DocumentUploadModal({
       { value: 'custom', label: '+ Divisi Lainnya...' },
     ];
   }, [availableUsers]);
+
+  const connectorMetadata = useMemo(
+    () => ({
+      divisionId: divisionId === 'custom' ? customDivision.trim() || 'General' : divisionId,
+      classification,
+      status: docStatus,
+      version: version.trim() || '1.0',
+      reviewDueDate: reviewDueDate || null,
+      userGrants: userGrants.length > 0 ? userGrants : undefined,
+    }),
+    [divisionId, customDivision, classification, docStatus, version, reviewDueDate, userGrants]
+  );
+
+  const headerInfo = useMemo(() => {
+    switch (ingestMode) {
+      case 'files':
+        return {
+          icon: <UploadCloud size={18} />,
+          title: language === 'en' ? 'Upload Documents (PDF, Word, Excel, CSV)' : 'Unggah Dokumen (PDF, Word, Excel, CSV)',
+          desc: language === 'en'
+            ? 'Ingest PDF, Word, Excel, and CSV files in batch without limit into pgvector'
+            : 'Ingest berkas PDF, Word, Excel, dan CSV tanpa batas jumlah file ke pgvector',
+        };
+      case 'api':
+        return {
+          icon: <Globe size={18} />,
+          title: language === 'en' ? 'REST API Ingestion Connector' : 'Integrasi REST API (Live Connector)',
+          desc: language === 'en'
+            ? 'Fetch live JSON data, convert to structured Markdown, and index into pgvector'
+            : 'Tarik data JSON eksternal, konversi ke Markdown terstruktur, dan indeks ke pgvector',
+        };
+      case 'feeds':
+        return {
+          icon: <TrendingUp size={18} />,
+          title: language === 'en' ? 'External Data Feeds (Market & Public Data)' : 'Data Feed Eksternal (Pasar, Kurs & BPS)',
+          desc: language === 'en'
+            ? 'Automated scheduled sync from Bank Indonesia exchange rates, BPS macro stats, and public feeds'
+            : 'Sinkronisasi terjadwal otomatis data Kurs BI, Statistik Makro BPS, dan feed publik berkala',
+        };
+      case 'database':
+        return {
+          icon: <Database size={18} />,
+          title: language === 'en' ? 'Direct Database Connection (Read-Only Guard)' : 'Koneksi Database Langsung (Read-Only)',
+          desc: language === 'en'
+            ? 'Secure read-only SELECT connection to PostgreSQL or MySQL with SQL injection protection'
+            : 'Koneksi aman read-only SELECT ke PostgreSQL atau MySQL dengan proteksi ketat DDL/DML',
+        };
+      case 'enterprise':
+        return {
+          icon: <Building2 size={18} />,
+          title: language === 'en' ? 'Enterprise Systems (SAP, CRM, Denodo)' : 'Sistem Enterprise (SAP, Salesforce & Denodo)',
+          desc: language === 'en'
+            ? 'Native ERP and CRM integration with automatic schema mapping into structured entity knowledge cards'
+            : 'Integrasi ERP/CRM dengan pemetaan skema entitas bisnis otomatis ke kartu pengetahuan AI',
+        };
+    }
+  }, [ingestMode, language]);
 
   // Auto-populate default division from current user's actual department
   useEffect(() => {
@@ -496,8 +558,8 @@ export default function DocumentUploadModal({
       <div
         style={{
           width: '100%',
-          maxWidth: '780px',
-          maxHeight: 'min(92vh, 600px)',
+          maxWidth: '860px',
+          maxHeight: 'min(92vh, 650px)',
           backgroundColor: '#FFFFFF',
           borderRadius: '16px',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
@@ -530,28 +592,17 @@ export default function DocumentUploadModal({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                flexShrink: 0,
               }}
             >
-              {ingestMode === 'pdf' ? <UploadCloud size={18} /> : <Globe size={18} />}
+              {headerInfo.icon}
             </div>
             <div>
               <h3 style={{ fontSize: '15px', fontWeight: 650, color: '#0F172A', letterSpacing: '-0.01em', margin: 0 }}>
-                {ingestMode === 'pdf'
-                  ? language === 'en'
-                    ? 'Upload Documents (PDF, Word, Excel, CSV)'
-                    : 'Unggah Dokumen (PDF, Word, Excel, CSV)'
-                  : language === 'en'
-                    ? 'REST API Ingestion Connector'
-                    : 'Integrasi REST API (Live Connector)'}
+                {headerInfo.title}
               </h3>
               <p style={{ fontSize: '12px', color: '#64748B', marginTop: '2px', margin: 0 }}>
-                {ingestMode === 'pdf'
-                  ? language === 'en'
-                    ? 'Ingest PDF, Word, Excel, and CSV files in batch without limit into pgvector'
-                    : 'Ingest berkas PDF, Word, Excel, dan CSV tanpa batas jumlah file ke pgvector'
-                  : language === 'en'
-                    ? 'Fetch live JSON data, convert to structured Markdown, and index into pgvector'
-                    : 'Tarik data JSON eksternal, konversi ke Markdown terstruktur, dan indeks ke pgvector'}
+                {headerInfo.desc}
               </p>
             </div>
           </div>
@@ -580,81 +631,73 @@ export default function DocumentUploadModal({
           </button>
         </div>
 
-        {/* ── Mode Segmented Switcher ── */}
+        {/* ── Mode Segmented Switcher (5 Enterprise Pillars) ── */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: '6px',
             padding: '8px 20px',
             backgroundColor: '#F8FAFC',
             borderBottom: '1px solid #E2E8F0',
+            overflowX: 'auto',
           }}
         >
-          <button
-            type="button"
-            onClick={() => {
-              setIngestMode('pdf');
-              setUploadError(null);
-            }}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '5px 12px',
-              fontSize: '11.5px',
-              fontWeight: ingestMode === 'pdf' ? 650 : 500,
-              borderRadius: '9999px',
-              border: ingestMode === 'pdf' ? '1px solid #2563EB' : '1px solid #E2E8F0',
-              backgroundColor: ingestMode === 'pdf' ? '#EFF6FF' : '#FFFFFF',
-              color: ingestMode === 'pdf' ? '#2563EB' : '#64748B',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-              boxShadow: ingestMode === 'pdf' ? '0 1px 2px rgba(37, 99, 235, 0.1)' : 'none',
-            }}
-          >
-            <FileText size={12} />
-            <span>{language === 'en' ? 'File Documents (PDF, Word, Excel, CSV)' : 'File Dokumen (PDF, Word, Excel, CSV)'}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setIngestMode('api');
-              setUploadError(null);
-            }}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '5px 12px',
-              fontSize: '11.5px',
-              fontWeight: ingestMode === 'api' ? 650 : 500,
-              borderRadius: '9999px',
-              border: ingestMode === 'api' ? '1px solid #2563EB' : '1px solid #E2E8F0',
-              backgroundColor: ingestMode === 'api' ? '#EFF6FF' : '#FFFFFF',
-              color: ingestMode === 'api' ? '#2563EB' : '#64748B',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-              boxShadow: ingestMode === 'api' ? '0 1px 2px rgba(37, 99, 235, 0.1)' : 'none',
-            }}
-          >
-            <Globe size={12} />
-            <span>{language === 'en' ? 'REST API Connector' : 'Integrasi REST API'}</span>
-            <span
-              style={{
-                fontSize: '9px',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                padding: '1px 5px',
-                borderRadius: '4px',
-                backgroundColor: '#2563EB',
-                color: '#FFFFFF',
-              }}
-            >
-              Live
-            </span>
-          </button>
+          {[
+            { id: 'files', label: language === 'en' ? 'File Documents' : 'Dokumen File', icon: FileText, badge: null },
+            { id: 'api', label: language === 'en' ? 'REST API' : 'REST / Web API', icon: Globe, badge: 'Live' },
+            { id: 'feeds', label: language === 'en' ? 'Data Feeds' : 'Data Feed Pasar', icon: TrendingUp, badge: 'Sync' },
+            { id: 'database', label: language === 'en' ? 'Database' : 'Database SQL', icon: Database, badge: 'Read-Only' },
+            { id: 'enterprise', label: language === 'en' ? 'Enterprise' : 'Sistem ERP/CRM', icon: Building2, badge: 'Schema' },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isActive = ingestMode === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  setIngestMode(tab.id as any);
+                  setUploadError(null);
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '5px 11px',
+                  fontSize: '11px',
+                  fontWeight: isActive ? 650 : 500,
+                  borderRadius: '9999px',
+                  border: isActive ? '1px solid #2563EB' : '1px solid #E2E8F0',
+                  backgroundColor: isActive ? '#EFF6FF' : '#FFFFFF',
+                  color: isActive ? '#2563EB' : '#64748B',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  boxShadow: isActive ? '0 1px 2px rgba(37, 99, 235, 0.1)' : 'none',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}
+              >
+                <Icon size={12} />
+                <span>{tab.label}</span>
+                {tab.badge && (
+                  <span
+                    style={{
+                      fontSize: '8.5px',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      padding: '1px 5px',
+                      borderRadius: '4px',
+                      backgroundColor: isActive ? '#2563EB' : '#F1F5F9',
+                      color: isActive ? '#FFFFFF' : '#64748B',
+                    }}
+                  >
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* ── Body Content (Wide 2-Column Side-by-Side) ── */}
@@ -667,9 +710,9 @@ export default function DocumentUploadModal({
               alignItems: 'start',
             }}
           >
-            {/* ── Left Column: Multi-PDF Dropzone OR REST API Ingest Form ── */}
+            {/* ── Left Column: Multi-File Dropzone OR Connector Form ── */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {ingestMode === 'pdf' ? (
+              {ingestMode === 'files' ? (
                 <>
                   <div
                     onDragOver={handleDragOver}
@@ -885,7 +928,7 @@ export default function DocumentUploadModal({
                     </p>
                   </div>
                 </>
-              ) : (
+              ) : ingestMode === 'api' ? (
                 /* ── Left Column: REST API Ingestion Connector Form ── */
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {/* Source Name */}
@@ -1170,6 +1213,30 @@ export default function DocumentUploadModal({
                     </div>
                   )}
                 </div>
+              ) : ingestMode === 'feeds' ? (
+                <FeedConnectorTab
+                  metadata={connectorMetadata}
+                  isSubmitting={isSubmitting}
+                  setIsSubmitting={setIsSubmitting}
+                  onSuccess={onSuccess}
+                  onClose={handleModalClose}
+                />
+              ) : ingestMode === 'database' ? (
+                <DatabaseConnectorTab
+                  metadata={connectorMetadata}
+                  isSubmitting={isSubmitting}
+                  setIsSubmitting={setIsSubmitting}
+                  onSuccess={onSuccess}
+                  onClose={handleModalClose}
+                />
+              ) : (
+                <EnterpriseConnectorTab
+                  metadata={connectorMetadata}
+                  isSubmitting={isSubmitting}
+                  setIsSubmitting={setIsSubmitting}
+                  onSuccess={onSuccess}
+                  onClose={handleModalClose}
+                />
               )}
 
               {/* Error Notice */}
@@ -1484,15 +1551,31 @@ export default function DocumentUploadModal({
             backgroundColor: '#FAFAFA',
           }}
         >
-          <div style={{ fontSize: '11px', color: '#64748B' }}>
-            {ingestMode === 'pdf' ? (
+          <div style={{ fontSize: '11px', color: '#64748B', maxWidth: '440px', lineHeight: 1.35 }}>
+            {ingestMode === 'files' && (
               selectedFiles.length > 0
-                ? `${selectedFiles.length} file PDF siap diproses ke pgvector`
-                : 'Pilih satu atau lebih dokumen untuk memulai'
-            ) : (
+                ? `${selectedFiles.length} berkas dokumen siap diproses ke pgvector`
+                : (language === 'en' ? 'Select documents (PDF, Word, Excel, CSV) to begin' : 'Pilih dokumen (PDF, Word, Excel, CSV) untuk memulai')
+            )}
+            {ingestMode === 'api' && (
               previewResult
-                ? `Siap diindeks: ${previewResult.recordCount} record dari API`
-                : 'Konfigurasikan endpoint REST API & klik Uji Koneksi'
+                ? `Siap diindeks: ${previewResult.recordCount} record dari REST API`
+                : (language === 'en' ? 'Configure REST endpoint & click Test Connection' : 'Konfigurasikan endpoint REST API & klik Uji Koneksi')
+            )}
+            {ingestMode === 'feeds' && (
+              language === 'en'
+                ? 'Use the "Sync Now" button inside the feed panel to ingest live market/BPS data.'
+                : 'Gunakan tombol "Sinkronkan Sekarang" pada panel data feed untuk menarik data pasar/kurs.'
+            )}
+            {ingestMode === 'database' && (
+              language === 'en'
+                ? 'Protected by Read-Only Query Guard. Execute test query or sync inside the database panel.'
+                : 'Koneksi SQL diproteksi Read-Only Guard. Gunakan tombol aksi di formulir database.'
+            )}
+            {ingestMode === 'enterprise' && (
+              language === 'en'
+                ? 'Native ERP/CRM schema mapping to structured pgvector knowledge cards.'
+                : 'Pemetaan skema otomatis SAP/Salesforce/Denodo ke kartu pengetahuan AI pgvector.'
             )}
           </div>
 
@@ -1516,65 +1599,70 @@ export default function DocumentUploadModal({
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F1F5F9')}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#FFFFFF')}
             >
-              Batal
+              {ingestMode === 'files' || ingestMode === 'api'
+                ? (language === 'en' ? 'Cancel' : 'Batal')
+                : (language === 'en' ? 'Close' : 'Tutup')}
             </button>
-            <button
-              type="button"
-              onClick={ingestMode === 'pdf' ? handleSubmit : handleApiSync}
-              disabled={
-                isSubmitting ||
-                (ingestMode === 'pdf' ? selectedFiles.length === 0 : !apiSourceName.trim() || !apiEndpoint.trim())
-              }
-              style={{
-                height: '30px',
-                padding: '0 16px',
-                borderRadius: '9999px',
-                border: '1px solid #1D4ED8',
-                backgroundColor:
-                  !isSubmitting &&
-                  (ingestMode === 'pdf' ? selectedFiles.length > 0 : apiSourceName.trim() && apiEndpoint.trim())
-                    ? '#2563EB'
-                    : '#94A3B8',
-                color: '#FFFFFF',
-                fontSize: '11.5px',
-                fontWeight: 600,
-                cursor:
-                  !isSubmitting &&
-                  (ingestMode === 'pdf' ? selectedFiles.length > 0 : apiSourceName.trim() && apiEndpoint.trim())
-                    ? 'pointer'
-                    : 'not-allowed',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                boxShadow: '0 1px 3px rgba(37, 99, 235, 0.25)',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 size={13} className="animate-spin" />
-                  <span>{ingestMode === 'pdf' ? 'Memasukkan ke Antrian...' : 'Menarik & Mengindeks API...'}</span>
-                </>
-              ) : (
-                <>
-                  {ingestMode === 'pdf' ? (
-                    <>
-                      <UploadCloud size={13} strokeWidth={2.2} />
-                      <span>
-                        {selectedFiles.length > 0
-                          ? `Mulai Ingestion (${selectedFiles.length} Dokumen)`
-                          : 'Mulai Ingestion'}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <Globe size={13} strokeWidth={2.2} />
-                      <span>Tarik & Indeks Data API ke pgvector</span>
-                    </>
-                  )}
-                </>
-              )}
-            </button>
+
+            {(ingestMode === 'files' || ingestMode === 'api') && (
+              <button
+                type="button"
+                onClick={ingestMode === 'files' ? handleSubmit : handleApiSync}
+                disabled={
+                  isSubmitting ||
+                  (ingestMode === 'files' ? selectedFiles.length === 0 : !apiSourceName.trim() || !apiEndpoint.trim())
+                }
+                style={{
+                  height: '30px',
+                  padding: '0 16px',
+                  borderRadius: '9999px',
+                  border: '1px solid #1D4ED8',
+                  backgroundColor:
+                    !isSubmitting &&
+                    (ingestMode === 'files' ? selectedFiles.length > 0 : apiSourceName.trim() && apiEndpoint.trim())
+                      ? '#2563EB'
+                      : '#94A3B8',
+                  color: '#FFFFFF',
+                  fontSize: '11.5px',
+                  fontWeight: 600,
+                  cursor:
+                    !isSubmitting &&
+                    (ingestMode === 'files' ? selectedFiles.length > 0 : apiSourceName.trim() && apiEndpoint.trim())
+                      ? 'pointer'
+                      : 'not-allowed',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 1px 3px rgba(37, 99, 235, 0.25)',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 size={13} className="animate-spin" />
+                    <span>{ingestMode === 'files' ? 'Memasukkan ke Antrian...' : 'Menarik & Mengindeks API...'}</span>
+                  </>
+                ) : (
+                  <>
+                    {ingestMode === 'files' ? (
+                      <>
+                        <UploadCloud size={13} strokeWidth={2.2} />
+                        <span>
+                          {selectedFiles.length > 0
+                            ? `Mulai Ingestion (${selectedFiles.length} Dokumen)`
+                            : 'Mulai Ingestion'}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <Globe size={13} strokeWidth={2.2} />
+                        <span>Tarik & Indeks Data API ke pgvector</span>
+                      </>
+                    )}
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>
