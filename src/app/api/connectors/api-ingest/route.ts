@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthenticatedUser } from '@lib/auth/serverAuth';
+import { getAuthenticatedUser, hasServerPermission } from '@lib/auth/serverAuth';
 import { testAndPreviewApi, syncApiConnector, ApiConnectorConfig } from '@lib/connectors/apiConnectorService';
 
 /**
@@ -31,13 +31,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 2. Permission Check (requires editor or admin role / documents:create)
+  // 2. Permission Check (requires documents:upload permission or admin/editor/superadmin role)
+  const canUpload = await hasServerPermission(req, 'documents:upload');
+  const roleId = String(authUser.role_id || '').toLowerCase();
+  const roleName = String(authUser.role?.name || '').toLowerCase();
   const isAuthorized =
-    authUser.role === 'admin' ||
-    authUser.role === 'superadmin' ||
-    authUser.role === 'editor' ||
-    (Array.isArray(authUser.permissions) &&
-      (authUser.permissions.includes('documents:create') || authUser.permissions.includes('documents:all')));
+    canUpload ||
+    roleId.includes('admin') ||
+    roleId.includes('editor') ||
+    roleName.includes('admin') ||
+    roleName.includes('editor') ||
+    Boolean(authUser.role?.permissions?.includes('documents:upload'));
 
   if (!isAuthorized) {
     return NextResponse.json(
