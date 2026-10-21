@@ -12,9 +12,13 @@ import {
   Eye,
   Loader2,
   AlertCircle,
+  Lock,
+  Unlock,
+  RotateCcw,
+  Sparkles,
 } from 'lucide-react';
-import { DashboardData, MorphableChartType } from '@/types/dashboard';
-import { AiDashboardPreview } from '@/components/chat/AiDashboardPreview';
+import { DashboardData, DashboardWidget, MorphableChartType } from '@/types/dashboard';
+import DraggableDashboardGrid from '@/components/dashboard/DraggableDashboardGrid';
 import { morphWidget } from '@/lib/utils/dashboardMorph';
 import { toast } from 'sonner';
 
@@ -49,6 +53,8 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [isLayoutLocked, setIsLayoutLocked] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
   useEffect(() => {
     if (!dashboardId) {
@@ -66,6 +72,7 @@ export default function DashboardPage() {
         }
         const data = await res.json();
         setPageData(data);
+        setIsLayoutLocked(Boolean(data.data?.isLayoutLocked));
       } catch (err: any) {
         setError(err?.message || 'Gagal memuat dashboard.');
       } finally {
@@ -102,13 +109,107 @@ export default function DashboardPage() {
           url,
         });
       } catch {
-        // User cancelled share or not supported
         handleCopyLink();
       }
     } else {
       handleCopyLink();
     }
   }, [dashboardId, pageData, handleCopyLink]);
+
+  // Persist updated widgets layout to database
+  const handlePersistWidgets = useCallback(
+    async (updatedWidgets: DashboardWidget[]) => {
+      if (!pageData) return;
+      setSaveStatus('saving');
+
+      const updatedData: DashboardData = {
+        ...pageData.data,
+        widgets: updatedWidgets,
+      };
+
+      try {
+        const res = await fetch(`/api/dashboard/${dashboardId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: updatedData }),
+        });
+
+        if (!res.ok) throw new Error('Gagal menyimpan layout');
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 2500);
+      } catch (err) {
+        console.error('[DashboardPage] Failed to persist layout:', err);
+        setSaveStatus('idle');
+      }
+    },
+    [dashboardId, pageData]
+  );
+
+  // Toggle Lock/Unlock layout
+  const handleToggleLockLayout = useCallback(async () => {
+    if (!pageData) return;
+    const nextLocked = !isLayoutLocked;
+    setIsLayoutLocked(nextLocked);
+    setSaveStatus('saving');
+
+    const updatedData: DashboardData = {
+      ...pageData.data,
+      isLayoutLocked: nextLocked,
+    };
+    setPageData((prev) => (prev ? { ...prev, data: updatedData } : prev));
+
+    try {
+      await fetch(`/api/dashboard/${dashboardId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: updatedData }),
+      });
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2500);
+      if (nextLocked) {
+        toast.success('Layout dashboard dikunci.');
+      } else {
+        toast.info('Mode atur layout aktif: tarik blok untuk pindah posisi atau sudut untuk resize.');
+      }
+    } catch {
+      setSaveStatus('idle');
+      toast.error('Gagal memperbarui status kunci layout');
+    }
+  }, [dashboardId, isLayoutLocked, pageData]);
+
+  // Reset layout to tidy default
+  const handleResetGrid = useCallback(async () => {
+    if (!pageData) return;
+    const cleanedWidgets = pageData.data.widgets.map((w) => {
+      const { layout, ...rest } = w;
+      return rest;
+    });
+
+    const updatedData: DashboardData = {
+      ...pageData.data,
+      widgets: cleanedWidgets,
+    };
+    setPageData((prev) => (prev ? { ...prev, data: updatedData } : prev));
+    setSaveStatus('saving');
+
+    try {
+      await fetch(`/api/dashboard/${dashboardId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: updatedData }),
+      });
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2500);
+      toast.success('Grid berhasil dirapikan ke susunan standar!');
+    } catch {
+      setSaveStatus('idle');
+      toast.error('Gagal merapikan grid');
+    }
+  }, [dashboardId, pageData]);
+
+  const handleUpdateData = useCallback((newData: DashboardData) => {
+    setPageData((prev) => (prev ? { ...prev, data: newData } : prev));
+  }, []);
 
   const handleMorphWidget = useCallback(
     (index: number, targetType: MorphableChartType) => {
@@ -220,7 +321,38 @@ export default function DashboardPage() {
               </span>
             </div>
 
-            {/* Actions */}
+            {/* Auto-save status indicator */}
+            {saveStatus === 'saving' && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  fontSize: '11px',
+                  color: '#64748B',
+                }}
+              >
+                <Loader2 size={12} className="db-page-spinner" />
+                <span>Menyimpan...</span>
+              </div>
+            )}
+            {saveStatus === 'saved' && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '11px',
+                  color: '#10B981',
+                  fontWeight: 500,
+                }}
+              >
+                <Check size={13} />
+                <span>Tersimpan</span>
+              </div>
+            )}
+
+            {/* Salin link */}
             <button
               type="button"
               onClick={handleCopyLink}
@@ -230,25 +362,65 @@ export default function DashboardPage() {
               {copiedLink ? <Check size={14} color="var(--color-success)" /> : <Copy size={14} />}
               <span>{copiedLink ? 'Tersalin!' : 'Salin Link'}</span>
             </button>
+
+            {/* Kunci / Buka Kunci Layout */}
+            <button
+              type="button"
+              onClick={handleToggleLockLayout}
+              className={`db-topbar-btn ${isLayoutLocked ? 'db-topbar-btn-ghost' : 'db-topbar-btn-primary'}`}
+              title={isLayoutLocked ? 'Buka kunci untuk memindah / ubah ukuran widget' : 'Kunci layout agar tidak sengaja bergeser'}
+              style={{
+                backgroundColor: isLayoutLocked ? 'transparent' : '#2563EB',
+                color: isLayoutLocked ? 'var(--text-secondary)' : '#FFFFFF',
+              }}
+            >
+              {isLayoutLocked ? <Lock size={13} /> : <Unlock size={13} />}
+              <span>{isLayoutLocked ? 'Buka Kunci' : 'Kunci Layout'}</span>
+            </button>
+
+            {/* Rapikan Grid */}
+            <button
+              type="button"
+              onClick={handleResetGrid}
+              className="db-topbar-btn db-topbar-btn-ghost"
+              title="Kembalikan ukuran dan susunan widget ke posisi standar yang rapi"
+            >
+              <RotateCcw size={13} />
+              <span>Rapikan Grid</span>
+            </button>
+
+            {/* Bagikan */}
             <button
               type="button"
               onClick={handleShare}
-              className="db-topbar-btn db-topbar-btn-primary"
+              className="db-topbar-btn db-topbar-btn-ghost"
             >
-              <Share2 size={14} />
+              <Share2 size={13} />
               <span>Bagikan</span>
             </button>
           </div>
         </div>
       </header>
 
-      {/* Dashboard Content */}
+      {/* Helper Banner when Unlocked */}
+      {!isLayoutLocked && (
+        <div className="db-layout-hint-bar">
+          <Sparkles size={13} style={{ color: '#2563EB', flexShrink: 0 }} />
+          <span>
+            + Drag widget untuk memindahkan · Tarik sudut kanan bawah untuk resize · Layout tersimpan otomatis
+          </span>
+        </div>
+      )}
+
+      {/* Dashboard Draggable & Resizable Grid */}
       <main className="db-page-main">
-        <AiDashboardPreview
-          data={pageData.data}
+        <DraggableDashboardGrid
           dashboardId={pageData.dashboardId}
-          compact={false}
+          data={pageData.data}
+          isLocked={isLayoutLocked}
+          onUpdateData={handleUpdateData}
           onMorphWidget={handleMorphWidget}
+          onPersistLayout={handlePersistWidgets}
         />
       </main>
 

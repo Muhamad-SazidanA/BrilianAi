@@ -9,6 +9,9 @@ export const dynamic = 'force-dynamic';
 const ALLOWED_WIDGET_TYPES: Set<string> = new Set([
   'stat_card',
   'bar_chart',
+  'line_chart',
+  'pie_chart',
+  'area_chart',
   'list',
   'table',
   'timeline',

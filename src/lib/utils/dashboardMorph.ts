@@ -115,21 +115,20 @@ export function morphWidget(
   targetType: MorphableChartType
 ): DashboardWidget {
   if (widget.type === targetType) return widget;
+  const layout = widget.layout;
 
+  let result = widget;
   // 1. Dari Table ke salah satu Chart
   if (widget.type === 'table') {
     const table = widget as TableWidget;
     switch (targetType) {
-      case 'bar_chart':  return convertTableToBarChart(table);
-      case 'line_chart': return convertTableToLineChart(table);
-      case 'pie_chart':  return convertTableToPieChart(table);
-      case 'area_chart': return convertTableToAreaChart(table);
-      default: return widget;
+      case 'bar_chart':  result = convertTableToBarChart(table); break;
+      case 'line_chart': result = convertTableToLineChart(table); break;
+      case 'pie_chart':  result = convertTableToPieChart(table); break;
+      case 'area_chart': result = convertTableToAreaChart(table); break;
+      default: result = widget;
     }
-  }
-
-  // 2. Dari salah satu Chart ke Table atau Chart lainnya
-  if (
+  } else if (
     widget.type === 'bar_chart' ||
     widget.type === 'line_chart' ||
     widget.type === 'pie_chart' ||
@@ -138,21 +137,22 @@ export function morphWidget(
     const chart = widget as (BarChartWidget | LineChartWidget | PieChartWidget | AreaChartWidget);
 
     if (targetType === 'table') {
-      return convertChartToTable(chart);
-    }
-
-    if (
+      result = convertChartToTable(chart);
+    } else if (
       targetType === 'bar_chart' ||
       targetType === 'line_chart' ||
       targetType === 'pie_chart' ||
       targetType === 'area_chart'
     ) {
-      return {
+      result = {
         ...chart,
         type: targetType,
       };
     }
   }
 
-  return widget;
+  if (layout) {
+    result = { ...result, layout };
+  }
+  return result;
 }

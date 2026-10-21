@@ -849,12 +849,12 @@ function TextSummaryWidgetComp({
 // ─────────────────────────────────────────────────────────────
 // Widget Router
 // ─────────────────────────────────────────────────────────────
-interface WidgetRendererProps extends WidgetCommonProps {
+export interface WidgetRendererProps extends WidgetCommonProps {
   widget: DashboardWidget;
   onMorphTo?: (target: MorphableChartType) => void;
 }
 
-function WidgetRenderer({
+export function WidgetRenderer({
   widget,
   onMorphTo,
   ...commonProps

@@ -113,7 +113,12 @@ export interface TextSummaryWidget {
   highlight?: string;
 }
 
-export type DashboardWidget =
+export interface WidgetLayout {
+  colSpan?: number; // 3, 4, 6, 8, 12 (12-column grid system)
+  heightPx?: number; // custom height in px
+}
+
+export type DashboardWidget = (
   | StatCardWidget
   | BarChartWidget
   | LineChartWidget
@@ -123,7 +128,8 @@ export type DashboardWidget =
   | TableWidget
   | TimelineWidget
   | ComparisonWidget
-  | TextSummaryWidget;
+  | TextSummaryWidget
+) & { layout?: WidgetLayout };
 
 export interface DashboardData {
   id?: string;
@@ -132,6 +138,7 @@ export interface DashboardData {
   sourceMessageId: string;
   sourceQuery: string;
   widgets: DashboardWidget[];
+  isLayoutLocked?: boolean;
   createdAt?: string;
   shareId?: string;
 }
