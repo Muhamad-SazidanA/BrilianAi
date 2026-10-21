@@ -126,8 +126,8 @@ export async function PATCH(
         ? body.is_active_knowledge
         : undefined;
 
-    // 1. Update lifecycle status atau metadata ABAC jika ada
-    if (status || classification || divisionId || version || reviewDueDate !== undefined) {
+    // 1. Update nama dokumen, lifecycle status, atau metadata ABAC
+    if (filename || status || classification || divisionId || version || reviewDueDate !== undefined) {
       if (status === 'Aktif') {
         const batch = await getBatchById(id);
         if (!batch) {
@@ -142,6 +142,7 @@ export async function PATCH(
       }
 
       const updated = await updateBatchMetadata(id, {
+        filename,
         status,
         classification,
         divisionId,
@@ -150,7 +151,7 @@ export async function PATCH(
       });
       return NextResponse.json(
         {
-          message: 'Metadata dokumen berhasil diperbarui.',
+          message: 'Data dokumen berhasil diperbarui.',
           data: updated,
         },
         { status: 200 }

@@ -91,23 +91,24 @@ function DocumentsContent() {
     }
   };
 
-  const handleRename = async (batchId: string, newFilename: string) => {
+  const handleRename = async (batchId: string, updates: string | any) => {
+    const payload = typeof updates === 'string' ? { filename: updates } : updates;
     toast.promise(
       async () => {
         const res = await fetch(`/api/documents/${batchId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filename: newFilename }),
+          body: JSON.stringify(payload),
         });
         if (!res.ok) {
           const data = await res.json();
-          throw new Error(data.error || (language === 'en' ? 'Failed to rename document' : 'Gagal mengubah nama dokumen'));
+          throw new Error(data.error || (language === 'en' ? 'Failed to update document' : 'Gagal memperbarui data dokumen'));
         }
         await fetchBatches();
       },
       {
-        loading: language === 'en' ? 'Saving new name...' : 'Menyimpan nama dokumen...',
-        success: language === 'en' ? 'Document renamed successfully.' : 'Nama dokumen berhasil diperbarui.',
+        loading: language === 'en' ? 'Saving changes...' : 'Menyimpan perubahan dokumen...',
+        success: language === 'en' ? 'Document updated successfully.' : 'Data dokumen berhasil diperbarui.',
         error: (err) => err.message,
       }
     );

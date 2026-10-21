@@ -31,7 +31,7 @@ interface DocumentTableProps {
   isLoading: boolean;
   onRefresh: () => Promise<void>;
   onDelete: (_batchId: string, _filename: string) => Promise<void>;
-  onRename: (_batchId: string, _newFilename: string) => Promise<void>;
+  onRename: (_batchId: string, _updates: any) => Promise<void>;
   onToggleActive: (_batchId: string, _active: boolean) => Promise<void>;
   onActivateAll?: () => Promise<void>;
   onUpload?: () => void;
@@ -763,7 +763,7 @@ export default function DocumentTable({
                       <button
                         onClick={() => setSelectedForRename(batch)}
                         className="btn btn-ghost btn-xs"
-                        title="Ubah Nama"
+                        title="Edit Dokumen & Metadata"
                         style={{ padding: '3px 5px', color: 'var(--text-secondary)' }}
                       >
                         <Pencil size={12} />

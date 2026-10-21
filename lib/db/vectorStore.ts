@@ -376,6 +376,7 @@ export async function toggleBatchKnowledgeBase(
 export async function updateBatchMetadata(
   batchId: string,
   metadata: {
+    filename?: string;
     status?: DocumentStatus;
     classification?: DocumentClassification;
     divisionId?: string;
@@ -388,6 +389,10 @@ export async function updateBatchMetadata(
   const values: any[] = [];
   let idx = 1;
 
+  if (metadata.filename !== undefined && metadata.filename.trim() !== '') {
+    fields.push(`original_filename = $${idx++}`);
+    values.push(metadata.filename.trim());
+  }
   if (metadata.status) {
     if (metadata.status === 'Aktif') {
       const curRes = await pool.query<{ count: number }>(
