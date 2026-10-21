@@ -388,13 +388,15 @@ export default function DocumentTable({
                     borderBottom: n === 5 ? 'none' : '1px solid var(--border-default)',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '9px', flex: 1 }}>
-                    <span className="skeleton-shimmer" style={{ width: '24px', height: '24px', borderRadius: '5px', flexShrink: 0 }} />
-                    <span className="skeleton-shimmer" style={{ width: `${140 + n * 25}px`, height: '13px', borderRadius: '3px' }} />
-                    <span className="skeleton-shimmer" style={{ width: '180px', height: '11px', borderRadius: '3px' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+                    <span className="skeleton-shimmer" style={{ width: '28px', height: '28px', borderRadius: '6px', flexShrink: 0 }} />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+                      <span className="skeleton-shimmer" style={{ width: `${140 + n * 25}px`, height: '13px', borderRadius: '3px' }} />
+                      <span className="skeleton-shimmer" style={{ width: '200px', height: '10px', borderRadius: '3px' }} />
+                    </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span className="skeleton-shimmer" style={{ width: '45px', height: '13px', borderRadius: '3px' }} />
+                    <span className="skeleton-shimmer" style={{ width: '55px', height: '14px', borderRadius: '3px' }} />
                     <span className="skeleton-shimmer" style={{ width: '60px', height: '20px', borderRadius: '4px' }} />
                   </div>
                 </div>
@@ -523,15 +525,16 @@ export default function DocumentTable({
                     backgroundColor: 'var(--bg-card)',
                   }}
                 >
-                  {/* ── Left: File/API Icon + Title + Inline Strict Monochrome Metadata ── */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0, flex: 1, marginRight: '12px' }}>
+                  {/* ── Left: File/API Icon + 2-Line Hierarchy (Title/Badge + Clean Metadata) ── */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1, marginRight: '16px' }}>
                     <div
                       style={{
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '5px',
-                        backgroundColor: isApiBatch ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-subtle)',
-                        color: isApiBatch ? '#2563eb' : 'var(--text-secondary)',
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '6px',
+                        backgroundColor: isApiBatch ? 'rgba(59, 130, 246, 0.08)' : 'var(--bg-subtle, #f1f5f9)',
+                        color: isApiBatch ? '#2563eb' : 'var(--text-secondary, #64748b)',
+                        border: isApiBatch ? '1px solid rgba(59, 130, 246, 0.2)' : '1px solid var(--border-default, #e2e8f0)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -539,29 +542,29 @@ export default function DocumentTable({
                       }}
                       title={isApiBatch ? 'Sumber: Integrasi REST API (Live Ingest)' : 'Sumber: Dokumen PDF (OCR)'}
                     >
-                      {isApiBatch ? <Globe size={13} /> : <FileText size={13} />}
+                      {isApiBatch ? <Globe size={14} /> : <FileText size={14} />}
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-                      <Link
-                        href={`/documents/${batch.id}`}
-                        style={{
-                          fontWeight: 500,
-                          fontSize: '13px',
-                          color: 'var(--text-primary)',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          maxWidth: isApiBatch ? '210px' : '280px',
-                          flexShrink: 0,
-                        }}
-                        className="hover:underline"
-                        title={batch.original_filename}
-                      >
-                        {cleanTitle}
-                      </Link>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1 }}>
+                      {/* Line 1: Title + Subtle Badge */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                        <Link
+                          href={`/documents/${batch.id}`}
+                          style={{
+                            fontWeight: 600,
+                            fontSize: '13px',
+                            color: 'var(--text-primary)',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            maxWidth: '450px',
+                          }}
+                          className="hover:underline"
+                          title={batch.original_filename}
+                        >
+                          {cleanTitle}
+                        </Link>
 
-                      {isApiBatch && (
                         <span
                           style={{
                             display: 'inline-flex',
@@ -569,44 +572,59 @@ export default function DocumentTable({
                             gap: '3px',
                             fontSize: '10px',
                             fontWeight: 600,
-                            color: '#2563eb',
-                            backgroundColor: '#eff6ff',
+                            color: isApiBatch ? '#1d4ed8' : '#475569',
+                            backgroundColor: isApiBatch ? '#eff6ff' : 'var(--bg-subtle, #f1f5f9)',
                             padding: '1px 6px',
-                            borderRadius: '9999px',
-                            border: '1px solid #bfdbfe',
+                            borderRadius: '4px',
+                            border: isApiBatch ? '1px solid #bfdbfe' : '1px solid var(--border-default, #e2e8f0)',
+                            lineHeight: '14px',
                             flexShrink: 0,
+                            letterSpacing: '0.02em',
                           }}
                         >
-                          API Ingest
+                          {isApiBatch ? 'REST API' : 'PDF'}
                         </span>
-                      )}
-                    </div>
+                      </div>
 
-                    {/* Strict Monochrome Slate Inline Metadata */}
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        fontSize: '11.5px',
-                        color: 'var(--text-muted)',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
-                    >
-                      <span>· {isApiBatch ? `${batch.page_count} Record` : `${batch.page_count} Hal (OCR)`}</span>
-                      <span>· {batch.chunk_count} Chunks</span>
-                      <span>· {batch.classification || 'Internal'}</span>
-                      <span>· {batch.division_id || 'General'}</span>
-                      <span className="font-mono">· v{batch.version || '1.0'}</span>
-                      {batch.has_user_grant && <span>· Akses Khusus</span>}
-                      {isCurated ? (
-                        <span>· {batch.curated_count} Insight</span>
-                      ) : (
-                        <span style={{ color: '#b45309', fontWeight: 500 }}>· Belum Terkurasi</span>
-                      )}
-                      <span>· {formattedDate}</span>
+                      {/* Line 2: Clean Muted Metadata (No redundant Belum Terkurasi) */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          fontSize: '11px',
+                          color: 'var(--text-muted, #64748b)',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        <span style={{ fontWeight: 500, color: 'var(--text-secondary, #475569)' }}>
+                          {isApiBatch ? `${batch.page_count} Record` : `${batch.page_count} Hal (OCR)`}
+                        </span>
+                        <span>·</span>
+                        <span>{batch.chunk_count} Chunks</span>
+                        <span>·</span>
+                        <span>{batch.classification || 'Internal'}</span>
+                        <span>·</span>
+                        <span>{batch.division_id || 'General'}</span>
+                        <span>·</span>
+                        <span className="font-mono">v{batch.version || '1.0'}</span>
+                        {batch.has_user_grant && (
+                          <>
+                            <span>·</span>
+                            <span style={{ color: '#2563eb', fontWeight: 500 }}>Akses Khusus</span>
+                          </>
+                        )}
+                        {isCurated && (
+                          <>
+                            <span>·</span>
+                            <span>{batch.curated_count} Insight</span>
+                          </>
+                        )}
+                        <span>·</span>
+                        <span>{formattedDate}</span>
+                      </div>
                     </div>
                   </div>
 
