@@ -67,6 +67,11 @@ export function IngestionProvider({ children }: { children: React.ReactNode }) {
   const tasksRef = useRef<IngestionTask[]>(tasks);
   tasksRef.current = tasks;
 
+  // Concurrency-controlled Upload Queue (Max 3 parallel workers for memory safety)
+  const uploadQueueRef = useRef<Array<{ file: File; clientId: string; options: IngestionOptions }>>([]);
+  const activeWorkerCountRef = useRef<number>(0);
+  const MAX_CONCURRENT_UPLOADS = 3;
+
   // 1. Restore persistent tasks from localStorage on initial load
   useEffect(() => {
     try {
@@ -185,7 +190,93 @@ export function IngestionProvider({ children }: { children: React.ReactNode }) {
     };
   }, [tasks, language]);
 
-  // 4. Enqueue multiple files to the ingestion queue
+  // Concurrency worker: Memproses antrian dokumen secara bertahap (maks 3 file paralel)
+  const processNextFromQueue = useCallback(async () => {
+    if (activeWorkerCountRef.current >= MAX_CONCURRENT_UPLOADS) return;
+    if (uploadQueueRef.current.length === 0) return;
+
+    const item = uploadQueueRef.current.shift();
+    if (!item) return;
+
+    activeWorkerCountRef.current++;
+    const { file, clientId, options } = item;
+
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === clientId
+          ? {
+              ...t,
+              status: 'extracting',
+              message: language === 'en' ? 'Uploading & parsing document...' : 'Mengunggah & memproses dokumen...',
+              progressPercent: 10,
+            }
+          : t
+      )
+    );
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('clientId', clientId);
+    formData.append('async', 'true');
+    if (options.ownerId) formData.append('ownerId', options.ownerId);
+    if (options.divisionId) formData.append('divisionId', options.divisionId);
+    if (options.classification) formData.append('classification', options.classification);
+    if (options.status) formData.append('status', options.status);
+    if (options.version) formData.append('version', options.version);
+    if (options.reviewDueDate) formData.append('reviewDueDate', options.reviewDueDate);
+    if (options.userGrants && options.userGrants.length > 0) {
+      formData.append('userGrants', JSON.stringify(options.userGrants));
+    }
+
+    try {
+      const res = await fetch('/api/documents/upload?async=true', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Upload failed with status ${res.status}`);
+      }
+
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === clientId
+            ? {
+                ...t,
+                status: 'extracting',
+                message: language === 'en' ? 'Processing document pipeline...' : 'Memproses pipeline ekstraksi berkas...',
+                progressPercent: 20,
+              }
+            : t
+        )
+      );
+    } catch (err: any) {
+      console.error('[IngestionContext] Upload dispatch error:', err);
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === clientId
+            ? {
+                ...t,
+                status: 'error',
+                message: err.message || 'Gagal mengirim file',
+                error: err.message,
+                progressPercent: 100,
+                completedAt: Date.now(),
+              }
+            : t
+        )
+      );
+    } finally {
+      activeWorkerCountRef.current = Math.max(0, activeWorkerCountRef.current - 1);
+      // Lanjutkan antrean berkas berikutnya secara otomatis
+      setTimeout(() => {
+        processNextFromQueue();
+      }, 40);
+    }
+  }, [language]);
+
+  // 4. Enqueue multiple files to the ingestion queue (Tanpa batas file, concurrency 3)
   const enqueueFiles = useCallback(async (files: File[], options: IngestionOptions) => {
     if (files.length === 0) return;
 
@@ -198,74 +289,24 @@ export function IngestionProvider({ children }: { children: React.ReactNode }) {
         fileName: file.name,
         fileSize: file.size,
         status: 'queued',
-        message: language === 'en' ? 'Preparing document for ingestion...' : 'Mempersiapkan dokumen untuk pipeline...',
+        message: language === 'en' ? 'Queued (waiting for worker slot)...' : 'Dalam antrean (menunggu giliran proses)...',
         progressPercent: 5,
         startedAt: Date.now(),
       };
       newTasks.push(task);
-
-      // Start asynchronous upload dispatch
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('clientId', clientId);
-      formData.append('async', 'true');
-      if (options.ownerId) formData.append('ownerId', options.ownerId);
-      if (options.divisionId) formData.append('divisionId', options.divisionId);
-      if (options.classification) formData.append('classification', options.classification);
-      if (options.status) formData.append('status', options.status);
-      if (options.version) formData.append('version', options.version);
-      if (options.reviewDueDate) formData.append('reviewDueDate', options.reviewDueDate);
-      if (options.userGrants && options.userGrants.length > 0) {
-        formData.append('userGrants', JSON.stringify(options.userGrants));
-      }
-
-      // Fire upload HTTP post to server
-      fetch('/api/documents/upload?async=true', {
-        method: 'POST',
-        body: formData,
-      })
-        .then(async (res) => {
-          if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            throw new Error(errData.error || `Upload failed with status ${res.status}`);
-          }
-          // Server accepted background job
-          setTasks((prev) =>
-            prev.map((t) =>
-              t.id === clientId
-                ? {
-                    ...t,
-                    status: 'extracting',
-                    message: language === 'en' ? 'Streaming text & AI Vision extraction...' : 'Mengekstrak teks & OCR halaman...',
-                    progressPercent: 15,
-                  }
-                : t
-            )
-          );
-        })
-        .catch((err) => {
-          console.error('[IngestionContext] Upload dispatch error:', err);
-          setTasks((prev) =>
-            prev.map((t) =>
-              t.id === clientId
-                ? {
-                    ...t,
-                    status: 'error',
-                    message: err.message || 'Gagal mengirim file',
-                    error: err.message,
-                    progressPercent: 100,
-                    completedAt: Date.now(),
-                  }
-                : t
-            )
-          );
-        });
+      uploadQueueRef.current.push({ file, clientId, options });
     }
 
     setTasks((prev) => [...prev, ...newTasks]);
-    // Make sure dock is visible when new files are enqueued
+    // Pastikan floating dock terbuka agar pengguna melihat progres langsung
     setIsDockMinimized(false);
-  }, [language]);
+
+    // Picu worker hingga batas concurrency maksimal (3)
+    for (let i = 0; i < MAX_CONCURRENT_UPLOADS; i++) {
+      processNextFromQueue();
+    }
+  }, [language, processNextFromQueue]);
+
 
   const clearTask = useCallback((taskId: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== taskId));

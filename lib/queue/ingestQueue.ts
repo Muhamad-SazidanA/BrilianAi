@@ -217,3 +217,5 @@ export async function queuePdfIngestion(
   }
 }
 
+export const queueDocumentIngestion = queuePdfIngestion;
+

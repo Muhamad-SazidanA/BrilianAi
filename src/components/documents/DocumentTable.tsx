@@ -16,6 +16,7 @@ import {
   Sparkles,
   Loader2,
   Globe,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { UploadBatch } from '@/types/document';
@@ -516,6 +517,65 @@ export default function DocumentTable({
                   ? batch.original_filename.replace(/^\[API\]\s*/, '')
                   : batch.original_filename;
 
+                const getFormatDetails = () => {
+                  if (isApiBatch) {
+                    return {
+                      badge: 'REST API',
+                      color: '#1d4ed8',
+                      bg: '#eff6ff',
+                      border: '#bfdbfe',
+                      icon: <Globe size={14} />,
+                      unit: 'Record',
+                      title: 'Sumber: Integrasi REST API (Live Ingest)',
+                    };
+                  }
+                  const ext = (cleanTitle.split('.').pop() || '').toLowerCase();
+                  if (ext === 'xlsx' || ext === 'xls') {
+                    return {
+                      badge: ext.toUpperCase(),
+                      color: '#15803d',
+                      bg: '#f0fdf4',
+                      border: '#bbf7d0',
+                      icon: <FileSpreadsheet size={14} />,
+                      unit: 'Sheet',
+                      title: 'Sumber: Dokumen Excel (Tabel Terstruktur)',
+                    };
+                  }
+                  if (ext === 'csv') {
+                    return {
+                      badge: 'CSV',
+                      color: '#0f766e',
+                      bg: '#f0fdfa',
+                      border: '#99f6e4',
+                      icon: <FileSpreadsheet size={14} />,
+                      unit: 'Record',
+                      title: 'Sumber: Berkas CSV (Tabel Terstruktur)',
+                    };
+                  }
+                  if (ext === 'docx' || ext === 'doc') {
+                    return {
+                      badge: ext.toUpperCase(),
+                      color: '#2563eb',
+                      bg: '#eff6ff',
+                      border: '#bfdbfe',
+                      icon: <FileText size={14} />,
+                      unit: 'Bagian',
+                      title: 'Sumber: Dokumen Word (Markdown)',
+                    };
+                  }
+                  return {
+                    badge: 'PDF',
+                    color: '#b91c1c',
+                    bg: '#fef2f2',
+                    border: '#fecaca',
+                    icon: <FileText size={14} />,
+                    unit: 'Hal',
+                    title: 'Sumber: Dokumen PDF (OCR)',
+                  };
+                };
+
+                const fmt = getFormatDetails();
+
               return (
                 <div
                   key={batch.id}
@@ -532,17 +592,17 @@ export default function DocumentTable({
                         width: '28px',
                         height: '28px',
                         borderRadius: '6px',
-                        backgroundColor: isApiBatch ? 'rgba(59, 130, 246, 0.08)' : 'var(--bg-subtle, #f1f5f9)',
-                        color: isApiBatch ? '#2563eb' : 'var(--text-secondary, #64748b)',
-                        border: isApiBatch ? '1px solid rgba(59, 130, 246, 0.2)' : '1px solid var(--border-default, #e2e8f0)',
+                        backgroundColor: fmt.bg,
+                        color: fmt.color,
+                        border: `1px solid ${fmt.border}`,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         flexShrink: 0,
                       }}
-                      title={isApiBatch ? 'Sumber: Integrasi REST API (Live Ingest)' : 'Sumber: Dokumen PDF (OCR)'}
+                      title={fmt.title}
                     >
-                      {isApiBatch ? <Globe size={14} /> : <FileText size={14} />}
+                      {fmt.icon}
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1 }}>
@@ -572,21 +632,21 @@ export default function DocumentTable({
                             gap: '3px',
                             fontSize: '10px',
                             fontWeight: 600,
-                            color: isApiBatch ? '#1d4ed8' : '#475569',
-                            backgroundColor: isApiBatch ? '#eff6ff' : 'var(--bg-subtle, #f1f5f9)',
+                            color: fmt.color,
+                            backgroundColor: fmt.bg,
                             padding: '1px 6px',
                             borderRadius: '4px',
-                            border: isApiBatch ? '1px solid #bfdbfe' : '1px solid var(--border-default, #e2e8f0)',
+                            border: `1px solid ${fmt.border}`,
                             lineHeight: '14px',
                             flexShrink: 0,
                             letterSpacing: '0.02em',
                           }}
                         >
-                          {isApiBatch ? 'REST API' : 'PDF'}
+                          {fmt.badge}
                         </span>
                       </div>
 
-                      {/* Line 2: Clean Muted Metadata (No redundant Belum Terkurasi) */}
+                      {/* Line 2: Clean Muted Metadata */}
                       <div
                         style={{
                           display: 'flex',
@@ -600,7 +660,7 @@ export default function DocumentTable({
                         }}
                       >
                         <span style={{ fontWeight: 500, color: 'var(--text-secondary, #475569)' }}>
-                          {isApiBatch ? `${batch.page_count} Record` : `${batch.page_count} Hal (OCR)`}
+                          {batch.page_count} {fmt.unit}
                         </span>
                         <span>·</span>
                         <span>{batch.chunk_count} Chunks</span>

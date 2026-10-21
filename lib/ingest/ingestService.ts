@@ -1,4 +1,4 @@
-import { extractPdfPagesTextHybrid } from '../pdf/renderPages';
+import { extractDocumentPages } from './documentExtractors';
 import { chunkWithPageOffsets } from '../chunking/splitWithPageTracking';
 import { embedTexts } from '../ai/embeddingClient';
 import { createUploadBatch, insertChunks } from '../db/vectorStore';
@@ -31,8 +31,8 @@ function resolveClientId(clientId?: string): string {
 }
 
 /**
- * Executes the complete end-to-end Hybrid PDF ingestion pipeline:
- * 1. Stream pages on-demand: extract digital text directly or invoke AI Vision for scan/images without accumulating images in memory.
+ * Executes the complete end-to-end multi-format document ingestion pipeline (PDF, Excel, CSV, Word):
+ * 1. Extract text and structured tables from document (PDF Hybrid OCR, Excel/CSV Markdown tables, Word Markdown).
  * 2. Split combined text into sliding-window chunks with source page range tracking.
  * 3. Generate 1024-dimension embeddings for all chunks in batches (bge-m3 via OllamaEmbeddings).
  * 4. Create upload batch record in PostgreSQL.
@@ -41,7 +41,7 @@ function resolveClientId(clientId?: string): string {
  *
  * All operations run 100% in-memory with zero temporary files written to disk.
  *
- * @param fileBuffer - In-memory Buffer of the uploaded PDF file
+ * @param fileBuffer - In-memory Buffer of the uploaded file
  * @param filename - Original filename of the document
  * @param options - Optional pipeline configuration
  * @returns Promise<UploadResult>
@@ -65,28 +65,30 @@ export async function ingestPdf(
   setIngestProgress(resolvedClientId, {
     clientId: resolvedClientId,
     status: 'extracting',
-    message: 'Memulai ekstraksi teks halaman PDF...',
+    message: `Memulai ekstraksi berkas "${filename}"...`,
     progressPercent: 0,
   });
 
-  // 1 & 2. Streaming Hybrid Text Extraction
-  console.log(`[IngestPipeline] [1/4] Memproses ekstraksi teks (Streaming Hybrid Engine)...`);
-  const pagesText = await extractPdfPagesTextHybrid(fileBuffer, { minDigitalTextLength });
+  // 1 & 2. Multi-Format Text & Table Extraction
+  console.log(`[IngestPipeline] [1/4] Memproses ekstraksi teks/tabel multi-format...`);
+  const { pagesText, detectedType } = await extractDocumentPages(fileBuffer, filename, { minDigitalTextLength });
   const pageCount = pagesText.length;
+
+  const unitLabel = detectedType === 'xlsx' || detectedType === 'xls' ? 'sheet/halaman' : 'halaman';
 
   setIngestProgress(resolvedClientId, {
     clientId: resolvedClientId,
     status: 'extracting',
-    message: `Mengekstrak teks dari ${pageCount} halaman PDF...`,
+    message: `Mengekstrak ${pageCount} ${unitLabel} dari ${detectedType.toUpperCase()}...`,
     totalPages: pageCount,
     currentPage: pageCount,
     progressPercent: 25,
   });
 
   if (pageCount === 0) {
-    throw new Error('PDF document contains 0 renderable pages.');
+    throw new Error(`Dokumen ${filename} tidak memiliki konten yang dapat diproses.`);
   }
-  console.log(`[IngestPipeline] Selesai mengekstrak seluruh ${pageCount} halaman.`);
+  console.log(`[IngestPipeline] Selesai mengekstrak seluruh ${pageCount} ${unitLabel} (${detectedType.toUpperCase()}).`);
 
   // 3. Sliding-window chunking with source page range tracking
   console.log(`[IngestPipeline] [2/4] Memotong teks menjadi Chunks dengan Sliding Window (size: ${chunkSize}, overlap: ${chunkOverlap})...`);
@@ -213,3 +215,5 @@ export async function ingestPdf(
     chunkCount,
   };
 }
+
+export const ingestDocument = ingestPdf;

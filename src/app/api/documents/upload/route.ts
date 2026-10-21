@@ -68,10 +68,12 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Validate PDF magic bytes (%PDF)
-    if (buffer.length < 4 || !buffer.subarray(0, 4).equals(PDF_MAGIC_BYTES)) {
+    // Validate multi-format document support (PDF, Excel, CSV, Word)
+    const { detectDocumentType } = await import('@lib/ingest/documentExtractors');
+    const detectedType = detectDocumentType(buffer, filename);
+    if (detectedType === 'unknown') {
       return NextResponse.json(
-        { error: 'Invalid file format: File does not have a valid PDF header signature (%PDF-).' },
+        { error: `Invalid file format: Format berkas "${filename}" tidak didukung. Sistem mendukung PDF (.pdf), Word (.docx, .doc), Excel (.xlsx, .xls), dan CSV (.csv).` },
         { status: 400 }
       );
     }

@@ -197,14 +197,50 @@ export default function DocumentUploadModal({
     }
   };
 
+  const SUPPORTED_EXTENSIONS = ['pdf', 'docx', 'doc', 'xlsx', 'xls', 'csv'];
+
+  const getFileBadgeInfo = (fileName: string) => {
+    const ext = (fileName.split('.').pop() || '').toLowerCase();
+    if (ext === 'xlsx' || ext === 'xls') {
+      return {
+        label: ext.toUpperCase(),
+        color: '#15803d',
+        bg: '#f0fdf4',
+        border: '#bbf7d0',
+      };
+    }
+    if (ext === 'csv') {
+      return {
+        label: 'CSV',
+        color: '#0f766e',
+        bg: '#f0fdfa',
+        border: '#99f6e4',
+      };
+    }
+    if (ext === 'docx' || ext === 'doc') {
+      return {
+        label: ext.toUpperCase(),
+        color: '#2563eb',
+        bg: '#eff6ff',
+        border: '#bfdbfe',
+      };
+    }
+    return {
+      label: 'PDF',
+      color: '#b91c1c',
+      bg: '#fef2f2',
+      border: '#fecaca',
+    };
+  };
+
   const appendFiles = (files: File[]) => {
-    const validPdfs: File[] = [];
+    const validFiles: File[] = [];
     let invalidCount = 0;
     let oversizeCount = 0;
 
     for (const file of files) {
-      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-      if (!isPdf) {
+      const ext = (file.name.split('.').pop() || '').toLowerCase();
+      if (!SUPPORTED_EXTENSIONS.includes(ext)) {
         invalidCount++;
         continue;
       }
@@ -215,15 +251,15 @@ export default function DocumentUploadModal({
       // Check if already in selectedFiles by name and size
       const exists = selectedFiles.some((f) => f.name === file.name && f.size === file.size);
       if (!exists) {
-        validPdfs.push(file);
+        validFiles.push(file);
       }
     }
 
     if (invalidCount > 0) {
       toast.warning(
         language === 'en'
-          ? `${invalidCount} file(s) ignored: only PDF format is supported (.pdf).`
-          : `${invalidCount} file diabaikan: hanya format PDF yang didukung (.pdf).`
+          ? `${invalidCount} file(s) ignored: only PDF, Word (.docx, .doc), Excel (.xlsx, .xls), and CSV (.csv) are supported.`
+          : `${invalidCount} file diabaikan: hanya format PDF, Word (.docx, .doc), Excel (.xlsx, .xls), dan CSV (.csv) yang didukung.`
       );
     }
     if (oversizeCount > 0) {
@@ -234,8 +270,8 @@ export default function DocumentUploadModal({
       );
     }
 
-    if (validPdfs.length > 0) {
-      setSelectedFiles((prev) => [...prev, ...validPdfs]);
+    if (validFiles.length > 0) {
+      setSelectedFiles((prev) => [...prev, ...validFiles]);
       setUploadError(null);
     }
   };
@@ -502,8 +538,8 @@ export default function DocumentUploadModal({
               <h3 style={{ fontSize: '15px', fontWeight: 650, color: '#0F172A', letterSpacing: '-0.01em', margin: 0 }}>
                 {ingestMode === 'pdf'
                   ? language === 'en'
-                    ? 'Upload Documents (Multi-PDF)'
-                    : 'Unggah Dokumen (Multi-PDF)'
+                    ? 'Upload Documents (PDF, Word, Excel, CSV)'
+                    : 'Unggah Dokumen (PDF, Word, Excel, CSV)'
                   : language === 'en'
                     ? 'REST API Ingestion Connector'
                     : 'Integrasi REST API (Live Connector)'}
@@ -511,8 +547,8 @@ export default function DocumentUploadModal({
               <p style={{ fontSize: '12px', color: '#64748B', marginTop: '2px', margin: 0 }}>
                 {ingestMode === 'pdf'
                   ? language === 'en'
-                    ? 'Queue multiple PDFs for background OCR extraction & pgvector indexing'
-                    : 'Ingest banyak file PDF sekaligus ke basis pengetahuan & pgvector'
+                    ? 'Ingest PDF, Word, Excel, and CSV files in batch without limit into pgvector'
+                    : 'Ingest berkas PDF, Word, Excel, dan CSV tanpa batas jumlah file ke pgvector'
                   : language === 'en'
                     ? 'Fetch live JSON data, convert to structured Markdown, and index into pgvector'
                     : 'Tarik data JSON eksternal, konversi ke Markdown terstruktur, dan indeks ke pgvector'}
@@ -578,7 +614,7 @@ export default function DocumentUploadModal({
             }}
           >
             <FileText size={12} />
-            <span>{language === 'en' ? 'PDF Upload' : 'File Dokumen PDF'}</span>
+            <span>{language === 'en' ? 'File Documents (PDF, Word, Excel, CSV)' : 'File Dokumen (PDF, Word, Excel, CSV)'}</span>
           </button>
 
           <button
@@ -660,7 +696,7 @@ export default function DocumentUploadModal({
                       type="file"
                       ref={fileInputRef}
                       onChange={handleFileChange}
-                      accept="application/pdf"
+                      accept=".pdf,.docx,.doc,.xlsx,.xls,.csv"
                       multiple
                       style={{ display: 'none' }}
                     />
@@ -684,16 +720,16 @@ export default function DocumentUploadModal({
                     </div>
                     <p style={{ fontSize: '12px', fontWeight: 600, color: '#0F172A', margin: 0 }}>
                       {language === 'en'
-                        ? 'Drop PDF files here, or'
-                        : 'Tarik file PDF ke sini, atau'}{' '}
+                        ? 'Drop files here (PDF, Word, Excel, CSV), or'
+                        : 'Tarik file ke sini (PDF, Word, Excel, CSV), atau'}{' '}
                       <span style={{ color: '#2563EB' }}>
                         {language === 'en' ? 'browse files' : 'pilih dokumen'}
                       </span>
                     </p>
                     <p style={{ fontSize: '10.5px', color: '#94A3B8', marginTop: '3px', margin: 0 }}>
                       {language === 'en'
-                        ? 'Supports multiple PDFs simultaneously (up to 50 MB / file)'
-                        : 'Bisa pilih banyak PDF sekaligus (maks. 50 MB / file)'}
+                        ? 'Supports unlimited batch files (PDF, DOCX, DOC, XLSX, XLS, CSV up to 50 MB / file)'
+                        : 'Bisa pilih banyak file sekaligus tanpa batas (PDF, Word, Excel, CSV maks. 50 MB / file)'}
                     </p>
                   </div>
 
@@ -742,42 +778,58 @@ export default function DocumentUploadModal({
                       </div>
 
                       <div style={{ maxHeight: '140px', overflowY: 'auto', padding: '4px 6px' }}>
-                        {selectedFiles.map((file, idx) => (
-                          <div
-                            key={`${file.name}-${idx}`}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              padding: '6px 8px',
-                              borderRadius: '6px',
-                              gap: '8px',
-                              borderBottom: idx < selectedFiles.length - 1 ? '1px solid #F1F5F9' : 'none',
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                              <FileText size={14} color="#2563EB" style={{ flexShrink: 0 }} />
-                              <div style={{ minWidth: 0 }}>
-                                <p
+                        {selectedFiles.map((file, idx) => {
+                          const badge = getFileBadgeInfo(file.name);
+                          return (
+                            <div
+                              key={`${file.name}-${idx}`}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '6px 8px',
+                                borderRadius: '6px',
+                                gap: '8px',
+                                borderBottom: idx < selectedFiles.length - 1 ? '1px solid #F1F5F9' : 'none',
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                                <span
                                   style={{
-                                    fontSize: '11.5px',
-                                    fontWeight: 550,
-                                    color: '#0F172A',
-                                    margin: 0,
-                                    whiteSpace: 'nowrap',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    maxWidth: '170px',
+                                    fontSize: '9px',
+                                    fontWeight: 700,
+                                    padding: '2px 5px',
+                                    borderRadius: '4px',
+                                    backgroundColor: badge.bg,
+                                    color: badge.color,
+                                    border: `1px solid ${badge.border}`,
+                                    letterSpacing: '0.02em',
+                                    flexShrink: 0,
                                   }}
-                                  title={file.name}
                                 >
-                                  {file.name}
-                                </p>
-                                <span style={{ fontSize: '10px', color: '#94A3B8', fontFamily: 'monospace' }}>
-                                  {formatFileSize(file.size)}
+                                  {badge.label}
                                 </span>
+                                <div style={{ minWidth: 0 }}>
+                                  <p
+                                    style={{
+                                      fontSize: '11.5px',
+                                      fontWeight: 550,
+                                      color: '#0F172A',
+                                      margin: 0,
+                                      whiteSpace: 'nowrap',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      maxWidth: '170px',
+                                    }}
+                                    title={file.name}
+                                  >
+                                    {file.name}
+                                  </p>
+                                  <span style={{ fontSize: '10px', color: '#94A3B8', fontFamily: 'monospace' }}>
+                                    {formatFileSize(file.size)}
+                                  </span>
+                                </div>
                               </div>
-                            </div>
 
                             <button
                               type="button"
@@ -800,7 +852,8 @@ export default function DocumentUploadModal({
                               <X size={13} />
                             </button>
                           </div>
-                        ))}
+                        );
+                      })}
                       </div>
                     </div>
                   )}

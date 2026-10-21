@@ -54,7 +54,7 @@ describe('Security Audit Regression Test Suite (SEC-01 to SEC-08)', () => {
   describe('2. [SEC-02] Server Authentication Fallback Elimination', () => {
     it('should return null when only unauthenticated active_user_id cookie is sent without valid session token', async () => {
       const originalEnv = process.env.NODE_ENV;
-      process.env.NODE_ENV = 'production';
+      (process.env as any).NODE_ENV = 'production';
 
       const req = new NextRequest('http://localhost:3000/api/documents', {
         headers: {
@@ -65,7 +65,7 @@ describe('Security Audit Regression Test Suite (SEC-01 to SEC-08)', () => {
       const user = await getAuthenticatedUser(req);
       expect(user).toBeNull();
 
-      process.env.NODE_ENV = originalEnv;
+      (process.env as any).NODE_ENV = originalEnv;
     });
   });
 
@@ -109,14 +109,14 @@ describe('Security Audit Regression Test Suite (SEC-01 to SEC-08)', () => {
   describe('5. [SEC-05] Curate Endpoint Protection', () => {
     it('should return 401 Unauthorized in production when unauthenticated', async () => {
       const originalEnv = process.env.NODE_ENV;
-      process.env.NODE_ENV = 'production';
+      (process.env as any).NODE_ENV = 'production';
       vi.spyOn(serverAuthModule, 'getAuthenticatedUser').mockResolvedValue(null);
 
       const req = new NextRequest('http://localhost:3000/api/documents/b1/curate');
       const res = await handleCurate(req, { params: { id: 'b1' } });
       expect(res.status).toBe(401);
 
-      process.env.NODE_ENV = originalEnv;
+      (process.env as any).NODE_ENV = originalEnv;
     });
   });
 
