@@ -437,6 +437,9 @@ export default function DatabaseConnectorTab({
             resize: 'vertical',
           }}
         />
+        <p style={{ margin: '4px 0 0 0', fontSize: '10px', color: '#64748B', lineHeight: 1.4 }}>
+          💡 <strong style={{ color: '#475569' }}>Tips Keamanan Kolom:</strong> Hindari <code>SELECT *</code>. Cantumkan hanya nama-nama kolom publik/katalog yang relevan. Jangan memilih kolom kredensial (password), token, NIK, atau data pribadi sensitif (PII). Data tersimpan sebagai draft untuk peninjauan di Studio.
+        </p>
       </div>
 
       {/* ── Preview & Sync Buttons ── */}

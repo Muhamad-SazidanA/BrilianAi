@@ -300,7 +300,7 @@ export async function syncDatabaseConnector(config: DbConnectorConfig): Promise<
     ownerId: config.ownerId || null,
     divisionId: config.divisionId || 'General',
     classification: config.classification || 'Internal',
-    status: config.status || 'Aktif',
+    status: config.status || 'Draft',
     version: config.version || '1.0',
     reviewDueDate: config.reviewDueDate || null,
   });

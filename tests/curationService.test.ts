@@ -260,4 +260,57 @@ describe('Dual-Chunk & Curation Service (Konten Mentah vs Insight Kurasi)', () =
       expect(data.data.wasDeactivated).toBe(false);
     });
   });
+
+  describe('5. Zero-Token Deterministic Tabular Curation Engine (autoCurateTabularBatch)', () => {
+    it('should extract title, tags, and financial importance without calling LLM', async () => {
+      const { autoCurateTabularBatch } = await import('../lib/curation/curationService');
+      const mockBatchId = 'tabular-batch-123';
+
+      const mockChunks = [
+        {
+          id: 101,
+          chunk_index: 0,
+          content: '## Sheet: Laporan Keuangan\n| Bulan | Pendapatan | Laba |\n| --- | --- | --- |\n| Januari | 100jt | 30jt |\n',
+          source_page_start: 1,
+          source_page_end: 1,
+          emb_str: '[0.1, 0.2, 0.3]',
+        },
+      ];
+
+      // mockPool.query for SELECT document_chunks
+      mockPool.query
+        .mockResolvedValueOnce({ rows: mockChunks }) // SELECT document_chunks
+        .mockResolvedValueOnce({ rowCount: 1 }); // UPDATE upload_batches
+
+      // mockClient.query for insertCuratedInsights transaction (BEGIN, SELECT check, INSERT, COMMIT)
+      mockClient.query
+        .mockResolvedValueOnce({}) // BEGIN
+        .mockResolvedValueOnce({ rows: [] }) // SELECT check existing
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 501,
+              upload_batch_id: mockBatchId,
+              title: 'Sheet: Laporan Keuangan',
+              content: mockChunks[0].content,
+              importance: 'high',
+              category: 'track1_financial',
+              tags: ['XLSX', 'Bulan', 'Pendapatan', 'Laba'],
+              source_chunk_id: 101,
+            },
+          ],
+          rowCount: 1,
+        }) // INSERT
+        .mockResolvedValueOnce({}); // COMMIT
+
+      const count = await autoCurateTabularBatch(mockBatchId, 'keuangan.xlsx', 'xlsx');
+
+      expect(count).toBe(1);
+      expect(mockPool.query).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE upload_batches'),
+        [mockBatchId]
+      );
+    });
+  });
 });
+

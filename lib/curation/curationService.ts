@@ -7,6 +7,7 @@ import {
   deduplicateCuratedInsights,
   getBatchById,
   CuratedInsight,
+  CuratedInsightInput,
 } from '../db/vectorStore';
 
 export interface CurationResultPayload {
@@ -625,3 +626,133 @@ export async function curateAllChunks(
   );
   return totalNewCurated;
 }
+
+/**
+ * Zero-Token Deterministic Curation Engine untuk dokumen tabular (Excel & CSV).
+ * Mengubah raw chunk tabel Markdown menjadi Curated Insight tanpa memanggil LLM (0 Token).
+ * Langsung menyalin embedding yang sudah di-generate pada tahap ingestion,
+ * mengekstrak nama sheet / judul tabel, tags dari header kolom, serta mengkategorikan data secara deterministik.
+ */
+export async function autoCurateTabularBatch(
+  batchId: string,
+  filename: string,
+  detectedType: 'xlsx' | 'xls' | 'csv'
+): Promise<number> {
+  const pool = getPool();
+
+  // Ambil chunks beserta embedding-nya dari database
+  const query = `
+    SELECT id, chunk_index, content, source_page_start, source_page_end, (embedding::text) as emb_str
+    FROM document_chunks
+    WHERE upload_batch_id = $1
+    ORDER BY chunk_index ASC;
+  `;
+  const res = await pool.query(query, [batchId]);
+  const chunks = res.rows;
+
+  if (chunks.length === 0) {
+    return 0;
+  }
+
+  const insightsToInsert: CuratedInsightInput[] = [];
+
+  for (const chunk of chunks) {
+    const content: string = chunk.content || '';
+    const lines = content.split('\n').map((l: string) => l.trim()).filter(Boolean);
+
+    // 1. Ekstrak Judul
+    let title = '';
+    const headingLine = lines.find((l: string) => l.startsWith('## ') || l.startsWith('# '));
+    if (headingLine) {
+      title = headingLine.replace(/^#+\s*/, '').trim();
+    } else {
+      title = `Tabel: ${filename} (Bagian ${Number(chunk.chunk_index) + 1})`;
+    }
+
+    // 2. Ekstrak Tags dari header tabel Markdown
+    const tags: string[] = [detectedType.toUpperCase()];
+    const headerLineIdx = lines.findIndex(
+      (l: string, idx: number) => l.startsWith('|') && idx + 1 < lines.length && lines[idx + 1].includes('---')
+    );
+
+    if (headerLineIdx !== -1) {
+      const headerLine = lines[headerLineIdx];
+      const cols = headerLine
+        .split('|')
+        .map((c: string) => c.trim())
+        .filter((c: string) => c.length > 0 && c.length <= 40 && !c.includes('---'));
+
+      for (const col of cols) {
+        if (!tags.includes(col) && tags.length < 6) {
+          tags.push(col);
+        }
+      }
+    }
+
+    // 3. Deteksi Importance & Kategori secara Deterministik
+    const financialKeywords = /\b(laba|rugi|pendapatan|omset|profit|revenue|total|harga|biaya|aset|neraca|budget|anggaran|kpi|target|realisasi|pajak|saldo|kas)\b/i;
+    const isFinancial = financialKeywords.test(content);
+    const importance: 'high' | 'medium' | 'low' = isFinancial ? 'high' : 'medium';
+    const category = isFinancial ? 'track1_financial' : 'tabular_data';
+
+    // 4. Parse embedding string dari vector column jika ada
+    let embedding: number[] | undefined = undefined;
+    if (chunk.emb_str) {
+      try {
+        embedding = JSON.parse(chunk.emb_str);
+      } catch {
+        const cleaned = chunk.emb_str.replace(/^\[|\]$/g, '');
+        if (cleaned) {
+          embedding = cleaned.split(',').map(Number);
+        }
+      }
+    }
+
+    const pageLabel =
+      chunk.source_page_start === chunk.source_page_end
+        ? `Halaman ${chunk.source_page_start}`
+        : `Halaman ${chunk.source_page_start}-${chunk.source_page_end}`;
+
+    insightsToInsert.push({
+      title,
+      content,
+      importance,
+      category,
+      tags,
+      sourcePages: pageLabel,
+      sourceChunkId: chunk.id,
+      embedding,
+    });
+  }
+
+  // Simpan insight kurasi ke database
+  const inserted = await insertCuratedInsights(batchId, insightsToInsert);
+
+  // Set status upload_batch menjadi Aktif dan is_active_knowledge = true
+  await pool.query(
+    `UPDATE upload_batches 
+     SET is_active_knowledge = true, status = 'Aktif' 
+     WHERE id = $1`,
+    [batchId]
+  );
+
+  // Update progressMap agar UI langsung mencerminkan 100% completed
+  progressMap.set(batchId, {
+    batchId,
+    totalChunks: chunks.length,
+    processedChunks: chunks.length,
+    curatedChunks: chunks.length,
+    curatedInsightsCount: inserted.length,
+    currentPercent: 100,
+    status: 'completed',
+    currentChunkTitle: `Terkurasi Otomatis via Engine (${inserted.length} insights)`,
+    updatedAt: Date.now(),
+  });
+
+  console.log(
+    `[CurationService] Auto-Curation Sukses (0 Token): ${inserted.length} insights dibuat untuk batch ${batchId} (${detectedType.toUpperCase()}). Batch diaktifkan.`
+  );
+
+  return inserted.length;
+}
+

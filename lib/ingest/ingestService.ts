@@ -3,6 +3,7 @@ import { chunkWithPageOffsets } from '../chunking/splitWithPageTracking';
 import { embedTexts } from '../ai/embeddingClient';
 import { createUploadBatch, insertChunks } from '../db/vectorStore';
 import { setIngestProgress } from './ingestProgress';
+import { autoCurateTabularBatch } from '../curation/curationService';
 
 export interface UploadResult {
   uploadBatchId: string;
@@ -203,9 +204,19 @@ export async function ingestPdf(
     progressPercent: 100,
   });
 
-  // 7. Catatan: Kurasi AI tidak lagi berjalan otomatis di background
-  // Dokumen tersimpan dengan status 'Belum Dikurasi', dan pengguna dapat menjalankannya manual via Studio
-  console.log(`[IngestPipeline] Dokumen siap. Status: Belum Dikurasi (tersedia kurasi manual via Studio).`);
+  // 7. Kurasi: File tabular (Excel & CSV) dikurasi otomatis via Zero-Token Engine lokal
+  // Dokumen naratif (PDF, Word) tetap berstatus 'Menunggu Kurasi' untuk kurasi terarah di Studio
+  if (['xlsx', 'xls', 'csv'].includes(detectedType) && chunkCount > 0) {
+    console.log(`[IngestPipeline] Menjalankan Zero-Token Curation Engine untuk file tabular ${filename} (${detectedType.toUpperCase()})...`);
+    try {
+      await autoCurateTabularBatch(batchId, filename, detectedType as 'xlsx' | 'xls' | 'csv');
+      console.log(`[IngestPipeline] Zero-Token Auto-Curation selesai. Dokumen tabular langsung aktif (0 Token).`);
+    } catch (curateErr) {
+      console.warn(`[IngestPipeline] Peringatan: Auto-curation tabular gagal:`, curateErr);
+    }
+  } else {
+    console.log(`[IngestPipeline] Dokumen siap. Status: Menunggu Kurasi (tersedia kurasi manual via Studio).`);
+  }
 
   // 8. Return complete upload result
   return {
