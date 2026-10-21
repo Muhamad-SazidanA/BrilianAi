@@ -19,6 +19,13 @@ import {
   ArrowRight,
   Layers,
   Sparkles,
+  Globe,
+  Key,
+  RefreshCw,
+  Eye,
+  Link2,
+  Code2,
+  Check,
 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserSession } from '@/context/UserSessionContext';
@@ -65,6 +72,23 @@ export default function DocumentUploadModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Ingest Mode: 'pdf' | 'api'
+  const [ingestMode, setIngestMode] = useState<'pdf' | 'api'>('pdf');
+
+  // REST API Connector State
+  const [apiSourceName, setApiSourceName] = useState<string>('');
+  const [apiEndpoint, setApiEndpoint] = useState<string>('');
+  const [apiMethod, setApiMethod] = useState<'GET' | 'POST'>('GET');
+  const [apiAuthType, setApiAuthType] = useState<'none' | 'bearer' | 'apiKey' | 'basic'>('none');
+  const [apiToken, setApiToken] = useState<string>('');
+  const [apiKeyHeader, setApiKeyHeader] = useState<string>('X-API-Key');
+  const [apiBasicUsername, setApiBasicUsername] = useState<string>('');
+  const [apiBasicPassword, setApiBasicPassword] = useState<string>('');
+  const [apiRecordPath, setApiRecordPath] = useState<string>('');
+  const [apiCustomHeaders, setApiCustomHeaders] = useState<string>('');
+  const [isPreviewing, setIsPreviewing] = useState<boolean>(false);
+  const [previewResult, setPreviewResult] = useState<{ recordCount: number; previewMarkdown: string } | null>(null);
 
   // Core Metadata Settings (Clean Defaults)
   const [divisionId, setDivisionId] = useState<string>('General');
@@ -286,6 +310,126 @@ export default function DocumentUploadModal({
     }
   };
 
+  const handleApiPreview = async () => {
+    if (!apiEndpoint.trim()) {
+      toast.error('Masukkan Endpoint URL API terlebih dahulu.');
+      return;
+    }
+    if (!apiSourceName.trim()) {
+      toast.error('Masukkan Nama Sumber Data terlebih dahulu.');
+      return;
+    }
+    setIsPreviewing(true);
+    setUploadError(null);
+    try {
+      let parsedHeaders: Record<string, string> = {};
+      if (apiCustomHeaders.trim()) {
+        try {
+          parsedHeaders = JSON.parse(apiCustomHeaders);
+        } catch {
+          throw new Error('Format Custom Headers harus berupa JSON valid (contoh: {"X-Custom": "val"}).');
+        }
+      }
+
+      const res = await fetch('/api/connectors/api-ingest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'preview',
+          sourceName: apiSourceName.trim(),
+          endpointUrl: apiEndpoint.trim(),
+          method: apiMethod,
+          authType: apiAuthType,
+          authToken: apiToken.trim() || undefined,
+          apiKeyHeader: apiKeyHeader.trim() || undefined,
+          basicUsername: apiBasicUsername.trim() || undefined,
+          basicPassword: apiBasicPassword.trim() || undefined,
+          recordPath: apiRecordPath.trim() || undefined,
+          headers: parsedHeaders,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Gagal menghubungi API');
+      }
+
+      setPreviewResult({
+        recordCount: data.preview.recordCount,
+        previewMarkdown: data.preview.previewMarkdown,
+      });
+      toast.success(`Terhubung! ${data.preview.recordCount} entri data terdeteksi.`);
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal menguji koneksi API');
+      setUploadError(err.message);
+    } finally {
+      setIsPreviewing(false);
+    }
+  };
+
+  const handleApiSync = async () => {
+    if (!apiEndpoint.trim()) {
+      toast.error('Masukkan Endpoint URL API terlebih dahulu.');
+      return;
+    }
+    if (!apiSourceName.trim()) {
+      toast.error('Masukkan Nama Sumber Data terlebih dahulu.');
+      return;
+    }
+    setIsSubmitting(true);
+    setUploadError(null);
+    try {
+      let parsedHeaders: Record<string, string> = {};
+      if (apiCustomHeaders.trim()) {
+        try {
+          parsedHeaders = JSON.parse(apiCustomHeaders);
+        } catch {
+          throw new Error('Format Custom Headers harus berupa JSON valid.');
+        }
+      }
+
+      const finalDivision = divisionId === 'custom' ? customDivision.trim() || 'General' : divisionId;
+
+      const res = await fetch('/api/connectors/api-ingest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'sync',
+          sourceName: apiSourceName.trim(),
+          endpointUrl: apiEndpoint.trim(),
+          method: apiMethod,
+          authType: apiAuthType,
+          authToken: apiToken.trim() || undefined,
+          apiKeyHeader: apiKeyHeader.trim() || undefined,
+          basicUsername: apiBasicUsername.trim() || undefined,
+          basicPassword: apiBasicPassword.trim() || undefined,
+          recordPath: apiRecordPath.trim() || undefined,
+          headers: parsedHeaders,
+          divisionId: finalDivision,
+          classification,
+          status: docStatus,
+          version,
+          reviewDueDate: reviewDueDate || null,
+          userGrants,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Gagal menarik data dari API');
+      }
+
+      toast.success(data.message || 'Data API berhasil diindeks ke pgvector!');
+      onSuccess();
+      handleModalClose();
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal menyinkronkan data API');
+      setUploadError(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const formatFileSize = (bytes: number) => {
     if (!bytes) return '0 B';
     const k = 1024;
@@ -352,16 +496,26 @@ export default function DocumentUploadModal({
                 justifyContent: 'center',
               }}
             >
-              <UploadCloud size={18} />
+              {ingestMode === 'pdf' ? <UploadCloud size={18} /> : <Globe size={18} />}
             </div>
             <div>
               <h3 style={{ fontSize: '15px', fontWeight: 650, color: '#0F172A', letterSpacing: '-0.01em', margin: 0 }}>
-                {language === 'en' ? 'Upload Documents (Multi-PDF)' : 'Unggah Dokumen (Multi-PDF)'}
+                {ingestMode === 'pdf'
+                  ? language === 'en'
+                    ? 'Upload Documents (Multi-PDF)'
+                    : 'Unggah Dokumen (Multi-PDF)'
+                  : language === 'en'
+                    ? 'REST API Ingestion Connector'
+                    : 'Integrasi REST API (Live Connector)'}
               </h3>
               <p style={{ fontSize: '12px', color: '#64748B', marginTop: '2px', margin: 0 }}>
-                {language === 'en'
-                  ? 'Queue multiple PDFs for background OCR extraction & pgvector indexing'
-                  : 'Ingest banyak file PDF sekaligus ke basis pengetahuan & pgvector'}
+                {ingestMode === 'pdf'
+                  ? language === 'en'
+                    ? 'Queue multiple PDFs for background OCR extraction & pgvector indexing'
+                    : 'Ingest banyak file PDF sekaligus ke basis pengetahuan & pgvector'
+                  : language === 'en'
+                    ? 'Fetch live JSON data, convert to structured Markdown, and index into pgvector'
+                    : 'Tarik data JSON eksternal, konversi ke Markdown terstruktur, dan indeks ke pgvector'}
               </p>
             </div>
           </div>
@@ -390,6 +544,83 @@ export default function DocumentUploadModal({
           </button>
         </div>
 
+        {/* ── Mode Segmented Switcher ── */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 20px',
+            backgroundColor: '#F8FAFC',
+            borderBottom: '1px solid #E2E8F0',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setIngestMode('pdf');
+              setUploadError(null);
+            }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '5px 12px',
+              fontSize: '11.5px',
+              fontWeight: ingestMode === 'pdf' ? 650 : 500,
+              borderRadius: '9999px',
+              border: ingestMode === 'pdf' ? '1px solid #2563EB' : '1px solid #E2E8F0',
+              backgroundColor: ingestMode === 'pdf' ? '#EFF6FF' : '#FFFFFF',
+              color: ingestMode === 'pdf' ? '#2563EB' : '#64748B',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              boxShadow: ingestMode === 'pdf' ? '0 1px 2px rgba(37, 99, 235, 0.1)' : 'none',
+            }}
+          >
+            <FileText size={12} />
+            <span>{language === 'en' ? 'PDF Upload' : 'File Dokumen PDF'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setIngestMode('api');
+              setUploadError(null);
+            }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '5px 12px',
+              fontSize: '11.5px',
+              fontWeight: ingestMode === 'api' ? 650 : 500,
+              borderRadius: '9999px',
+              border: ingestMode === 'api' ? '1px solid #2563EB' : '1px solid #E2E8F0',
+              backgroundColor: ingestMode === 'api' ? '#EFF6FF' : '#FFFFFF',
+              color: ingestMode === 'api' ? '#2563EB' : '#64748B',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              boxShadow: ingestMode === 'api' ? '0 1px 2px rgba(37, 99, 235, 0.1)' : 'none',
+            }}
+          >
+            <Globe size={12} />
+            <span>{language === 'en' ? 'REST API Connector' : 'Integrasi REST API'}</span>
+            <span
+              style={{
+                fontSize: '9px',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                padding: '1px 5px',
+                borderRadius: '4px',
+                backgroundColor: '#2563EB',
+                color: '#FFFFFF',
+              }}
+            >
+              Live
+            </span>
+          </button>
+        </div>
+
         {/* ── Body Content (Wide 2-Column Side-by-Side) ── */}
         <div style={{ padding: '16px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div
@@ -400,204 +631,493 @@ export default function DocumentUploadModal({
               alignItems: 'start',
             }}
           >
-            {/* ── Left Column: Multi-PDF Dropzone & Selected Files List ── */}
+            {/* ── Left Column: Multi-PDF Dropzone OR REST API Ingest Form ── */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                style={{
-                  border: `1.5px dashed ${isDragging ? '#2563EB' : selectedFiles.length > 0 ? '#93C5FD' : '#CBD5E1'}`,
-                  backgroundColor: isDragging ? '#EFF6FF' : selectedFiles.length > 0 ? '#F0F7FF' : '#F8FAFC',
-                  borderRadius: '12px',
-                  padding: selectedFiles.length > 0 ? '12px 14px' : '22px 14px',
-                  textAlign: 'center',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  userSelect: 'none',
-                  minHeight: selectedFiles.length > 0 ? 'auto' : '120px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}
-              >
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                  accept="application/pdf"
-                  multiple
-                  style={{ display: 'none' }}
-                />
-
-                <div
-                  style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '50%',
-                    backgroundColor: '#FFFFFF',
-                    border: '1px solid #E2E8F0',
-                    color: '#2563EB',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: '0 auto 6px',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                  }}
-                >
-                  <UploadCloud size={16} />
-                </div>
-                <p style={{ fontSize: '12px', fontWeight: 600, color: '#0F172A', margin: 0 }}>
-                  {language === 'en'
-                    ? 'Drop PDF files here, or'
-                    : 'Tarik file PDF ke sini, atau'}{' '}
-                  <span style={{ color: '#2563EB' }}>
-                    {language === 'en' ? 'browse files' : 'pilih dokumen'}
-                  </span>
-                </p>
-                <p style={{ fontSize: '10.5px', color: '#94A3B8', marginTop: '3px', margin: 0 }}>
-                  {language === 'en'
-                    ? 'Supports multiple PDFs simultaneously (up to 50 MB / file)'
-                    : 'Bisa pilih banyak PDF sekaligus (maks. 50 MB / file)'}
-                </p>
-              </div>
-
-              {/* Selected Files Preview List */}
-              {selectedFiles.length > 0 && (
-                <div
-                  style={{
-                    border: '1px solid #E2E8F0',
-                    borderRadius: '10px',
-                    backgroundColor: '#FFFFFF',
-                    overflow: 'hidden',
-                  }}
-                >
+              {ingestMode === 'pdf' ? (
+                <>
                   <div
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
                     style={{
-                      padding: '8px 12px',
-                      backgroundColor: '#F8FAFC',
-                      borderBottom: '1px solid #E2E8F0',
+                      border: `1.5px dashed ${isDragging ? '#2563EB' : selectedFiles.length > 0 ? '#93C5FD' : '#CBD5E1'}`,
+                      backgroundColor: isDragging ? '#EFF6FF' : selectedFiles.length > 0 ? '#F0F7FF' : '#F8FAFC',
+                      borderRadius: '12px',
+                      padding: selectedFiles.length > 0 ? '12px 14px' : '22px 14px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      userSelect: 'none',
+                      minHeight: selectedFiles.length > 0 ? 'auto' : '120px',
                       display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center',
                       alignItems: 'center',
-                      justifyContent: 'space-between',
-                      fontSize: '11px',
                     }}
                   >
-                    <span style={{ fontWeight: 650, color: '#334155' }}>
-                      {selectedFiles.length} Dokumen Terpilih ({formatFileSize(totalBytes)})
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileChange}
+                      accept="application/pdf"
+                      multiple
+                      style={{ display: 'none' }}
+                    />
+
+                    <div
                       style={{
-                        background: 'none',
-                        border: 'none',
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '50%',
+                        backgroundColor: '#FFFFFF',
+                        border: '1px solid #E2E8F0',
                         color: '#2563EB',
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '3px',
+                        justifyContent: 'center',
+                        margin: '0 auto 6px',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
                       }}
                     >
-                      <Plus size={11} />
-                      <span>Tambah Lagi</span>
-                    </button>
+                      <UploadCloud size={16} />
+                    </div>
+                    <p style={{ fontSize: '12px', fontWeight: 600, color: '#0F172A', margin: 0 }}>
+                      {language === 'en'
+                        ? 'Drop PDF files here, or'
+                        : 'Tarik file PDF ke sini, atau'}{' '}
+                      <span style={{ color: '#2563EB' }}>
+                        {language === 'en' ? 'browse files' : 'pilih dokumen'}
+                      </span>
+                    </p>
+                    <p style={{ fontSize: '10.5px', color: '#94A3B8', marginTop: '3px', margin: 0 }}>
+                      {language === 'en'
+                        ? 'Supports multiple PDFs simultaneously (up to 50 MB / file)'
+                        : 'Bisa pilih banyak PDF sekaligus (maks. 50 MB / file)'}
+                    </p>
                   </div>
 
-                  <div style={{ maxHeight: '140px', overflowY: 'auto', padding: '4px 6px' }}>
-                    {selectedFiles.map((file, idx) => (
+                  {/* Selected Files Preview List */}
+                  {selectedFiles.length > 0 && (
+                    <div
+                      style={{
+                        border: '1px solid #E2E8F0',
+                        borderRadius: '10px',
+                        backgroundColor: '#FFFFFF',
+                        overflow: 'hidden',
+                      }}
+                    >
                       <div
-                        key={`${file.name}-${idx}`}
                         style={{
+                          padding: '8px 12px',
+                          backgroundColor: '#F8FAFC',
+                          borderBottom: '1px solid #E2E8F0',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          padding: '6px 8px',
-                          borderRadius: '6px',
-                          gap: '8px',
-                          borderBottom: idx < selectedFiles.length - 1 ? '1px solid #F1F5F9' : 'none',
+                          fontSize: '11px',
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                          <FileText size={14} color="#2563EB" style={{ flexShrink: 0 }} />
-                          <div style={{ minWidth: 0 }}>
-                            <p
-                              style={{
-                                fontSize: '11.5px',
-                                fontWeight: 550,
-                                color: '#0F172A',
-                                margin: 0,
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                maxWidth: '170px',
-                              }}
-                              title={file.name}
-                            >
-                              {file.name}
-                            </p>
-                            <span style={{ fontSize: '10px', color: '#94A3B8', fontFamily: 'monospace' }}>
-                              {formatFileSize(file.size)}
-                            </span>
-                          </div>
-                        </div>
-
+                        <span style={{ fontWeight: 650, color: '#334155' }}>
+                          {selectedFiles.length} Dokumen Terpilih ({formatFileSize(totalBytes)})
+                        </span>
                         <button
                           type="button"
-                          onClick={() => removeFile(idx)}
+                          onClick={() => fileInputRef.current?.click()}
                           style={{
                             background: 'none',
                             border: 'none',
-                            color: '#94A3B8',
+                            color: '#2563EB',
+                            fontSize: '11px',
+                            fontWeight: 600,
                             cursor: 'pointer',
-                            padding: '3px',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            borderRadius: '4px',
+                            gap: '3px',
                           }}
-                          onMouseEnter={(e) => (e.currentTarget.style.color = '#EF4444')}
-                          onMouseLeave={(e) => (e.currentTarget.style.color = '#94A3B8')}
-                          title="Hapus dari antrian"
                         >
-                          <X size={13} />
+                          <Plus size={11} />
+                          <span>Tambah Lagi</span>
                         </button>
                       </div>
-                    ))}
+
+                      <div style={{ maxHeight: '140px', overflowY: 'auto', padding: '4px 6px' }}>
+                        {selectedFiles.map((file, idx) => (
+                          <div
+                            key={`${file.name}-${idx}`}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '6px 8px',
+                              borderRadius: '6px',
+                              gap: '8px',
+                              borderBottom: idx < selectedFiles.length - 1 ? '1px solid #F1F5F9' : 'none',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                              <FileText size={14} color="#2563EB" style={{ flexShrink: 0 }} />
+                              <div style={{ minWidth: 0 }}>
+                                <p
+                                  style={{
+                                    fontSize: '11.5px',
+                                    fontWeight: 550,
+                                    color: '#0F172A',
+                                    margin: 0,
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    maxWidth: '170px',
+                                  }}
+                                  title={file.name}
+                                >
+                                  {file.name}
+                                </p>
+                                <span style={{ fontSize: '10px', color: '#94A3B8', fontFamily: 'monospace' }}>
+                                  {formatFileSize(file.size)}
+                                </span>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => removeFile(idx)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#94A3B8',
+                                cursor: 'pointer',
+                                padding: '3px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: '4px',
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.color = '#EF4444')}
+                              onMouseLeave={(e) => (e.currentTarget.style.color = '#94A3B8')}
+                              title="Hapus dari antrian"
+                            >
+                              <X size={13} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Capability Notice Card */}
+                  <div
+                    style={{
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      backgroundColor: '#F8FAFC',
+                      border: '1px solid #E2E8F0',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Sparkles size={11} color="#2563EB" style={{ flexShrink: 0 }} />
+                      <span style={{ fontSize: '10.5px', fontWeight: 600, color: '#334155' }}>
+                        {language === 'en'
+                          ? 'Persistent Background Vector Ingestion'
+                          : 'Pemrosesan Latar Belakang & pgvector'}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '10px', color: '#64748B', margin: 0, lineHeight: 1.35 }}>
+                      {language === 'en'
+                        ? 'Uploads continue uninterrupted even if you change pages, refresh browser, or minimize modal.'
+                        : 'Proses tetap berjalan aman meski berpindah halaman, di-refresh, atau modal ditutup.'}
+                    </p>
                   </div>
+                </>
+              ) : (
+                /* ── Left Column: REST API Ingestion Connector Form ── */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {/* Source Name */}
+                  <div>
+                    <label style={{ fontSize: '11px', fontWeight: 650, color: '#334155', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '3px' }}>
+                      <Link2 size={12} color="#2563EB" />
+                      <span>Nama Sumber Data API <span style={{ color: '#EF4444' }}>*</span></span>
+                    </label>
+                    <input
+                      type="text"
+                      value={apiSourceName}
+                      onChange={(e) => setApiSourceName(e.target.value)}
+                      placeholder="Contoh: Data CRM Leads 2026 atau Katalog Produk"
+                      style={{
+                        width: '100%',
+                        height: '31px',
+                        padding: '0 9px',
+                        fontSize: '11.5px',
+                        borderRadius: '7px',
+                        border: '1px solid #CBD5E1',
+                        outline: 'none',
+                        backgroundColor: '#FFFFFF',
+                        color: '#0F172A',
+                      }}
+                    />
+                  </div>
+
+                  {/* Endpoint URL & Method */}
+                  <div>
+                    <label style={{ fontSize: '11px', fontWeight: 650, color: '#334155', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '3px' }}>
+                      <Globe size={12} color="#2563EB" />
+                      <span>Endpoint URL & Method <span style={{ color: '#EF4444' }}>*</span></span>
+                    </label>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <select
+                        value={apiMethod}
+                        onChange={(e) => setApiMethod(e.target.value as any)}
+                        style={{
+                          height: '31px',
+                          padding: '0 8px',
+                          fontSize: '11px',
+                          fontWeight: 650,
+                          borderRadius: '7px',
+                          border: '1px solid #CBD5E1',
+                          backgroundColor: '#F8FAFC',
+                          color: apiMethod === 'POST' ? '#D97706' : '#2563EB',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                      </select>
+                      <input
+                        type="url"
+                        value={apiEndpoint}
+                        onChange={(e) => setApiEndpoint(e.target.value)}
+                        placeholder="https://api.perusahaan.com/v1/data"
+                        style={{
+                          flex: 1,
+                          height: '31px',
+                          padding: '0 9px',
+                          fontSize: '11px',
+                          fontFamily: 'monospace',
+                          borderRadius: '7px',
+                          border: '1px solid #CBD5E1',
+                          outline: 'none',
+                          backgroundColor: '#FFFFFF',
+                          color: '#0F172A',
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Auth Type Selector */}
+                  <div>
+                    <label style={{ fontSize: '11px', fontWeight: 650, color: '#334155', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '3px' }}>
+                      <Key size={12} color="#2563EB" />
+                      <span>Metode Autentikasi</span>
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px', marginBottom: '5px' }}>
+                      {[
+                        { id: 'none', label: 'None' },
+                        { id: 'bearer', label: 'Bearer' },
+                        { id: 'apiKey', label: 'API Key' },
+                        { id: 'basic', label: 'Basic' },
+                      ].map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setApiAuthType(item.id as any)}
+                          style={{
+                            padding: '4px 6px',
+                            fontSize: '10.5px',
+                            fontWeight: apiAuthType === item.id ? 650 : 500,
+                            borderRadius: '6px',
+                            border: apiAuthType === item.id ? '1px solid #2563EB' : '1px solid #E2E8F0',
+                            backgroundColor: apiAuthType === item.id ? '#EFF6FF' : '#FFFFFF',
+                            color: apiAuthType === item.id ? '#2563EB' : '#64748B',
+                            cursor: 'pointer',
+                            transition: 'all 0.1s ease',
+                          }}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {apiAuthType === 'bearer' && (
+                      <input
+                        type="password"
+                        value={apiToken}
+                        onChange={(e) => setApiToken(e.target.value)}
+                        placeholder="Bearer Token (JWT / Secret Token)"
+                        style={{
+                          width: '100%',
+                          height: '29px',
+                          padding: '0 8px',
+                          fontSize: '11px',
+                          fontFamily: 'monospace',
+                          borderRadius: '6px',
+                          border: '1px solid #CBD5E1',
+                          backgroundColor: '#FFFFFF',
+                        }}
+                      />
+                    )}
+
+                    {apiAuthType === 'apiKey' && (
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <input
+                          type="text"
+                          value={apiKeyHeader}
+                          onChange={(e) => setApiKeyHeader(e.target.value)}
+                          placeholder="Header (X-API-Key)"
+                          style={{
+                            width: '110px',
+                            height: '29px',
+                            padding: '0 8px',
+                            fontSize: '10.5px',
+                            fontFamily: 'monospace',
+                            borderRadius: '6px',
+                            border: '1px solid #CBD5E1',
+                          }}
+                        />
+                        <input
+                          type="password"
+                          value={apiToken}
+                          onChange={(e) => setApiToken(e.target.value)}
+                          placeholder="Nilai API Key"
+                          style={{
+                            flex: 1,
+                            height: '29px',
+                            padding: '0 8px',
+                            fontSize: '11px',
+                            fontFamily: 'monospace',
+                            borderRadius: '6px',
+                            border: '1px solid #CBD5E1',
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    {apiAuthType === 'basic' && (
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <input
+                          type="text"
+                          value={apiBasicUsername}
+                          onChange={(e) => setApiBasicUsername(e.target.value)}
+                          placeholder="Username"
+                          style={{
+                            flex: 1,
+                            height: '29px',
+                            padding: '0 8px',
+                            fontSize: '11px',
+                            borderRadius: '6px',
+                            border: '1px solid #CBD5E1',
+                          }}
+                        />
+                        <input
+                          type="password"
+                          value={apiBasicPassword}
+                          onChange={(e) => setApiBasicPassword(e.target.value)}
+                          placeholder="Password"
+                          style={{
+                            flex: 1,
+                            height: '29px',
+                            padding: '0 8px',
+                            fontSize: '11px',
+                            borderRadius: '6px',
+                            border: '1px solid #CBD5E1',
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* JSON Record Path (Optional) */}
+                  <div>
+                    <label style={{ fontSize: '10.5px', fontWeight: 600, color: '#64748B', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
+                      <Code2 size={11} />
+                      <span>Path Array JSON (Opsional, contoh: <code>data.items</code> atau <code>results</code>)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={apiRecordPath}
+                      onChange={(e) => setApiRecordPath(e.target.value)}
+                      placeholder="Kosongkan jika root berupa array atau auto-detect"
+                      style={{
+                        width: '100%',
+                        height: '29px',
+                        padding: '0 8px',
+                        fontSize: '11px',
+                        fontFamily: 'monospace',
+                        borderRadius: '6px',
+                        border: '1px solid #CBD5E1',
+                      }}
+                    />
+                  </div>
+
+                  {/* Test Connection Button */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '2px' }}>
+                    <button
+                      type="button"
+                      onClick={handleApiPreview}
+                      disabled={isPreviewing || !apiEndpoint.trim() || !apiSourceName.trim()}
+                      style={{
+                        height: '27px',
+                        padding: '0 12px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        borderRadius: '6px',
+                        border: '1px solid #93C5FD',
+                        backgroundColor: '#EFF6FF',
+                        color: '#1D4ED8',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        cursor: isPreviewing || !apiEndpoint.trim() || !apiSourceName.trim() ? 'not-allowed' : 'pointer',
+                        opacity: isPreviewing || !apiEndpoint.trim() || !apiSourceName.trim() ? 0.6 : 1,
+                      }}
+                    >
+                      {isPreviewing ? <Loader2 size={12} className="animate-spin" /> : <Eye size={12} />}
+                      <span>{isPreviewing ? 'Menguji Endpoint...' : 'Uji Koneksi & Pratinjau'}</span>
+                    </button>
+                  </div>
+
+                  {/* Preview Box */}
+                  {previewResult && (
+                    <div
+                      style={{
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        backgroundColor: '#F0FDF4',
+                        border: '1px solid #BBF7D0',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Check size={12} color="#16A34A" />
+                        <span style={{ fontSize: '11px', fontWeight: 650, color: '#15803D' }}>
+                          HTTP 200 OK · {previewResult.recordCount} Record Terdeteksi
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          maxHeight: '75px',
+                          overflowY: 'auto',
+                          fontSize: '10px',
+                          fontFamily: 'monospace',
+                          backgroundColor: '#FFFFFF',
+                          border: '1px solid #DCFCE7',
+                          padding: '5px 7px',
+                          borderRadius: '5px',
+                          color: '#166534',
+                          whiteSpace: 'pre-wrap',
+                          lineHeight: 1.3,
+                        }}
+                      >
+                        {previewResult.previewMarkdown.slice(0, 350)}...
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
-
-              {/* Capability Notice Card */}
-              <div
-                style={{
-                  padding: '8px 10px',
-                  borderRadius: '8px',
-                  backgroundColor: '#F8FAFC',
-                  border: '1px solid #E2E8F0',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4px',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Sparkles size={11} color="#2563EB" style={{ flexShrink: 0 }} />
-                  <span style={{ fontSize: '10.5px', fontWeight: 600, color: '#334155' }}>
-                    {language === 'en'
-                      ? 'Persistent Background Vector Ingestion'
-                      : 'Pemrosesan Latar Belakang & pgvector'}
-                  </span>
-                </div>
-                <p style={{ fontSize: '10px', color: '#64748B', margin: 0, lineHeight: 1.35 }}>
-                  {language === 'en'
-                    ? 'Uploads continue uninterrupted even if you change pages, refresh browser, or minimize modal.'
-                    : 'Proses tetap berjalan aman meski berpindah halaman, di-refresh, atau modal ditutup.'}
-                </p>
-              </div>
 
               {/* Error Notice */}
               {uploadError && (
@@ -912,9 +1432,15 @@ export default function DocumentUploadModal({
           }}
         >
           <div style={{ fontSize: '11px', color: '#64748B' }}>
-            {selectedFiles.length > 0
-              ? `${selectedFiles.length} file PDF siap diproses ke pgvector`
-              : 'Pilih satu atau lebih dokumen untuk memulai'}
+            {ingestMode === 'pdf' ? (
+              selectedFiles.length > 0
+                ? `${selectedFiles.length} file PDF siap diproses ke pgvector`
+                : 'Pilih satu atau lebih dokumen untuk memulai'
+            ) : (
+              previewResult
+                ? `Siap diindeks: ${previewResult.recordCount} record dari API`
+                : 'Konfigurasikan endpoint REST API & klik Uji Koneksi'
+            )}
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -941,38 +1467,58 @@ export default function DocumentUploadModal({
             </button>
             <button
               type="button"
-              onClick={handleSubmit}
-              disabled={selectedFiles.length === 0 || isSubmitting}
+              onClick={ingestMode === 'pdf' ? handleSubmit : handleApiSync}
+              disabled={
+                isSubmitting ||
+                (ingestMode === 'pdf' ? selectedFiles.length === 0 : !apiSourceName.trim() || !apiEndpoint.trim())
+              }
               style={{
                 height: '30px',
                 padding: '0 16px',
                 borderRadius: '9999px',
                 border: '1px solid #1D4ED8',
-                backgroundColor: selectedFiles.length > 0 && !isSubmitting ? '#2563EB' : '#94A3B8',
+                backgroundColor:
+                  !isSubmitting &&
+                  (ingestMode === 'pdf' ? selectedFiles.length > 0 : apiSourceName.trim() && apiEndpoint.trim())
+                    ? '#2563EB'
+                    : '#94A3B8',
                 color: '#FFFFFF',
                 fontSize: '11.5px',
                 fontWeight: 600,
-                cursor: selectedFiles.length > 0 && !isSubmitting ? 'pointer' : 'not-allowed',
+                cursor:
+                  !isSubmitting &&
+                  (ingestMode === 'pdf' ? selectedFiles.length > 0 : apiSourceName.trim() && apiEndpoint.trim())
+                    ? 'pointer'
+                    : 'not-allowed',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
-                boxShadow: selectedFiles.length > 0 ? '0 1px 3px rgba(37, 99, 235, 0.25)' : 'none',
+                boxShadow: '0 1px 3px rgba(37, 99, 235, 0.25)',
                 transition: 'all 0.15s ease',
               }}
             >
               {isSubmitting ? (
                 <>
                   <Loader2 size={13} className="animate-spin" />
-                  <span>Memasukkan ke Antrian...</span>
+                  <span>{ingestMode === 'pdf' ? 'Memasukkan ke Antrian...' : 'Menarik & Mengindeks API...'}</span>
                 </>
               ) : (
                 <>
-                  <UploadCloud size={13} strokeWidth={2.2} />
-                  <span>
-                    {selectedFiles.length > 0
-                      ? `Mulai Ingestion (${selectedFiles.length} Dokumen)`
-                      : 'Mulai Ingestion'}
-                  </span>
+                  {ingestMode === 'pdf' ? (
+                    <>
+                      <UploadCloud size={13} strokeWidth={2.2} />
+                      <span>
+                        {selectedFiles.length > 0
+                          ? `Mulai Ingestion (${selectedFiles.length} Dokumen)`
+                          : 'Mulai Ingestion'}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Globe size={13} strokeWidth={2.2} />
+                      <span>Tarik & Indeks Data API ke pgvector</span>
+                    </>
+                  )}
                 </>
               )}
             </button>

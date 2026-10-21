@@ -15,6 +15,7 @@ import {
   X,
   Sparkles,
   Loader2,
+  Globe,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { UploadBatch } from '@/types/document';
@@ -508,6 +509,10 @@ export default function DocumentTable({
                   (t) => t.result?.upload_batch_id === batch.id || t.fileName === batch.original_filename
                 );
                 const isCurated = (batch.curated_count || 0) > 0;
+                const isApiBatch = batch.original_filename.startsWith('[API]');
+                const cleanTitle = isApiBatch
+                  ? batch.original_filename.replace(/^\[API\]\s*/, '')
+                  : batch.original_filename;
 
               return (
                 <div
@@ -518,41 +523,64 @@ export default function DocumentTable({
                     backgroundColor: 'var(--bg-card)',
                   }}
                 >
-                  {/* ── Left: File Icon + Title + Inline Strict Monochrome Metadata ── */}
+                  {/* ── Left: File/API Icon + Title + Inline Strict Monochrome Metadata ── */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0, flex: 1, marginRight: '12px' }}>
                     <div
                       style={{
                         width: '24px',
                         height: '24px',
                         borderRadius: '5px',
-                        backgroundColor: 'var(--bg-subtle)',
-                        color: 'var(--text-secondary)',
+                        backgroundColor: isApiBatch ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-subtle)',
+                        color: isApiBatch ? '#2563eb' : 'var(--text-secondary)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         flexShrink: 0,
                       }}
+                      title={isApiBatch ? 'Sumber: Integrasi REST API (Live Ingest)' : 'Sumber: Dokumen PDF (OCR)'}
                     >
-                      <FileText size={13} />
+                      {isApiBatch ? <Globe size={13} /> : <FileText size={13} />}
                     </div>
 
-                    <Link
-                      href={`/documents/${batch.id}`}
-                      style={{
-                        fontWeight: 500,
-                        fontSize: '13px',
-                        color: 'var(--text-primary)',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        maxWidth: '280px',
-                        flexShrink: 0,
-                      }}
-                      className="hover:underline"
-                      title={batch.original_filename}
-                    >
-                      {batch.original_filename}
-                    </Link>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                      <Link
+                        href={`/documents/${batch.id}`}
+                        style={{
+                          fontWeight: 500,
+                          fontSize: '13px',
+                          color: 'var(--text-primary)',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          maxWidth: isApiBatch ? '210px' : '280px',
+                          flexShrink: 0,
+                        }}
+                        className="hover:underline"
+                        title={batch.original_filename}
+                      >
+                        {cleanTitle}
+                      </Link>
+
+                      {isApiBatch && (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            fontSize: '10px',
+                            fontWeight: 600,
+                            color: '#2563eb',
+                            backgroundColor: '#eff6ff',
+                            padding: '1px 6px',
+                            borderRadius: '9999px',
+                            border: '1px solid #bfdbfe',
+                            flexShrink: 0,
+                          }}
+                        >
+                          API Ingest
+                        </span>
+                      )}
+                    </div>
 
                     {/* Strict Monochrome Slate Inline Metadata */}
                     <div
@@ -567,7 +595,7 @@ export default function DocumentTable({
                         textOverflow: 'ellipsis',
                       }}
                     >
-                      <span>· {batch.page_count} Hal (OCR)</span>
+                      <span>· {isApiBatch ? `${batch.page_count} Record` : `${batch.page_count} Hal (OCR)`}</span>
                       <span>· {batch.chunk_count} Chunks</span>
                       <span>· {batch.classification || 'Internal'}</span>
                       <span>· {batch.division_id || 'General'}</span>

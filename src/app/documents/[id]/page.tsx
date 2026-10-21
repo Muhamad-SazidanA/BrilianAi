@@ -15,6 +15,7 @@ import {
   Lock,
   Users,
   Sparkles,
+  Globe,
 } from 'lucide-react';
 import AppShell from '@/components/layout/AppShell';
 import CuratedInsightsTab from '@/components/studio/CuratedInsightsTab';
@@ -195,49 +196,76 @@ export default function DocumentStudioPage() {
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1.25rem', flexWrap: 'wrap' }}>
               {/* Left: File icon & metadata */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div
-                  style={{
-                    width: '38px',
-                    height: '38px',
-                    borderRadius: '8px',
-                    backgroundColor: 'var(--bg-subtle, #f1f5f9)',
-                    border: '1px solid var(--border-default, #e2e8f0)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'var(--color-primary, #2563eb)',
-                    flexShrink: 0,
-                  }}
-                >
-                  <FileText size={20} />
-                </div>
-                <div>
-                  <h2
-                    style={{
-                      fontSize: '16px',
-                      fontWeight: 600,
-                      color: 'var(--text-primary, #0f172a)',
-                      letterSpacing: '-0.01em',
-                      margin: 0,
-                    }}
-                  >
-                    {batch.original_filename}
-                  </h2>
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      fontSize: '12px',
-                      color: 'var(--text-secondary, #64748b)',
-                      marginTop: '4px',
-                      flexWrap: 'wrap',
-                    }}
-                  >
-                    <span>{batch.page_count} Hal (OCR)</span>
-                    <span style={{ color: 'var(--text-muted)' }}>·</span>
-                    <span style={{ fontFamily: 'var(--font-mono)' }}>{batch.chunk_count} Chunks</span>
+              {(() => {
+                const isApiBatch = batch.original_filename.startsWith('[API]');
+                const cleanTitle = isApiBatch
+                  ? batch.original_filename.replace(/^\[API\]\s*/, '')
+                  : batch.original_filename;
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div
+                      style={{
+                        width: '38px',
+                        height: '38px',
+                        borderRadius: '8px',
+                        backgroundColor: isApiBatch ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-subtle, #f1f5f9)',
+                        border: isApiBatch ? '1px solid #bfdbfe' : '1px solid var(--border-default, #e2e8f0)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: isApiBatch ? '#2563eb' : 'var(--color-primary, #2563eb)',
+                        flexShrink: 0,
+                      }}
+                      title={isApiBatch ? 'Sumber: Integrasi REST API' : 'Sumber: Dokumen PDF (OCR)'}
+                    >
+                      {isApiBatch ? <Globe size={20} /> : <FileText size={20} />}
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <h2
+                          style={{
+                            fontSize: '16px',
+                            fontWeight: 600,
+                            color: 'var(--text-primary, #0f172a)',
+                            letterSpacing: '-0.01em',
+                            margin: 0,
+                          }}
+                        >
+                          {cleanTitle}
+                        </h2>
+                        {isApiBatch && (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              color: '#2563eb',
+                              backgroundColor: '#eff6ff',
+                              padding: '1px 8px',
+                              borderRadius: '9999px',
+                              border: '1px solid #bfdbfe',
+                            }}
+                          >
+                            REST API Ingest
+                          </span>
+                        )}
+                      </div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          fontSize: '12px',
+                          color: 'var(--text-secondary, #64748b)',
+                          marginTop: '4px',
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <span>{isApiBatch ? `${batch.page_count} Record (Live Data)` : `${batch.page_count} Hal (OCR)`}</span>
+                        <span style={{ color: 'var(--text-muted)' }}>·</span>
+                        <span style={{ fontFamily: 'var(--font-mono)' }}>{batch.chunk_count} Chunks</span>
                     <span style={{ color: 'var(--text-muted)' }}>·</span>
                     <span>{batch.classification || 'Internal'}</span>
                     <span style={{ color: 'var(--text-muted)' }}>·</span>
@@ -271,6 +299,8 @@ export default function DocumentStudioPage() {
                   </div>
                 </div>
               </div>
+            );
+          })()}
 
               {/* Right: Curation Status & AI Knowledge Base Toggle */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
