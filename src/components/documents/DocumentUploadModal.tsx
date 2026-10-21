@@ -628,7 +628,6 @@ export default function DocumentUploadModal({
           {[
             { id: 'files', label: language === 'en' ? 'File Documents' : 'Dokumen File', icon: FileText, badge: null },
             { id: 'api', label: language === 'en' ? 'REST API' : 'REST / Web API', icon: Globe, badge: 'Live' },
-            { id: 'database', label: language === 'en' ? 'Database' : 'Database SQL', icon: Database, badge: 'Read-Only' },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = ingestMode === tab.id;
@@ -1193,7 +1192,7 @@ export default function DocumentUploadModal({
                     </div>
                   )}
                 </div>
-              ) : (
+              ) : ingestMode === 'database' ? (
                 <DatabaseConnectorTab
                   metadata={connectorMetadata}
                   isSubmitting={isSubmitting}
@@ -1201,7 +1200,7 @@ export default function DocumentUploadModal({
                   onSuccess={onSuccess}
                   onClose={handleModalClose}
                 />
-              )}
+              ) : null}
 
               {/* Error Notice */}
               {uploadError && (
