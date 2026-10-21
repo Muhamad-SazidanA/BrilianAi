@@ -36,9 +36,7 @@ import { toast } from 'sonner';
 import EnterpriseSelect from '@/components/ui/EnterpriseSelect';
 import { useIngestion } from '@/context/IngestionContext';
 import { ENTERPRISE_DIVISIONS } from '@lib/constants/divisions';
-import FeedConnectorTab from './connectors/FeedConnectorTab';
 import DatabaseConnectorTab from './connectors/DatabaseConnectorTab';
-import EnterpriseConnectorTab from './connectors/EnterpriseConnectorTab';
 
 export interface UserGrantSelection {
   userId: string;
@@ -78,8 +76,8 @@ export default function DocumentUploadModal({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Ingest Mode: 'files' | 'api' | 'feeds' | 'database' | 'enterprise'
-  const [ingestMode, setIngestMode] = useState<'files' | 'api' | 'feeds' | 'database' | 'enterprise'>('files');
+  // Ingest Mode: 'files' | 'api' | 'database'
+  const [ingestMode, setIngestMode] = useState<'files' | 'api' | 'database'>('files');
 
   // REST API Connector State
   const [apiSourceName, setApiSourceName] = useState<string>('');
@@ -162,14 +160,6 @@ export default function DocumentUploadModal({
             ? 'Fetch live JSON data, convert to structured Markdown, and index into pgvector'
             : 'Tarik data JSON eksternal, konversi ke Markdown terstruktur, dan indeks ke pgvector',
         };
-      case 'feeds':
-        return {
-          icon: <TrendingUp size={18} />,
-          title: language === 'en' ? 'External Data Feeds (Market & Public Data)' : 'Data Feed Eksternal (Pasar, Kurs & BPS)',
-          desc: language === 'en'
-            ? 'Automated scheduled sync from Bank Indonesia exchange rates, BPS macro stats, and public feeds'
-            : 'Sinkronisasi terjadwal otomatis data Kurs BI, Statistik Makro BPS, dan feed publik berkala',
-        };
       case 'database':
         return {
           icon: <Database size={18} />,
@@ -177,14 +167,6 @@ export default function DocumentUploadModal({
           desc: language === 'en'
             ? 'Secure read-only SELECT connection to PostgreSQL or MySQL with SQL injection protection'
             : 'Koneksi aman read-only SELECT ke PostgreSQL atau MySQL dengan proteksi ketat DDL/DML',
-        };
-      case 'enterprise':
-        return {
-          icon: <Building2 size={18} />,
-          title: language === 'en' ? 'Enterprise Systems (SAP, CRM, Denodo)' : 'Sistem Enterprise (SAP, Salesforce & Denodo)',
-          desc: language === 'en'
-            ? 'Native ERP and CRM integration with automatic schema mapping into structured entity knowledge cards'
-            : 'Integrasi ERP/CRM dengan pemetaan skema entitas bisnis otomatis ke kartu pengetahuan AI',
         };
     }
   }, [ingestMode, language]);
@@ -631,7 +613,7 @@ export default function DocumentUploadModal({
           </button>
         </div>
 
-        {/* ── Mode Segmented Switcher (5 Enterprise Pillars) ── */}
+        {/* ── Mode Segmented Switcher (3 Core Ingestion Pillars) ── */}
         <div
           style={{
             display: 'flex',
@@ -646,9 +628,7 @@ export default function DocumentUploadModal({
           {[
             { id: 'files', label: language === 'en' ? 'File Documents' : 'Dokumen File', icon: FileText, badge: null },
             { id: 'api', label: language === 'en' ? 'REST API' : 'REST / Web API', icon: Globe, badge: 'Live' },
-            { id: 'feeds', label: language === 'en' ? 'Data Feeds' : 'Data Feed Pasar', icon: TrendingUp, badge: 'Sync' },
             { id: 'database', label: language === 'en' ? 'Database' : 'Database SQL', icon: Database, badge: 'Read-Only' },
-            { id: 'enterprise', label: language === 'en' ? 'Enterprise' : 'Sistem ERP/CRM', icon: Building2, badge: 'Schema' },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = ingestMode === tab.id;
@@ -1213,24 +1193,8 @@ export default function DocumentUploadModal({
                     </div>
                   )}
                 </div>
-              ) : ingestMode === 'feeds' ? (
-                <FeedConnectorTab
-                  metadata={connectorMetadata}
-                  isSubmitting={isSubmitting}
-                  setIsSubmitting={setIsSubmitting}
-                  onSuccess={onSuccess}
-                  onClose={handleModalClose}
-                />
-              ) : ingestMode === 'database' ? (
-                <DatabaseConnectorTab
-                  metadata={connectorMetadata}
-                  isSubmitting={isSubmitting}
-                  setIsSubmitting={setIsSubmitting}
-                  onSuccess={onSuccess}
-                  onClose={handleModalClose}
-                />
               ) : (
-                <EnterpriseConnectorTab
+                <DatabaseConnectorTab
                   metadata={connectorMetadata}
                   isSubmitting={isSubmitting}
                   setIsSubmitting={setIsSubmitting}
@@ -1562,20 +1526,10 @@ export default function DocumentUploadModal({
                 ? `Siap diindeks: ${previewResult.recordCount} record dari REST API`
                 : (language === 'en' ? 'Configure REST endpoint & click Test Connection' : 'Konfigurasikan endpoint REST API & klik Uji Koneksi')
             )}
-            {ingestMode === 'feeds' && (
-              language === 'en'
-                ? 'Use the "Sync Now" button inside the feed panel to ingest live market/BPS data.'
-                : 'Gunakan tombol "Sinkronkan Sekarang" pada panel data feed untuk menarik data pasar/kurs.'
-            )}
             {ingestMode === 'database' && (
               language === 'en'
                 ? 'Protected by Read-Only Query Guard. Execute test query or sync inside the database panel.'
                 : 'Koneksi SQL diproteksi Read-Only Guard. Gunakan tombol aksi di formulir database.'
-            )}
-            {ingestMode === 'enterprise' && (
-              language === 'en'
-                ? 'Native ERP/CRM schema mapping to structured pgvector knowledge cards.'
-                : 'Pemetaan skema otomatis SAP/Salesforce/Denodo ke kartu pengetahuan AI pgvector.'
             )}
           </div>
 

@@ -12,7 +12,7 @@ const nextConfig = {
 
   // Next.js 14.x: server-only native/WASM packages → stays in experimental
   experimental: {
-    serverComponentsExternalPackages: ['mupdf', 'pg', 'bullmq', 'undici'],
+    serverComponentsExternalPackages: ['mupdf', 'pg', 'mysql2', 'bullmq', 'undici'],
     outputFileTracingIncludes: {
       '/api/documents/upload': ['./node_modules/mupdf/**'],
       '/api/documents/[id]/curate': ['./node_modules/mupdf/**'],
@@ -84,6 +84,7 @@ const nextConfig = {
         tls: false,
         child_process: false,
         crypto: false,
+        dns: false,
       };
     }
 
