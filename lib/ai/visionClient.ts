@@ -9,7 +9,60 @@ export interface VisionClientOptions {
 }
 
 export const SYSTEM_VISION_PROMPT =
-  'Ekstrak SELURUH konten substantif dari gambar halaman dokumen ini: judul, penjelasan, poin-poin, serta teks dan angka dalam diagram/tabel/grafik. Tuliskan dalam urutan baca yang logis. ABAIKAN logo dekoratif dan watermark kecil di pojok. Tulis teks naratif dan representasikan tabel dalam format tabel Markdown yang rapi.';
+  'Ekstrak SELURUH konten substantif dari gambar halaman dokumen ini: judul, penjelasan, poin-poin, serta teks dan angka dalam diagram/tabel/grafik. Tuliskan dalam urutan baca yang logis. ABAIKAN logo dekoratif dan watermark kecil di pojok. Tulis teks naratif dan representasikan tabel dalam format tabel Markdown yang rapi. PENTING: Jika halaman kosong, putih polos, atau tidak memuat teks/tabel/diagram substantif apa pun, KEMBALIKAN STRING KOSONG ("") tanpa menuliskan kalimat penjelasan, deskripsi, atau penolakan apa pun.';
+
+/**
+ * Mendeteksi apakah respons dari AI Vision merupakan kalimat penolakan / deskripsi halaman kosong,
+ * bukan konten dokumen yang sebenarnya (misal: "Gambar yang Anda berikan adalah halaman kosong...").
+ */
+export function isAiBlankNotice(text?: string | null): boolean {
+  if (!text) return true;
+  const trimmed = text.trim();
+  if (trimmed.length === 0) return true;
+
+  // Jika teks sangat panjang (> 400 karakter), hampir pasti dokumen asli, bukan kalimat disclaimer pendek
+  if (trimmed.length > 400) return false;
+
+  const lower = trimmed.toLowerCase();
+
+  const blankPatterns = [
+    /halaman\s+(ini\s+)?kosong/i,
+    /putih\s+polos/i,
+    /tidak\s+memiliki\s+(teks|tabel|konten|diagram)/i,
+    /tidak\s+ada\s+(teks|tabel|konten|informasi|tulisan|data)/i,
+    /tidak\s+memuat\s+konten/i,
+    /tidak\s+ditemukan\s+(teks|konten|informasi)/i,
+    /blank\s+page/i,
+    /empty\s+page/i,
+    /no\s+(substantive\s+)?(content|text)/i,
+    /gambar\s+yang\s+anda\s+berikan/i,
+    /halaman\s+ini\s+tampaknya\s+kosong/i,
+    /gambar\s+(ini\s+)?kosong/i,
+    /halaman\s+putih/i,
+    /kosong\s+tanpa\s+teks/i,
+    /dokumen\s+kosong/i,
+  ];
+
+  const matchesPattern = blankPatterns.some((pattern) => pattern.test(lower));
+  if (matchesPattern) {
+    const hasMarkdownTable = lower.includes('|') && lower.includes('---');
+    const hasHeadings = /^#{1,6}\s+/m.test(trimmed);
+    if (!hasMarkdownTable && !hasHeadings) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function sanitizeVisionOutput(rawText: any): string {
+  if (!rawText || typeof rawText !== 'string') return '';
+  const trimmed = rawText.trim();
+  if (isAiBlankNotice(trimmed)) {
+    return '';
+  }
+  return trimmed;
+}
 
 /**
  * Agent 1: Vision Ingestion Agent
@@ -57,7 +110,7 @@ export async function extractPageText(
       try {
         const client = new ChatOllama({ model, baseUrl, numCtx: 4096 });
         const response = await client.invoke(messages);
-        return typeof response.content === 'string' ? response.content.trim() : '';
+        return sanitizeVisionOutput(response.content);
       } catch (err) {
         attempt++;
         if (attempt <= maxRetries) {
@@ -116,10 +169,7 @@ export async function extractPageText(
       if (res.ok) {
         const data = await res.json();
         const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text && typeof text === 'string') {
-          return text.trim();
-        }
-        return '';
+        return sanitizeVisionOutput(text);
       }
 
       // Jika error 404 (model dihentikan Google), coba model alternatif atau OpenAI Vision
@@ -150,8 +200,9 @@ export async function extractPageText(
             if (altRes.ok) {
               const altData = await altRes.json();
               const text = altData?.candidates?.[0]?.content?.parts?.[0]?.text;
-              if (text && typeof text === 'string') {
-                return text.trim();
+              const sanitized = sanitizeVisionOutput(text);
+              if (sanitized) {
+                return sanitized;
               }
             }
           } catch {}
@@ -162,7 +213,8 @@ export async function extractPageText(
         if (openAiApiKey) {
           try {
             const openAiText = await extractWithOpenAiVision(base64Image, openAiApiKey);
-            if (openAiText) return openAiText;
+            const sanitized = sanitizeVisionOutput(openAiText);
+            if (sanitized) return sanitized;
           } catch {}
         }
 
@@ -189,7 +241,8 @@ export async function extractPageText(
         if (openAiApiKey) {
           try {
             const fallbackText = await extractWithOpenAiVision(base64Image, openAiApiKey);
-            if (fallbackText) return fallbackText;
+            const sanitized = sanitizeVisionOutput(fallbackText);
+            if (sanitized) return sanitized;
           } catch {}
         }
 
@@ -238,7 +291,7 @@ async function extractWithOpenAiVision(base64Image: string, apiKey: string): Pro
     clearTimeout(timeoutId);
     if (res.ok) {
       const data = await res.json();
-      return data?.choices?.[0]?.message?.content?.trim() || '';
+      return sanitizeVisionOutput(data?.choices?.[0]?.message?.content);
     }
   } catch (err: any) {
     console.warn('[VisionClient] OpenAI vision fallback notice:', err?.message);

@@ -7,7 +7,7 @@ import { checkRateLimit, recordRateLimitHit, resetRateLimit } from '@lib/securit
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { email, password, isSso } = body;
+    const { email, password } = body;
 
     const cleanInput = (email || '').trim().toLowerCase();
     const cleanPassword = (password || '').trim();
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!isSso && !cleanPassword) {
+    if (!cleanPassword) {
       return NextResponse.json(
         { error: 'Password is required.' },
         { status: 400 }
@@ -51,8 +51,13 @@ export async function POST(req: NextRequest) {
     const rawEnvPassword = (process.env.SUPERADMIN_PASSWORD || 'admin123').trim();
     const envSuperadminPassword = rawEnvPassword.replace(/^["']|["']$/g, '').trim();
 
-    const isPasswordValid = (pwd: string) =>
-      pwd === envSuperadminPassword || pwd === rawEnvPassword || pwd === 'admin123' || pwd === '1qa2ws3ed!@#';
+    const isPasswordValid = (pwd: string) => {
+      if (!pwd) return false;
+      return (
+        (Boolean(envSuperadminPassword) && pwd === envSuperadminPassword) ||
+        (Boolean(rawEnvPassword) && pwd === rawEnvPassword)
+      );
+    };
 
     // Match either exact email, configured env email, or username 'superadmin'
     const isSuperadminMatch =
@@ -61,8 +66,8 @@ export async function POST(req: NextRequest) {
       cleanInput === 'superadmin@brilian.ai';
 
     if (isSuperadminMatch) {
-      // Validate password if not SSO
-      if (!isSso && !isPasswordValid(cleanPassword)) {
+      // Validate password
+      if (!isPasswordValid(cleanPassword)) {
         recordRateLimitHit(rateLimitKey);
         return NextResponse.json(
           { error: 'Incorrect username or password.' },
@@ -192,7 +197,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Standard password check against environment password
-    if (!isSso && !isPasswordValid(cleanPassword)) {
+    if (!isPasswordValid(cleanPassword)) {
       recordRateLimitHit(rateLimitKey);
       return NextResponse.json(
         { error: 'Incorrect username or password.' },

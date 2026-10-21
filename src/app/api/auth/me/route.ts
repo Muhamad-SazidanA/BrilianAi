@@ -20,10 +20,15 @@ export async function GET(req: NextRequest) {
       user = await validateSession(sessionToken);
     }
 
-    // 2. Dev / Legacy fallback
-    if (!user) {
+    // 2. Dev / Legacy fallback (strictly local development only)
+    const isLocalDevOrTest =
+      process.env.NODE_ENV !== 'production' &&
+      !process.env.DOCKER_CONTAINER &&
+      process.env.ENABLE_INSECURE_DEV_AUTH === 'true';
+
+    if (!user && isLocalDevOrTest) {
       let userId = req.cookies.get('brilian_active_user_id')?.value;
-      if (!userId && process.env.NODE_ENV !== 'production') {
+      if (!userId) {
         userId = req.headers.get('x-user-id') || undefined;
       }
 

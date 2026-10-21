@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserByEmail, createUser, ensureUsersAndRolesTables } from '@lib/db/userStore';
+import { createSession } from '@lib/db/sessionStore';
 import { getPool } from '@lib/db/dbClient';
 import { getGoogleRedirectUri } from '@lib/auth/googleOAuth';
 
@@ -16,7 +17,13 @@ export async function GET(req: NextRequest) {
   if (rawState) {
     try {
       const decoded = JSON.parse(Buffer.from(rawState, 'base64url').toString('utf8'));
-      if (decoded.redirect && typeof decoded.redirect === 'string' && decoded.redirect.startsWith('/')) {
+      if (
+        decoded.redirect &&
+        typeof decoded.redirect === 'string' &&
+        decoded.redirect.startsWith('/') &&
+        !decoded.redirect.startsWith('//') &&
+        !decoded.redirect.includes('\\')
+      ) {
         targetRedirect = decoded.redirect;
       }
     } catch {
@@ -140,6 +147,12 @@ export async function GET(req: NextRequest) {
     const isPending = userStatus === 'pending_approval';
     const destination = isPending ? '/pending-approval' : targetRedirect;
 
+    // Create authentic database session
+    const userAgent = req.headers.get('user-agent') || undefined;
+    const forwardedFor = req.headers.get('x-forwarded-for');
+    const ipAddress = forwardedFor ? forwardedFor.split(',')[0].trim() : req.headers.get('x-real-ip') || undefined;
+    const sessionToken = await createSession(userId, userAgent, ipAddress);
+
     // 4. Return HTML client-side transition to store session in localStorage and redirect
     const htmlResponse = `<!DOCTYPE html>
 <html lang="en">
@@ -212,6 +225,15 @@ export async function GET(req: NextRequest) {
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
       },
+    });
+    response.cookies.set({
+      name: 'brilian_session_token',
+      value: sessionToken,
+      path: '/',
+      maxAge: 30 * 24 * 60 * 60,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
     });
     response.cookies.set({
       name: 'brilian_active_user_id',

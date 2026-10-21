@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { listCuratedInsights, deduplicateCuratedInsights, createManualCuratedInsight } from '@lib/db/vectorStore';
+import { listCuratedInsights, deduplicateCuratedInsights, createManualCuratedInsight, getBatchById } from '@lib/db/vectorStore';
 import { curateBatch, curateAllChunks, isBatchCurating, getCurationProgress } from '@lib/curation/curationService';
-import { getAuthenticatedUser, hasServerPermission } from '@lib/auth/serverAuth';
+import { getAuthenticatedUser, hasServerPermission, canUserAccessDocumentAsync } from '@lib/auth/serverAuth';
 import { embedTexts } from '@lib/ai/embeddingClient';
 
 export const dynamic = 'force-dynamic';
@@ -12,6 +12,29 @@ export async function GET(
 ) {
   try {
     const { id } = params;
+    const authUser = await getAuthenticatedUser(request);
+    if (!authUser && process.env.NODE_ENV === 'production') {
+      return NextResponse.json({ error: 'Unauthorized: Session required.' }, { status: 401 });
+    }
+
+    const isAdmin = authUser?.role_id === 'superadmin' || authUser?.role_id === 'admin';
+    if (!isAdmin && authUser) {
+      const batch = await getBatchById(id);
+      if (!batch) {
+        return NextResponse.json(
+          { error: 'Dokumen tidak ditemukan atau akses ditolak.' },
+          { status: 404 }
+        );
+      }
+      const { canAccess } = await canUserAccessDocumentAsync(authUser, batch);
+      if (!canAccess) {
+        return NextResponse.json(
+          { error: 'Dokumen tidak ditemukan atau akses ditolak.' },
+          { status: 404 }
+        );
+      }
+    }
+
     const insights = await listCuratedInsights(id);
     return NextResponse.json(insights, { status: 200 });
   } catch (error) {

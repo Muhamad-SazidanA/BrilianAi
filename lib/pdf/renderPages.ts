@@ -1,5 +1,5 @@
 import * as mupdf from 'mupdf';
-import { extractPageText } from '../ai/visionClient';
+import { extractPageText, isAiBlankNotice } from '../ai/visionClient';
 
 export interface PageTextResult {
   pageNumber: number;
@@ -8,6 +8,39 @@ export interface PageTextResult {
 
 export interface ExtractHybridOptions {
   minDigitalTextLength?: number;
+}
+
+/**
+ * Mengecek apakah pixmap halaman PDF adalah halaman putih polos / kosong.
+ * Membaca buffer pixel RGB dan mendeteksi apakah ada tinta/pixel gelap signifikan.
+ * Menghindari pemanggilan API AI Vision yang tidak perlu dan menghemat token/biaya.
+ */
+export function isPixmapBlank(pixmap: mupdf.Pixmap, threshold = 240, maxDarkPixels = 80): boolean {
+  try {
+    const pixels = pixmap.getPixels();
+    if (!pixels || pixels.length === 0) return true;
+
+    const numComponents = typeof pixmap.getNumberOfComponents === 'function' ? pixmap.getNumberOfComponents() : 3;
+    let darkPixelCount = 0;
+
+    // Scan pixel RGB
+    for (let i = 0; i < pixels.length; i += numComponents) {
+      const r = pixels[i];
+      const g = pixels[i + 1];
+      const b = pixels[i + 2];
+      // Jika salah satu komponen R, G, B lebih gelap dari threshold (ada tinta / konten)
+      if (r < threshold || g < threshold || b < threshold) {
+        darkPixelCount++;
+        if (darkPixelCount > maxDarkPixels) {
+          return false; // Halaman memuat konten visual / teks / gambar
+        }
+      }
+    }
+
+    return true; // Halaman praktis putih polos / kosong
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -97,7 +130,7 @@ export async function extractPdfPagesTextHybrid(
       page = doc.loadPage(i);
       const digitalText = extractPageDigitalText(page);
 
-      if (digitalText && digitalText.length >= minDigitalTextLength) {
+      if (digitalText && digitalText.length >= minDigitalTextLength && !isAiBlankNotice(digitalText)) {
         // Log periodically for large documents to avoid flooding console
         if (pageNumber % 50 === 1 || pageNumber === pageCount || pageCount <= 30) {
           console.log(
@@ -109,23 +142,37 @@ export async function extractPdfPagesTextHybrid(
           text: digitalText,
         });
       } else {
-        // Only render image on-demand if digital text is empty / scanned
-        console.log(
-          `[IngestPipeline] Halaman ${pageNumber}/${pageCount}: Teks digital minim/scan, memindai via AI Vision...`
-        );
+        // Render image on-demand to inspect visual content
         pixmap = page.toPixmap(mupdf.Matrix.scale(1.0, 1.0), mupdf.ColorSpace.DeviceRGB);
-        const pngBytes = pixmap.asPNG();
-        const imageBuffer = Buffer.from(pngBytes);
-        const text = await extractPageText(imageBuffer);
-        const finalText = text || digitalText || '';
 
-        console.log(
-          `[IngestPipeline] -> Halaman ${pageNumber} selesai dipindai AI Vision (${finalText.length} karakter diekstrak).`
-        );
-        results.push({
-          pageNumber,
-          text: finalText,
-        });
+        // Fast-check: Lewati halaman kosong putih polos tanpa panggil AI Vision (hemat kuota & token)
+        if (isPixmapBlank(pixmap)) {
+          console.log(
+            `[IngestPipeline] Halaman ${pageNumber}/${pageCount}: Halaman kosong terdeteksi (putih polos), melewati ekstraksi AI Vision.`
+          );
+          results.push({
+            pageNumber,
+            text: '',
+          });
+        } else {
+          console.log(
+            `[IngestPipeline] Halaman ${pageNumber}/${pageCount}: Teks digital minim/scan, memindai via AI Vision...`
+          );
+          const pngBytes = pixmap.asPNG();
+          const imageBuffer = Buffer.from(pngBytes);
+          const rawText = await extractPageText(imageBuffer);
+          const text = isAiBlankNotice(rawText) ? '' : rawText;
+          const cleanDigital = isAiBlankNotice(digitalText) ? '' : digitalText;
+          const finalText = text || cleanDigital || '';
+
+          console.log(
+            `[IngestPipeline] -> Halaman ${pageNumber} selesai dipindai AI Vision (${finalText.length} karakter diekstrak).`
+          );
+          results.push({
+            pageNumber,
+            text: finalText,
+          });
+        }
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

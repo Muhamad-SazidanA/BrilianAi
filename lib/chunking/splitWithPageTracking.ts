@@ -1,4 +1,5 @@
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
+import { isAiBlankNotice } from '../ai/visionClient';
 
 export type PageText = {
   pageNumber: number;
@@ -47,9 +48,12 @@ export async function chunkWithPageOffsets(
 
   for (let i = 0; i < validPages.length; i++) {
     const page = validPages[i];
-    const text = page.text || '';
+    const rawText = page.text || '';
+    const trimmed = rawText.trim();
+    const effectiveText = isAiBlankNotice(trimmed) ? '' : rawText;
+
     const startOffset = fullText.length;
-    fullText += text;
+    fullText += effectiveText;
     const endOffset = fullText.length;
 
     pageOffsets.push({
@@ -58,7 +62,7 @@ export async function chunkWithPageOffsets(
       endOffset,
     });
 
-    if (i < validPages.length - 1) {
+    if (effectiveText && i < validPages.length - 1) {
       fullText += '\n\n';
     }
   }
@@ -112,9 +116,9 @@ export async function chunkWithPageOffsets(
 
     // Find all pages overlapping with [chunkStart, chunkEnd]
     const overlappingPages = pageOffsets.filter((p) => {
-      // If page text is empty, check if chunk boundary aligns
+      // If page text is empty, ignore it from chunk attribution
       if (p.startOffset === p.endOffset) {
-        return chunkStart <= p.startOffset && p.endOffset <= chunkEnd;
+        return false;
       }
       // Standard interval intersection: [chunkStart, chunkEnd] overlaps [p.startOffset, p.endOffset]
       return Math.max(chunkStart, p.startOffset) < Math.min(chunkEnd, p.endOffset);
@@ -127,12 +131,14 @@ export async function chunkWithPageOffsets(
       sourcePageStart = overlappingPages[0].pageNumber;
       sourcePageEnd = overlappingPages[overlappingPages.length - 1].pageNumber;
     } else {
-      // Fallback to nearest page in offset table
-      const nearest = pageOffsets.reduce((prev, curr) => {
+      // Fallback to nearest page in offset table that actually has text
+      const nonZeroPages = pageOffsets.filter((p) => p.startOffset < p.endOffset);
+      const candidates = nonZeroPages.length > 0 ? nonZeroPages : pageOffsets;
+      const nearest = candidates.reduce((prev, curr) => {
         const prevDiff = Math.abs(prev.startOffset - chunkStart);
         const currDiff = Math.abs(curr.startOffset - chunkStart);
         return currDiff < prevDiff ? curr : prev;
-      }, pageOffsets[0]);
+      }, candidates[0]);
       sourcePageStart = nearest.pageNumber;
       sourcePageEnd = nearest.pageNumber;
     }

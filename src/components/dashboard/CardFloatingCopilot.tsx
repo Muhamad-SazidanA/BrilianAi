@@ -24,7 +24,15 @@ interface CardFloatingCopilotProps {
 
 function renderMarkdown(content: string): string {
   if (!content) return '';
-  return content
+  // Sanitize raw HTML tags to prevent XSS injection
+  const sanitized = content
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+  return sanitized
     // Bold **text**
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     // Italic *text*

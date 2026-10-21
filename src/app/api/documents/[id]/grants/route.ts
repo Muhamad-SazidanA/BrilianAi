@@ -19,8 +19,6 @@ async function canManageDocumentAccess(
   if (user.role_id === 'superadmin' || user.role_id === 'admin') return true;
   // Document owner can manage access to their own document
   if (batch.owner_id && user.id && batch.owner_id === user.id) return true;
-  // Editor role can manage document access
-  if (user.role_id === 'editor') return true;
   return false;
 }
 

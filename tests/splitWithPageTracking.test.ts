@@ -109,4 +109,44 @@ describe('chunkWithPageOffsets (Sliding-Window Chunking with Page Tracking)', ()
     expect(await chunkWithPageOffsets([{ pageNumber: 1, text: '' }])).toEqual([]);
     expect(await chunkWithPageOffsets([{ pageNumber: 1, text: '   ' }])).toEqual([]);
   });
+
+  it('6. should ignore polite AI blank disclaimers and not produce any chunk for empty pages', async () => {
+    const politeDisclaimer =
+      'Gambar yang Anda berikan adalah halaman kosong (putih polos) dan tidak memiliki teks, tabel, diagram, atau konten substantif apa pun untuk diekstrak.';
+
+    const pages: PageText[] = [
+      { pageNumber: 1, text: 'Halaman 1 berisi kebijakan keamanan data nasabah.' },
+      { pageNumber: 2, text: politeDisclaimer }, // Page 2 is a blank page that was hallucinated by vision
+      { pageNumber: 3, text: 'Halaman 3 berisi prosedur penanganan insiden siber.' },
+    ];
+
+    const chunks = await chunkWithPageOffsets(pages, 400, 50);
+
+    // Ensure polite disclaimer never appears in any chunk
+    for (const chunk of chunks) {
+      expect(chunk.content).not.toContain('halaman kosong');
+      expect(chunk.content).not.toContain('putih polos');
+      // Chunks should never attribute to empty page 2 alone
+      if (chunk.content.includes('kebijakan keamanan')) {
+        expect(chunk.sourcePageStart).toBe(1);
+      }
+      if (chunk.content.includes('prosedur penanganan')) {
+        expect(chunk.sourcePageEnd).toBe(3);
+      }
+    }
+  });
+
+  it('7. should return empty array if all pages only contain blank notices or empty strings', async () => {
+    const pages: PageText[] = [
+      { pageNumber: 1, text: '' },
+      {
+        pageNumber: 2,
+        text: 'Gambar yang Anda berikan adalah halaman kosong (putih polos) dan tidak memiliki teks, tabel, diagram, atau konten substantif apa pun untuk diekstrak.',
+      },
+      { pageNumber: 3, text: '   \n  ' },
+    ];
+
+    const chunks = await chunkWithPageOffsets(pages, 500, 100);
+    expect(chunks).toEqual([]);
+  });
 });

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listChunks, getBatchById } from '@lib/db/vectorStore';
-import { getAuthenticatedUser, canUserAccessDocument } from '@lib/auth/serverAuth';
+import { getAuthenticatedUser, canUserAccessDocumentAsync } from '@lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,11 +18,24 @@ export async function GET(
       );
     }
 
-    const user = await getAuthenticatedUser(req);
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-    if (isUuid) {
+    if (!isUuid && process.env.NODE_ENV === 'production') {
+      return NextResponse.json({ error: 'Format ID dokumen tidak valid.' }, { status: 400 });
+    }
+
+    const user = await getAuthenticatedUser(req);
+    const isAdmin = user?.role_id === 'superadmin' || user?.role_id === 'admin';
+
+    if (!isAdmin && isUuid) {
       const batch = await getBatchById(id);
-      if (batch && !canUserAccessDocument(user, batch)) {
+      if (!batch) {
+        return NextResponse.json(
+          { error: 'Dokumen tidak ditemukan atau akses ditolak.' },
+          { status: 404 }
+        );
+      }
+      const { canAccess } = await canUserAccessDocumentAsync(user, batch);
+      if (!canAccess) {
         return NextResponse.json(
           { error: 'Dokumen tidak ditemukan atau akses ditolak.' },
           { status: 404 }

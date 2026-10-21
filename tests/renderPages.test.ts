@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { renderPdfPagesToImages } from '../lib/pdf/renderPages';
+import * as mupdf from 'mupdf';
+import { renderPdfPagesToImages, isPixmapBlank, extractPdfPagesTextHybrid } from '../lib/pdf/renderPages';
 import { createTestPdf } from './fixtures/createPdf';
 
 describe('renderPdfPagesToImages', () => {
@@ -51,5 +52,31 @@ describe('renderPdfPagesToImages', () => {
     await expect(renderPdfPagesToImages(emptyBuffer)).rejects.toThrowError(
       /Invalid PDF buffer/
     );
+  });
+
+  it('5. should identify blank page pixmaps using isPixmapBlank without sending to Vision', () => {
+    const pdfBuffer = createTestPdf(1);
+    const doc = mupdf.Document.openDocument(pdfBuffer, 'application/pdf');
+    const page = doc.loadPage(0);
+    const pixmap = page.toPixmap(mupdf.Matrix.scale(1.0, 1.0), mupdf.ColorSpace.DeviceRGB);
+
+    try {
+      expect(isPixmapBlank(pixmap)).toBe(true);
+    } finally {
+      pixmap.destroy();
+      page.destroy();
+      (doc as any).destroy?.();
+    }
+  });
+
+  it('6. should return empty text for blank PDF pages in extractPdfPagesTextHybrid without AI Vision calls', async () => {
+    const pdfBuffer = createTestPdf(2);
+    const results = await extractPdfPagesTextHybrid(pdfBuffer);
+
+    expect(results).toHaveLength(2);
+    expect(results[0].pageNumber).toBe(1);
+    expect(results[0].text).toBe('');
+    expect(results[1].pageNumber).toBe(2);
+    expect(results[1].text).toBe('');
   });
 });

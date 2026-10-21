@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { extractPageText, SYSTEM_VISION_PROMPT } from '../lib/ai/visionClient';
+import { extractPageText, SYSTEM_VISION_PROMPT, isAiBlankNotice } from '../lib/ai/visionClient';
 import { ChatOllama } from '@langchain/ollama';
 import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 
@@ -83,5 +83,34 @@ describe('extractPageText (AI Vision Client)', () => {
     );
     expect(imageContent).toBeDefined();
     expect(imageContent.image_url?.url).toContain(expectedBase64);
+  });
+
+  it('4. should detect polite AI blank page disclaimers via isAiBlankNotice', () => {
+    const politeAiResponse =
+      'Gambar yang Anda berikan adalah halaman kosong (putih polos) dan tidak memiliki teks, tabel, diagram, atau konten substantif apa pun untuk diekstrak.';
+    expect(isAiBlankNotice(politeAiResponse)).toBe(true);
+    expect(isAiBlankNotice('Halaman ini kosong.')).toBe(true);
+    expect(isAiBlankNotice('Halaman kosong tanpa teks')).toBe(true);
+    expect(isAiBlankNotice('Tidak ada teks yang dapat diekstrak.')).toBe(true);
+    expect(isAiBlankNotice('Blank page')).toBe(true);
+    expect(isAiBlankNotice('   ')).toBe(true);
+    expect(isAiBlankNotice(null)).toBe(true);
+
+    // Legit document texts should NOT be marked as blank notice
+    expect(isAiBlankNotice('Pendahuluan dan Latar Belakang Perusahaan PT ABC')).toBe(false);
+    expect(isAiBlankNotice('| No | Nama | Nilai |\n|---|---|---|\n| 1 | Budi | 100 |')).toBe(false);
+  });
+
+  it('5. should sanitize and return empty string when Vision model returns polite blank page notice', async () => {
+    const politeAiResponse =
+      'Gambar yang Anda berikan adalah halaman kosong (putih polos) dan tidak memiliki teks, tabel, diagram, atau konten substantif apa pun untuk diekstrak.';
+
+    vi.mocked(ChatOllama.prototype.invoke).mockResolvedValueOnce(
+      new AIMessage({ content: politeAiResponse }) as any
+    );
+
+    const result = await extractPageText(dummyPngBuffer, { initialBackoffMs: 10 });
+    // Must return empty string so it is ignored from chunks
+    expect(result).toBe('');
   });
 });

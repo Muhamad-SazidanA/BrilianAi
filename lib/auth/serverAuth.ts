@@ -25,12 +25,21 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<User |
       }
     }
 
-    // 2. Fallback to active user cookie (with status check) for dev / test compatibility
-    const userId = readUserId(request);
-    if (!userId) return null;
-    const user = await getUserById(userId);
-    if (!user || user.status !== 'active') return null;
-    return user;
+    // 2. Strict development/testing-only fallback (disabled in production)
+    const isLocalDevOrTest =
+      process.env.NODE_ENV !== 'production' &&
+      !process.env.DOCKER_CONTAINER &&
+      process.env.ENABLE_INSECURE_DEV_AUTH === 'true';
+
+    if (isLocalDevOrTest) {
+      const userId = readUserId(request);
+      if (!userId) return null;
+      const user = await getUserById(userId);
+      if (!user || user.status !== 'active') return null;
+      return user;
+    }
+
+    return null;
   } catch (err) {
     console.warn('[serverAuth] getAuthenticatedUser error:', err);
     return null;

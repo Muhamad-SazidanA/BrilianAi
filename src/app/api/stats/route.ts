@@ -11,6 +11,15 @@ export async function GET(req: NextRequest) {
   try {
     const pool = getPool();
     const authenticatedUser = await getAuthenticatedUser(req);
+    if (!authenticatedUser) {
+      return NextResponse.json({ error: 'Unauthorized: Session required.' }, { status: 401 });
+    }
+
+    const isAdminOrAuditor =
+      authenticatedUser.role_id === 'admin' ||
+      authenticatedUser.role_id === 'superadmin' ||
+      Boolean(authenticatedUser.role?.permissions.includes('audit:read')) ||
+      Boolean(authenticatedUser.role?.permissions.includes('users:manage'));
 
     // Ensure all optional tables exist before querying
     await Promise.all([
@@ -56,65 +65,69 @@ export async function GET(req: NextRequest) {
     const deepseekActive = Boolean(process.env.DEEPSEEK_API_KEY);
     const allAiOnline = geminiActive && openAiActive && deepseekActive;
 
-    // 4. Fetch Recent Logins (Last 5 sessions with user details)
+    // 4. Fetch Recent Logins (Last 5 sessions with user details) - restricted to admins/auditors
     let recentLogins: any[] = [];
-    try {
-      const loginsRes = await pool.query(`
-        SELECT 
-          s.id,
-          s.user_id,
-          s.ip_address,
-          s.user_agent,
-          s.created_at,
-          COALESCE(u.name, 'Pengguna') as user_name,
-          COALESCE(u.email, '-') as user_email,
-          COALESCE(u.avatar_color, '#2563EB') as avatar_color,
-          COALESCE(r.name, 'Member') as user_role
-        FROM user_sessions s
-        LEFT JOIN users u ON s.user_id = u.id
-        LEFT JOIN roles r ON u.role_id = r.id
-        ORDER BY s.created_at DESC
-        LIMIT 5;
-      `);
-      recentLogins = loginsRes.rows.map((r) => ({
-        id: r.id,
-        userId: r.user_id,
-        userName: r.user_name,
-        userEmail: r.user_email,
-        userRole: r.user_role,
-        avatarColor: r.avatar_color,
-        ipAddress: r.ip_address,
-        userAgent: r.user_agent,
-        createdAt: r.created_at,
-      }));
-    } catch (err) {
-      console.warn('[API /api/stats] Error querying recentLogins:', err);
+    if (isAdminOrAuditor) {
+      try {
+        const loginsRes = await pool.query(`
+          SELECT 
+            s.id,
+            s.user_id,
+            s.ip_address,
+            s.user_agent,
+            s.created_at,
+            COALESCE(u.name, 'Pengguna') as user_name,
+            COALESCE(u.email, '-') as user_email,
+            COALESCE(u.avatar_color, '#2563EB') as avatar_color,
+            COALESCE(r.name, 'Member') as user_role
+          FROM user_sessions s
+          LEFT JOIN users u ON s.user_id = u.id
+          LEFT JOIN roles r ON u.role_id = r.id
+          ORDER BY s.created_at DESC
+          LIMIT 5;
+        `);
+        recentLogins = loginsRes.rows.map((r) => ({
+          id: r.id,
+          userId: r.user_id,
+          userName: r.user_name,
+          userEmail: r.user_email,
+          userRole: r.user_role,
+          avatarColor: r.avatar_color,
+          ipAddress: r.ip_address,
+          userAgent: r.user_agent,
+          createdAt: r.created_at,
+        }));
+      } catch (err) {
+        console.warn('[API /api/stats] Error querying recentLogins:', err);
+      }
     }
 
     // 5. Fetch Attention Items (Pending users, open gaps, negative feedback)
     let pendingUsers: any[] = [];
     let pendingUsersCount = 0;
-    try {
-      const pendingRes = await pool.query(`
-        SELECT id, name, email, created_at
-        FROM users
-        WHERE status = 'pending_approval'
-        ORDER BY created_at DESC
-        LIMIT 5;
-      `);
-      pendingUsers = pendingRes.rows.map((u) => ({
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        createdAt: u.created_at,
-      }));
+    if (isAdminOrAuditor) {
+      try {
+        const pendingRes = await pool.query(`
+          SELECT id, name, email, created_at
+          FROM users
+          WHERE status = 'pending_approval'
+          ORDER BY created_at DESC
+          LIMIT 5;
+        `);
+        pendingUsers = pendingRes.rows.map((u) => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          createdAt: u.created_at,
+        }));
 
-      const countRes = await pool.query(`
-        SELECT COUNT(*)::int as count FROM users WHERE status = 'pending_approval';
-      `);
-      pendingUsersCount = countRes.rows[0]?.count || 0;
-    } catch (err) {
-      console.warn('[API /api/stats] Error querying pending users:', err);
+        const countRes = await pool.query(`
+          SELECT COUNT(*)::int as count FROM users WHERE status = 'pending_approval';
+        `);
+        pendingUsersCount = countRes.rows[0]?.count || 0;
+      } catch (err) {
+        console.warn('[API /api/stats] Error querying pending users:', err);
+      }
     }
 
     let recentGaps: any[] = [];
