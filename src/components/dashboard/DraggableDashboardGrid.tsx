@@ -3,14 +3,8 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   GripVertical,
-  Lock,
-  Unlock,
-  RotateCcw,
-  Check,
   Sparkles,
-  Maximize2,
-  Minimize2,
-  Grid,
+  Plus,
 } from 'lucide-react';
 import {
   DashboardData,
@@ -19,13 +13,14 @@ import {
   WidgetLayout,
 } from '@/types/dashboard';
 import { WidgetRenderer } from '@/components/chat/AiDashboardPreview';
-import CardFloatingCopilot from '@/components/dashboard/CardFloatingCopilot';
+import DashboardAiCanvas from '@/components/dashboard/DashboardAiCanvas';
 import { toast } from 'sonner';
 
 interface DraggableDashboardGridProps {
   dashboardId: string;
   data: DashboardData;
   isLocked: boolean;
+  canEdit?: boolean;
   onUpdateData: (newData: DashboardData) => void;
   onMorphWidget?: (index: number, targetType: MorphableChartType) => void;
   onPersistLayout?: (updatedWidgets: DashboardWidget[]) => void;
@@ -59,6 +54,7 @@ export default function DraggableDashboardGrid({
   dashboardId,
   data,
   isLocked,
+  canEdit = true,
   onUpdateData,
   onMorphWidget,
   onPersistLayout,
@@ -80,8 +76,9 @@ export default function DraggableDashboardGrid({
     startHeight: number;
   } | null>(null);
 
-  // Copilot active index
-  const [activeCopilotIndex, setActiveCopilotIndex] = useState<number | null>(null);
+  // ── Card Selection & AI Canvas ──
+  const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
+  const [isAiCanvasOpen, setIsAiCanvasOpen] = useState(false);
 
   // Handle Drag & Drop reordering
   const handleDragStart = (e: React.DragEvent, index: number) => {
@@ -139,28 +136,6 @@ export default function DraggableDashboardGrid({
   const handleDragEnd = () => {
     setDraggedIndex(null);
     setDragOverIndex(null);
-  };
-
-  // Quick resize button (direct set colSpan)
-  const handleSetColSpan = (index: number, newColSpan: number) => {
-    if (isLocked) return;
-    const currentWidgets = [...data.widgets];
-    const widget = currentWidgets[index];
-    if (!widget) return;
-
-    currentWidgets[index] = {
-      ...widget,
-      layout: {
-        ...(widget.layout || {}),
-        colSpan: newColSpan,
-      },
-    };
-
-    const updatedData = { ...data, widgets: currentWidgets };
-    onUpdateData(updatedData);
-    if (onPersistLayout) {
-      onPersistLayout(currentWidgets);
-    }
   };
 
   // Resize Start (Mouse Down on Bottom-Right Corner)
@@ -288,30 +263,40 @@ export default function DraggableDashboardGrid({
 
           const isDraggingThis = draggedIndex === index;
           const isDragOverThis = dragOverIndex === index && draggedIndex !== index;
+          const isSelected = selectedIndices.includes(index);
 
-          const isMorphable =
-            widget.type === 'table' ||
-            widget.type === 'bar_chart' ||
-            widget.type === 'line_chart' ||
-            widget.type === 'pie_chart' ||
-            widget.type === 'area_chart';
+          // Toggle card selection for AI canvas
+          const handleToggleSelect = (e: React.MouseEvent) => {
+            e.stopPropagation();
+            setSelectedIndices(prev => {
+              const next = prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index];
+              return next;
+            });
+            if (!isAiCanvasOpen) setIsAiCanvasOpen(true);
+          };
 
-          const handleMorphTo = onMorphWidget && isMorphable
-            ? (targetType: MorphableChartType) => {
-                onMorphWidget(index, targetType);
-              }
-            : undefined;
+          // Click on card body itself also selects and connects to AI
+          const handleCardClick = (e: React.MouseEvent) => {
+            if ((e.target as HTMLElement).closest('.db-widget-select-btn')) return;
+            if ((e.target as HTMLElement).closest('button')) return;
+            setSelectedIndices(prev => {
+              const next = prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index];
+              return next;
+            });
+            if (!isAiCanvasOpen) setIsAiCanvasOpen(true);
+          };
 
           return (
             <div
               key={`widget-${index}-${widget.type}`}
-              className="db-grid-widget-item"
-              draggable={!isLocked}
-              onDragStart={(e) => handleDragStart(e, index)}
-              onDragOver={(e) => handleDragOver(e, index)}
-              onDragLeave={handleDragLeave}
-              onDrop={(e) => handleDrop(e, index)}
-              onDragEnd={handleDragEnd}
+              className={`db-grid-widget-item${canEdit && isSelected ? ' db-grid-widget-selected' : ''}`}
+              draggable={canEdit && !isLocked}
+              onDragStart={(e) => canEdit && handleDragStart(e, index)}
+              onDragOver={(e) => canEdit && handleDragOver(e, index)}
+              onDragLeave={canEdit ? handleDragLeave : undefined}
+              onDrop={(e) => canEdit && handleDrop(e, index)}
+              onDragEnd={canEdit ? handleDragEnd : undefined}
+              onClick={canEdit ? handleCardClick : undefined}
               style={{
                 gridColumn: `span ${effectiveColSpan}`,
                 height: effectiveHeight ? `${effectiveHeight}px` : undefined,
@@ -320,106 +305,117 @@ export default function DraggableDashboardGrid({
                 display: 'flex',
                 flexDirection: 'column',
                 borderRadius: '12px',
-                border: isDragOverThis
+                border: canEdit && isSelected
+                  ? '2px solid #2563EB'
+                  : canEdit && isDragOverThis
                   ? '2px dashed #2563EB'
-                  : isBeingResized
+                  : canEdit && isBeingResized
                   ? '2px solid #2563EB'
                   : '1px solid #E2E8F0',
                 backgroundColor: '#FFFFFF',
-                boxShadow: isDragOverThis
+                boxShadow: canEdit && isSelected
+                  ? '0 0 0 3px rgba(37, 99, 235, 0.18), 0 4px 16px rgba(37, 99, 235, 0.12)'
+                  : canEdit && isDragOverThis
                   ? '0 0 0 3px rgba(37, 99, 235, 0.15)'
-                  : isDraggingThis
+                  : canEdit && isDraggingThis
                   ? 'none'
                   : '0 1px 3px rgba(0, 0, 0, 0.05)',
-                opacity: isDraggingThis ? 0.4 : 1,
-                transition: isBeingResized ? 'none' : 'box-shadow 0.15s ease, border-color 0.15s ease',
+                opacity: canEdit && isDraggingThis ? 0.4 : 1,
+                transition: isBeingResized ? 'none' : 'box-shadow 0.2s ease, border-color 0.2s ease',
                 overflow: 'hidden',
+                cursor: canEdit ? 'pointer' : 'default',
               }}
             >
-              {/* ── Top Drag & Resize Control Bar (Only when Unlocked) ── */}
-              {!isLocked && (
+              {/* ── Top Control Bar (Only rendered when user can edit) ── */}
+              {canEdit && (
                 <div
+                  className="db-grid-ctrl-bar"
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '3px 8px',
-                    backgroundColor: '#F8FAFC',
-                    borderBottom: '1px solid #F1F5F9',
-                    fontSize: '10px',
-                    color: '#64748B',
-                    userSelect: 'none',
-                    cursor: 'grab',
+                    padding: '4px 6px',
+                    background: isSelected ? 'rgba(37, 99, 235, 0.06)' : 'transparent',
+                    borderBottom: isSelected ? '1px solid rgba(37, 99, 235, 0.18)' : '1px solid transparent',
+                    minHeight: '22px',
+                    transition: 'background 0.15s ease, border-color 0.15s ease',
                   }}
-                  title="Klik & tarik bar ini untuk memindahkan posisi widget"
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <GripVertical size={12} color="#94A3B8" />
-                    <span style={{ fontWeight: 600, fontSize: '9.5px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      Drag Blok
-                    </span>
-                  </div>
+                  {!isLocked ? (
+                    <div
+                      title="Tarik / geser untuk memindahkan posisi card"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        cursor: 'grab',
+                        padding: '2px 4px',
+                        borderRadius: '4px',
+                        color: isSelected ? '#2563EB' : '#94A3B8',
+                      }}
+                    >
+                      <GripVertical size={13} />
+                    </div>
+                  ) : (
+                    <div style={{ width: '13px' }} />
+                  )}
 
-                  {/* Quick Span Selector Buttons */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                    <span style={{ fontSize: '9px', color: '#94A3B8', marginRight: '2px' }}>Lebar:</span>
-                    {[
-                      { span: 3, label: '1/4' },
-                      { span: 4, label: '1/3' },
-                      { span: 6, label: '1/2' },
-                      { span: 8, label: '2/3' },
-                      { span: 12, label: 'Full' },
-                    ].map((btn) => (
-                      <button
-                        key={btn.span}
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSetColSpan(index, btn.span);
-                        }}
-                        style={{
-                          border: 'none',
-                          padding: '1px 5px',
-                          borderRadius: '4px',
-                          fontSize: '9px',
-                          fontWeight: effectiveColSpan === btn.span ? 700 : 500,
-                          backgroundColor: effectiveColSpan === btn.span ? '#2563EB' : '#E2E8F0',
-                          color: effectiveColSpan === btn.span ? '#FFFFFF' : '#475569',
-                          cursor: 'pointer',
-                        }}
-                        title={`Ubah lebar menjadi ${btn.label} layar (${btn.span}/12)`}
-                      >
-                        {btn.label}
-                      </button>
-                    ))}
+                  {/* + Icon Button → Connect to AI Assistant */}
+                  <button
+                    type="button"
+                    className={`db-widget-select-btn${isSelected ? ' selected' : ''}`}
+                    onClick={handleToggleSelect}
+                    title={isSelected ? 'Lepas fokus dari AI Assistant' : 'Hubungkan card ini ke AI Assistant (+)'}
+                    style={{
+                      width: '20px',
+                      height: '20px',
+                      padding: 0,
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {isSelected ? (
+                      <Sparkles size={10} />
+                    ) : (
+                      <Plus size={11} strokeWidth={2.5} />
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {/* ── Selection Overlay (Only when user can edit) ── */}
+              {canEdit && isSelected && (
+                <div className="db-widget-select-overlay" onClick={handleCardClick}>
+                  <div className="db-widget-select-badge">
+                    <Sparkles size={9} />
+                    <span>Terpilih</span>
                   </div>
                 </div>
               )}
 
               {/* ── Widget Body ── */}
               <div
+                className="db-widget-body"
                 style={{
                   flex: 1,
                   display: 'flex',
                   flexDirection: 'column',
                   overflowY: 'auto',
-                  padding: '4px 6px',
+                  padding: canEdit ? '4px 6px' : '10px 12px',
                 }}
               >
                 <WidgetRenderer
                   widget={widget}
                   originalIndex={index}
-                  onMorphTo={handleMorphTo}
-                  onOpenCopilot={() =>
-                    setActiveCopilotIndex((prev) => (prev === index ? null : index))
-                  }
-                  isCopilotOpen={activeCopilotIndex === index}
                 />
               </div>
 
-              {/* ── Corner Resize Handle (Bottom-Right, Only when Unlocked) ── */}
-              {!isLocked && (
+              {/* ── Corner Resize Handle (Bottom-Right, Only when Unlocked and Editable) ── */}
+              {!isLocked && canEdit && (
                 <div
+                  className="db-resize-handle"
                   onMouseDown={(e) => handleResizeStart(e, index)}
                   title="Tarik sudut ini untuk memperbesar/memperkecil widget (ke samping & ke atas)"
                   style={{
@@ -480,16 +476,42 @@ export default function DraggableDashboardGrid({
         })}
       </div>
 
-      {/* ── Floating Copilot Dock if Opened ── */}
-      {activeCopilotIndex !== null && data.widgets[activeCopilotIndex] && (
-        <CardFloatingCopilot
+      {/* ── Floating AI Canvas (Only for editors) ── */}
+      {canEdit && (
+        <DashboardAiCanvas
+          isOpen={isAiCanvasOpen}
           dashboardId={dashboardId}
           dashboardData={data}
-          widget={data.widgets[activeCopilotIndex]}
-          widgetIndex={activeCopilotIndex}
+          selectedIndices={selectedIndices}
           onMorphWidget={onMorphWidget}
-          onClose={() => setActiveCopilotIndex(null)}
+          onToggleSelect={(idx) => {
+            setSelectedIndices((prev) =>
+              prev.includes(idx) ? prev.filter((i) => i !== idx) : [...prev, idx]
+            );
+          }}
+          onClearSelection={() => setSelectedIndices([])}
+          onClose={() => {
+            setIsAiCanvasOpen(false);
+            setSelectedIndices([]);
+          }}
         />
+      )}
+
+      {/* ── Floating AI Canvas Launch Button (when closed, editor only) ── */}
+      {canEdit && !isAiCanvasOpen && (
+        <button
+          type="button"
+          className="canvas-launcher"
+          onClick={() => setIsAiCanvasOpen(true)}
+          aria-label="Buka Brilian AI Canvas"
+          title="Buka Brilian AI Canvas"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" />
+            <path d="M19 15l.7 1.8 1.8.7-1.8.7L19 20l-.7-1.8-1.8-.7 1.8-.7z" />
+          </svg>
+          <i />
+        </button>
       )}
     </div>
   );

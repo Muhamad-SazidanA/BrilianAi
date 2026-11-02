@@ -491,17 +491,15 @@ TUGAS UTAMA:
    - Berikan penjelasan komprehensif, ringkas, dan jelas dalam Bahasa Indonesia.
    - Sorot metrik utama, perbandingan, atau temuan menarik dari widget yang tersedia.
    - Format jawaban dengan rapi menggunakan bullet points atau paragraf padat.
-2. Jika pengguna meminta mengubah bentuk visualisasi (misal: "ubah ke bar chart", "jadikan grafik garis / line chart", "ubah ke diagram lingkaran / pie chart", "jadikan area chart", "ubah chart ini jadi tabel", "tampilkan data tabel dalam bentuk grafik"):
-   - Cari index widget tabel/chart yang dimaksud (0-indexed, dari 0 sampai ${Math.max(0, safeWidgets.length - 1)}).
-   - Jelaskan bahwa kamu telah mengubah visualisasinya.
-   - Sertakan field "action" dengan:
-     {
-       "type": "morph_widget",
-       "widgetIndex": <number>,
-       "targetType": "bar_chart" | "line_chart" | "pie_chart" | "area_chart" | "table",
-       "reason": "keterangan singkat perubahan"
-     }
-3. Jika tidak ada permintaan transformasi visualisasi, set "action" ke null.
+2. ATURAN SELEKSI CARD & TRANSFORMASI VISUALISASI:
+   - Jika terdapat tag '[Fokus pada: Widget #X: ...]', pengguna telah memilih card spesifik.
+     * Jika pengguna meminta mengubah bentuk visualisasi (misal: "ubah ke bar chart", "jadikan grafik garis / line chart", "ubah ke diagram lingkaran / pie chart", "jadikan area chart", "ubah chart ini jadi tabel"):
+       Cari widgetIndex card yang dipilih (0-indexed) dan kembalikan action "morph_widget" dengan targetType yang sesuai ("bar_chart" | "line_chart" | "pie_chart" | "area_chart" | "table").
+     * Jika pengguna bertanya, jawab khusus mengenai card yang dipilih tersebut.
+   - Jika TIDAK terdapat tag '[Fokus pada: ...]', ini berarti pengguna berada pada mode konteks keseluruhan dashboard.
+     * Pengguna HANYA bisa bertanya tentang keseluruhan dashboard. Jawab pertanyaan seputar gambaran umum dashboard secara utuh.
+     * JIKA pengguna meminta mengubah visualisasi tanpa memilih card, JANGAN ubah visualisasi (action: null). Jawab secara ramah bahwa pengguna harus memilih/mengklik card mana yang ingin diubah terlebih dahulu atau menekan tombol '+' di bagian atas card.
+3. Jika tidak ada permintaan transformasi visualisasi yang valid, set "action" ke null.
 
 ATURAN KEAMANAN & BATASAN KETAT:
 - PENTING: Kamu HANYA boleh menganalisis dan menjawab hal yang berkaitan langsung dengan data visual pada dashboard di atas.
@@ -687,38 +685,46 @@ Kembalikan HANYA format JSON valid tanpa tanda kutip markdown pembuka/penutup:
 
   // TIER 4: Local Heuristic Fallback
   const lowerMsg = message.toLowerCase();
-  const wantsBarChart = lowerMsg.includes('bar chart') || lowerMsg.includes('grafik') || lowerMsg.includes('batang') || lowerMsg.includes('chart');
+  const isTargetFocused = message.includes('[Fokus pada:');
+  const wantsBarChart = lowerMsg.includes('bar chart') || lowerMsg.includes('grafik') || lowerMsg.includes('batang') || (lowerMsg.includes('ubah') && lowerMsg.includes('bar'));
+  const wantsLineChart = lowerMsg.includes('line chart') || lowerMsg.includes('garis') || (lowerMsg.includes('ubah') && lowerMsg.includes('line'));
+  const wantsPieChart = lowerMsg.includes('pie chart') || lowerMsg.includes('lingkaran') || (lowerMsg.includes('ubah') && lowerMsg.includes('pie'));
+  const wantsAreaChart = lowerMsg.includes('area chart') || (lowerMsg.includes('ubah') && lowerMsg.includes('area'));
   const wantsTable = lowerMsg.includes('tabel') || lowerMsg.includes('table');
+  const isMorphRequest = wantsBarChart || wantsLineChart || wantsPieChart || wantsAreaChart || wantsTable || (lowerMsg.includes('ubah') && lowerMsg.includes('ke'));
 
-  // Check if there is a table or bar chart to morph
-  const tableIdx = dashboard.widgets.findIndex((w) => w.type === 'table');
-  const barChartIdx = dashboard.widgets.findIndex((w) => w.type === 'bar_chart');
-
-  if (wantsBarChart && tableIdx !== -1) {
+  // If user requests a morph without selecting a card first
+  if (isMorphRequest && !isTargetFocused) {
     return {
-      answer: `Tentu! Saya telah mengubah data tabel **"${dashboard.widgets[tableIdx].title}"** menjadi **Bar Chart (Grafik Batang)** agar perbandingan data lebih mudah dianalisis secara visual.`,
-      action: {
-        type: 'morph_widget',
-        widgetIndex: tableIdx,
-        targetType: 'bar_chart',
-        reason: 'Permintaan konversi tabel ke bar chart',
-      },
+      answer: 'Untuk mengubah bentuk visualisasi data (seperti bar chart, line chart, pie chart, area, atau tabel), **silakan pilih card terlebih dahulu** yang ingin diubah dengan mengklik card tersebut atau tombol **+** di bagian atas card.',
     };
   }
 
-  if (wantsTable && barChartIdx !== -1) {
+  // Parse focused widget index if available
+  let targetIndex: number | null = null;
+  const matchFocus = message.match(/\[Fokus pada:\s*Widget\s*#(\d+)/i);
+  if (matchFocus && matchFocus[1]) {
+    const parsedIdx = parseInt(matchFocus[1], 10) - 1;
+    if (parsedIdx >= 0 && parsedIdx < dashboard.widgets.length) {
+      targetIndex = parsedIdx;
+    }
+  }
+
+  if (targetIndex !== null && isMorphRequest) {
+    const targetType = wantsBarChart ? 'bar_chart' : wantsLineChart ? 'line_chart' : wantsPieChart ? 'pie_chart' : wantsAreaChart ? 'area_chart' : 'table';
+    const widget = dashboard.widgets[targetIndex];
     return {
-      answer: `Tentu! Saya telah mengubah grafik **"${dashboard.widgets[barChartIdx].title}"** menjadi format **Tabel** terstruktur agar setiap nilai dan label dapat dibaca dengan presisi.`,
+      answer: `Tentu! Saya telah mengubah card **"${widget?.title || `Card #${targetIndex + 1}`}"** menjadi format **${targetType.replace('_', ' ').toUpperCase()}** sesuai permintaan Anda.`,
       action: {
         type: 'morph_widget',
-        widgetIndex: barChartIdx,
-        targetType: 'table',
-        reason: 'Permintaan konversi bar chart ke tabel',
+        widgetIndex: targetIndex,
+        targetType,
+        reason: `Permintaan transformasi ke ${targetType}`,
       },
     };
   }
 
   return {
-    answer: `Dashboard **"${dashboard.title}"** ini memuat **${dashboard.widgets.length} widget visual** yang merangkum hasil analisis data dokumen Anda. Terdiri dari metrik kunci, daftar terstruktur, dan representasi visual untuk memudahkan pengambilan keputusan. Anda juga dapat meminta saya untuk mengubah visualisasi tabel ke bar chart atau sebaliknya kapan saja!`,
+    answer: `Dashboard **"${dashboard.title}"** ini memuat **${dashboard.widgets.length} widget visual** yang merangkum hasil analisis data dokumen Anda. Terdiri dari metrik kunci, daftar terstruktur, dan representasi visual untuk memudahkan pengambilan keputusan. Anda dapat memilih salah satu card untuk mengubah visualisasinya atau bertanya seputar seluruh dashboard!`,
   };
 }

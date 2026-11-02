@@ -45,7 +45,6 @@ export function checkRateLimit(
   options?: RateLimitOptions
 ): RateLimitResult {
   const maxAttempts = options?.maxAttempts ?? 5;
-  const windowMs = (options?.windowSeconds ?? 900) * 1000;
   const now = Date.now();
 
   const record = rateLimitStore.get(key);

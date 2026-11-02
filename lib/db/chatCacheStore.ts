@@ -1,7 +1,6 @@
 import { getPool } from './dbClient';
 import { ChatResponseResult } from '../chat/chatService';
 import { parseUserFormattingInstruction, isDataNotFoundAnswer } from '../chat/chatUtils';
-import { ensureCompleteDatabaseSchema } from './autoMigration';
 
 export const GOLDEN_FISIOTERAPI_ANSWER = `Fisioterapi adalah profesi kesehatan holistik yang berfokus pada gerak dan fungsi manusia sepanjang rentang kehidupan. Profesi ini mempertimbangkan hubungan antara gangguan tubuh, keterbatasan aktivitas, dan hambatan partisipasi, dengan selalu memperhitungkan faktor personal dan lingkungan.
 
@@ -70,12 +69,7 @@ export function isUncacheableAnswer(
  */
 export async function ensureChatCacheTable(): Promise<void> {
   if (isTableInitialized) return;
-  try {
-    await ensureCompleteDatabaseSchema();
-    isTableInitialized = true;
-  } catch (err) {
-    // If pool is mocked (e.g. unit testing), fail gracefully
-  }
+  isTableInitialized = true;
 }
 
 export interface ChatCacheOptions {

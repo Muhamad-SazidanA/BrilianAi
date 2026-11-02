@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@lib/auth/serverAuth';
 import { saveDashboard, getDashboardByMessageId } from '@lib/db/dashboardStore';
+import { recordAuditEvent } from '@lib/db/auditLogStore';
 import { generateDashboardData } from '@lib/ai/dashboardClient';
 import { checkRateLimit, recordRateLimitHit } from '@lib/security/rateLimiter';
+import { checkDashboardEligibility } from '@lib/utils/dashboardEligibility';
+import { generateDashboardShareToken } from '@lib/security/dashboardShareToken';
+import { getPool } from '@lib/db/dbClient';
 import { DashboardData } from '@/types/dashboard';
 
 export const dynamic = 'force-dynamic';
@@ -17,7 +21,7 @@ const RATE_LIMIT_WINDOW_SECONDS = 60;
  * Transform an AI answer text into a structured interactive dashboard.
  * Uses Multi-Tier Cloud API (Gemini Flash -> OpenAI -> DeepSeek -> Ollama fallback).
  *
- * Body: { messageId, sessionId?, answerText, queryText, forceRegenerate? }
+ * Body: { messageId, sessionId?, turnIndex?, answerText, queryText, forceRegenerate? }
  */
 export async function POST(request: NextRequest) {
   const user = await getAuthenticatedUser(request);
@@ -53,9 +57,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Payload tidak valid.' }, { status: 400 });
     }
 
-    const { messageId, sessionId, answerText, queryText, forceRegenerate } = body as {
+    const { messageId, sessionId, turnIndex: rawTurnIndex, answerText, queryText, forceRegenerate } = body as {
       messageId?: string;
       sessionId?: string;
+      turnIndex?: number;
       answerText?: string;
       queryText?: string;
       forceRegenerate?: boolean;
@@ -77,14 +82,91 @@ export async function POST(request: NextRequest) {
 
     const cleanQuery = typeof queryText === 'string' ? queryText.slice(0, MAX_QUERY_LENGTH) : undefined;
 
+    // Compute turnIndex if not explicitly provided
+    let turnIndex: number | null = typeof rawTurnIndex === 'number' && rawTurnIndex > 0 ? rawTurnIndex : null;
+    if (!turnIndex && sessionId) {
+      try {
+        const pool = getPool();
+        const sessionRes = await pool.query<{ messages: any[] }>(
+          `SELECT messages FROM chat_sessions WHERE id = $1 LIMIT 1`,
+          [sessionId]
+        );
+        if (sessionRes.rows[0]?.messages && Array.isArray(sessionRes.rows[0].messages)) {
+          const msgs = sessionRes.rows[0].messages;
+          let count = 0;
+          for (let i = 0; i < msgs.length; i++) {
+            if (msgs[i].sender === 'user') {
+              count++;
+            }
+            if (msgs[i].id === messageId) {
+              turnIndex = count;
+              break;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[POST /api/chat/dashboard] Error computing turnIndex:', err);
+      }
+    }
+    if (!turnIndex) {
+      turnIndex = 1;
+    }
+
     // Return existing dashboard if already created and user didn't request forceRegenerate
     if (!forceRegenerate) {
       const existing = await getDashboardByMessageId(messageId);
       if (existing) {
         const existingData: DashboardData =
           typeof existing.data === 'string' ? JSON.parse(existing.data) : (existing.data as DashboardData);
+        // Backfill turn_index and session_id if missing
+        if (!existing.turn_index && turnIndex) {
+          existing.turn_index = turnIndex;
+        }
+        if (!existing.session_id && sessionId) {
+          existing.session_id = sessionId;
+        }
+
+        const actorIp =
+          request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+          request.headers.get('x-real-ip') ||
+          '127.0.0.1';
+
+        await recordAuditEvent({
+          eventCategory: 'DASHBOARD',
+          action: 'dashboard.reuse_existing',
+          actorId: user.id,
+          actorName: user.name,
+          actorEmail: user.email,
+          actorDepartment: user.department || 'General',
+          actorIp,
+          resourceType: 'dashboard',
+          resourceId: existing.dashboard_id,
+          resourceName: existing.title || existingData.title,
+          status: 'success',
+          details: {
+            messageId,
+            sessionId: existing.session_id,
+            turnIndex: existing.turn_index,
+            widgetCount: existingData.widgets?.length || 0,
+          },
+        }).catch((err) => console.warn('[AuditLog] Failed to log existing dashboard reuse:', err));
+
         return buildShareResponse(request, existing, existingData);
       }
+    }
+
+    // Validate eligibility (must contain quantifiable or structured data)
+    const eligibility = checkDashboardEligibility(answerText);
+    if (!eligibility.eligible && !forceRegenerate) {
+      return NextResponse.json(
+        {
+          error:
+            'Teks jawaban ini tidak memenuhi syarat untuk dijadikan dashboard: ' +
+            (eligibility.reason || 'Data metrik, tabel, atau list terstruktur tidak mencukupi.'),
+          eligibility,
+        },
+        { status: 422 }
+      );
     }
 
     // Record rate limit hit on actual LLM generation
@@ -100,10 +182,37 @@ export async function POST(request: NextRequest) {
     const record = await saveDashboard({
       messageId,
       sessionId: sessionId || null,
+      turnIndex,
       userId: user.id,
       title: dashboardData.title,
       data: dashboardData,
     });
+
+    const actorIp =
+      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      request.headers.get('x-real-ip') ||
+      '127.0.0.1';
+
+    await recordAuditEvent({
+      eventCategory: 'DASHBOARD',
+      action: 'dashboard.create',
+      actorId: user.id,
+      actorName: user.name,
+      actorEmail: user.email,
+      actorDepartment: user.department || 'General',
+      actorIp,
+      resourceType: 'dashboard',
+      resourceId: record.dashboard_id,
+      resourceName: record.title || dashboardData.title,
+      status: 'success',
+      details: {
+        messageId,
+        sessionId: record.session_id,
+        turnIndex: record.turn_index,
+        widgetCount: dashboardData.widgets.length,
+        forceRegenerate: Boolean(forceRegenerate),
+      },
+    }).catch((err) => console.warn('[AuditLog] Failed to log dashboard creation:', err));
 
     return buildShareResponse(request, record, dashboardData);
   } catch (err: any) {
@@ -134,13 +243,27 @@ function buildShareResponse(request: NextRequest, record: any, data: DashboardDa
   }
   origin = origin.replace(/\/+$/, '');
 
-  const publicUrl = `${origin}/dashboard/${record.dashboard_id}`;
-  const directUrl = `/dashboard/${record.dashboard_id}`;
+  const hasSessionAndTurn = Boolean(record.session_id && record.turn_index);
+  let shareToken = '';
+  let dashboardUrl = `${origin}/dashboard/w/${record.session_id || 'default'}/${record.turn_index || 1}`;
+  let shareUrl = `${origin}/dashboard/w/${record.session_id || 'default'}/${record.turn_index || 1}`;
+  let directUrl = `/dashboard/w/${record.session_id || 'default'}/${record.turn_index || 1}`;
+
+  if (hasSessionAndTurn) {
+    shareToken = generateDashboardShareToken(record.session_id, record.turn_index, record.dashboard_id);
+    dashboardUrl = `${origin}/dashboard/w/${record.session_id}/${record.turn_index}`;
+    shareUrl = `${origin}/dashboard/w/${record.session_id}/${record.turn_index}?share=${shareToken}`;
+    directUrl = `/dashboard/w/${record.session_id}/${record.turn_index}`;
+  }
 
   return NextResponse.json({
     success: true,
     dashboardId: record.dashboard_id,
-    dashboardUrl: publicUrl,
+    sessionId: record.session_id || null,
+    turnIndex: record.turn_index || null,
+    dashboardUrl,
+    shareUrl,
+    shareToken,
     directUrl,
     title: data.title,
     widgetCount: data.widgets.length,

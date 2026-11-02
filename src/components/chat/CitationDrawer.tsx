@@ -107,15 +107,7 @@ export default function CitationDrawer({ source, isOpen, onClose }: CitationDraw
             </span>
             {source.classification && (
               <span
-                className={`badge ${
-                  source.classification === 'Publik'
-                    ? 'badge-success'
-                    : source.classification === 'Rahasia'
-                    ? 'badge-warning'
-                    : source.classification === 'Sangat Rahasia'
-                    ? 'badge-danger'
-                    : 'badge-neutral'
-                }`}
+                className="badge badge-neutral"
                 style={{ fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
               >
                 {source.classification === 'Sangat Rahasia' ? <Lock size={10} /> : <Shield size={10} />}
@@ -127,7 +119,7 @@ export default function CitationDrawer({ source, isOpen, onClose }: CitationDraw
                 v{source.version}
               </span>
             )}
-            <span className="badge badge-success">
+            <span className="badge badge-neutral font-mono">
               {language === 'en' ? 'Relevance' : 'Relevansi'}: {similarityPercent}%
             </span>
           </div>

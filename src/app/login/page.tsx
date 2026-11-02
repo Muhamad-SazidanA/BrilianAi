@@ -3,7 +3,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
-import { Loader2, KeyRound } from 'lucide-react';
+import { Loader2, KeyRound, AlertCircle, Clock } from 'lucide-react';
 import { useUserSession } from '@/context/UserSessionContext';
 import { toast } from 'sonner';
 
@@ -16,6 +16,10 @@ function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Forgot Password Warning Modal State (Slim)
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [sessionTimeoutAlert, setSessionTimeoutAlert] = useState(false);
 
   // Lock body scroll cleanly and set light theme
   useEffect(() => {
@@ -85,10 +89,20 @@ function LoginForm() {
     }
   };
 
-  // Handle error query param from Google OAuth redirect
+  const handleOpenForgot = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setShowForgotModal(true);
+  };
+
+  // Handle reason & error query params (OAuth, session timeout)
   useEffect(() => {
+    const reason = searchParams.get('reason');
     const err = searchParams.get('error');
-    if (err) {
+
+    if (reason === 'session_timeout' || err === 'session_timeout') {
+      setSessionTimeoutAlert(true);
+      toast.warning('Sesi Anda habis, silakan login lagi.');
+    } else if (err) {
       if (err === 'google_not_configured') {
         toast.error('Google OAuth belum dikonfigurasi. Silakan isi GOOGLE_CLIENT_ID & GOOGLE_CLIENT_SECRET di file .env.');
       } else if (err === 'google_access_denied') {
@@ -207,6 +221,28 @@ function LoginForm() {
           </h1>
         </div>
 
+        {/* Session Inactivity Timeout Alert Banner */}
+        {sessionTimeoutAlert && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '10px',
+              backgroundColor: '#FFFBEB',
+              border: '1px solid #FDE68A',
+              borderRadius: '8px',
+              padding: '10px 12px',
+              marginBottom: '14px',
+              boxSizing: 'border-box',
+            }}
+          >
+            <Clock size={16} style={{ color: '#D97706', flexShrink: 0, marginTop: '2px' }} />
+            <div style={{ fontSize: '12px', color: '#92400E', lineHeight: 1.45 }}>
+              Sesi Anda habis, silakan login lagi.
+            </div>
+          </div>
+        )}
+
         {/* Login Form */}
         <form onSubmit={handleLoginSubmit} style={{ display: 'flex', flexDirection: 'column' }}>
           {/* Username or email address */}
@@ -260,22 +296,23 @@ function LoginForm() {
               >
                 Password
               </label>
-              <a
-                href="#forgot"
-                onClick={(e) => {
-                  e.preventDefault();
-                  toast.info('Password reset instructions sent to your email.');
-                }}
+              <button
+                type="button"
+                onClick={handleOpenForgot}
                 style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
                   fontSize: '12.5px',
                   fontWeight: 500,
                   color: '#2563EB',
                   textDecoration: 'none',
+                  cursor: 'pointer',
                 }}
                 className="hover:underline"
               >
                 Forgot password?
-              </a>
+              </button>
             </div>
             <input
               id="login-password"
@@ -384,12 +421,9 @@ function LoginForm() {
 
         {/* Passkey Link: Perfectly balanced bottom placement */}
         <div style={{ textAlign: 'center', marginTop: '14px', paddingTop: '12px', borderTop: '1px solid #F1F5F9' }}>
-          <a
-            href="#passkey"
-            onClick={(e) => {
-              e.preventDefault();
-              handlePasskeySignIn();
-            }}
+          <button
+            type="button"
+            onClick={handlePasskeySignIn}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -397,15 +431,102 @@ function LoginForm() {
               fontSize: '13px',
               fontWeight: 500,
               color: '#2563EB',
-              textDecoration: 'none',
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
             }}
             className="hover:underline"
           >
             <KeyRound size={14} />
             <span>Sign in with a passkey</span>
-          </a>
+          </button>
+        </div>
+
+        {/* Enterprise Compliance Assurance */}
+        <div style={{ marginTop: '12px', textAlign: 'center' }}>
+          <p style={{ margin: 0, fontSize: '10px', color: '#94A3B8', letterSpacing: '0.02em', lineHeight: 1.4 }}>
+            Enterprise Zero-Data-Retention • ISO 27001 & UU PDP Compliant
+          </p>
         </div>
       </div>
+
+      {/* ── MODAL: Peringatan Hubungi Administrator (Slim & Minimal) ── */}
+      {showForgotModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.45)',
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem',
+          }}
+          onClick={() => setShowForgotModal(false)}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '340px',
+              backgroundColor: '#FFFFFF',
+              borderRadius: '12px',
+              border: '1px solid #E2E8F0',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)',
+              padding: '1.25rem',
+              boxSizing: 'border-box',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+              <div
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '8px',
+                  backgroundColor: '#FEF3C7',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#D97706',
+                  flexShrink: 0,
+                }}
+              >
+                <AlertCircle size={18} />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#0F172A' }}>
+                Reset Password
+              </h3>
+            </div>
+
+            <p style={{ margin: '0 0 16px', fontSize: '13px', color: '#475569', lineHeight: 1.5 }}>
+              Untuk mengatur ulang kata sandi akun Anda, silakan hubungi <strong>Administrator Workspace</strong>.
+            </p>
+
+            <button
+              type="button"
+              onClick={() => setShowForgotModal(false)}
+              style={{
+                width: '100%',
+                height: '34px',
+                borderRadius: '6px',
+                border: 'none',
+                backgroundColor: '#2563EB',
+                color: '#FFFFFF',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+              className="hover:bg-blue-700"
+            >
+              Mengerti
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

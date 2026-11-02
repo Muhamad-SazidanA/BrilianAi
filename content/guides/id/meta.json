@@ -1,0 +1,19 @@
+{
+  "title": "Panduan Brilian.Ai",
+  "description": "Panduan lengkap penggunaan platform Brilian.Ai Knowledge Base & AI Copilot",
+  "root": true,
+  "pagesIndex": "00-index",
+  "pages": [
+    "00-index",
+    "01-authentication",
+    "02-upload-and-ingestion",
+    "03-knowledge-base",
+    "04-ai-curation",
+    "05-ai-chat",
+    "06-ai-dashboard",
+    "07-user-management",
+    "08-roles-and-permissions",
+    "09-audit-logs"
+  ]
+}
+

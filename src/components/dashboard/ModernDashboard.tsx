@@ -11,6 +11,10 @@ import PersonalDashboardView from './PersonalDashboardView';
 
 export type DashboardTabKey = 'admin' | 'documents' | 'personal';
 
+// In-memory module cache for instant zero-flicker dashboard rendering on navigation
+let cachedDashboardStats: DashboardStats | null = null;
+let lastDashboardSyncTime: string = '';
+
 interface ModernDashboardProps {
   initialStats?: DashboardStats | null;
 }
@@ -19,9 +23,10 @@ export default function ModernDashboard({ initialStats }: ModernDashboardProps) 
   const { language } = useLanguage();
   const { currentUser, hasPermission } = useUserSession();
 
-  const [stats, setStats] = useState<DashboardStats | null>(initialStats || null);
-  const [isLoading, setIsLoading] = useState(!initialStats);
+  const [stats, setStats] = useState<DashboardStats | null>(() => initialStats || cachedDashboardStats);
+  const [isLoading, setIsLoading] = useState(() => !initialStats && !cachedDashboardStats);
   const [syncTime, setSyncTime] = useState<string>(() => {
+    if (lastDashboardSyncTime) return lastDashboardSyncTime;
     const d = new Date();
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   });
@@ -79,15 +84,20 @@ export default function ModernDashboard({ initialStats }: ModernDashboardProps) 
     }
   }, [canViewAdmin, canViewDocuments, activeTab]);
 
-  const fetchStats = useCallback(async () => {
-    setIsLoading(true);
+  const fetchStats = useCallback(async (silent = false) => {
+    if (!silent && !cachedDashboardStats) {
+      setIsLoading(true);
+    }
     try {
       const res = await fetch('/api/stats');
       if (res.ok) {
         const data = await res.json();
+        cachedDashboardStats = data;
         setStats(data);
         const d = new Date();
-        setSyncTime(d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        lastDashboardSyncTime = timeStr;
+        setSyncTime(timeStr);
       }
     } catch (err) {
       console.warn('[ModernDashboard] Failed to fetch stats:', err);
@@ -98,7 +108,7 @@ export default function ModernDashboard({ initialStats }: ModernDashboardProps) 
 
   useEffect(() => {
     if (!initialStats) {
-      fetchStats();
+      fetchStats(Boolean(cachedDashboardStats));
     }
   }, [fetchStats, initialStats]);
 

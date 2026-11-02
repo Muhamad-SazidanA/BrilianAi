@@ -14,16 +14,19 @@ export function middleware(request: NextRequest) {
     return NextResponse.rewrite(shareRewriteUrl);
   }
 
-  // 1. Skip static files, Next.js internal files, auth APIs, public share pages, and images
+  // 1. Skip static files, Next.js internal files, auth APIs, public share pages, images, and documentation
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/images') ||
     pathname.startsWith('/favicon') ||
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/api/public') ||
+    pathname === '/api/chat/suggestions' ||
     pathname.startsWith('/api/dashboard') ||
     pathname.startsWith('/share') ||
-    pathname.startsWith('/dashboard') ||
+    pathname.startsWith('/dashboard/w') ||
+    pathname.startsWith('/docs') ||
+    pathname.startsWith('/api/search') ||
     /\.(.*)$/.test(pathname)
   ) {
     return NextResponse.next();

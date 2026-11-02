@@ -101,6 +101,7 @@ export async function ensureUsersAndRolesTables(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_users_role_id ON users (role_id);
       CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
       CREATE INDEX IF NOT EXISTS idx_users_status ON users (status);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;
     `);
 
     // Seed initial Super Admin and demo RBAC accounts
@@ -152,6 +153,7 @@ export async function ensureUsersAndRolesTables(): Promise<void> {
 
     isUserTableInitialized = true;
   } catch (err) {
+    isUserTableInitialized = true;
     console.warn('[UserStore] ensureUsersAndRolesTables warning:', err);
   }
 }
@@ -274,7 +276,7 @@ export async function getUserById(id: string): Promise<User | null> {
     [id]
   );
 
-  if (res.rows.length === 0) return null;
+  if (!res?.rows || res.rows.length === 0) return null;
   const row = res.rows[0];
 
   return {
@@ -331,7 +333,7 @@ export async function getUserByEmail(email: string): Promise<User | null> {
     [email.trim().toLowerCase()]
   );
 
-  if (res.rows.length === 0) return null;
+  if (!res?.rows || res.rows.length === 0) return null;
   const row = res.rows[0];
 
   return {
@@ -360,6 +362,19 @@ export async function getUserByEmail(email: string): Promise<User | null> {
  * Mengambil satu user berdasarkan Email atau Username (case-insensitive).
  */
 export async function getUserByEmailOrUsername(identifier: string): Promise<User | null> {
+  const authUser = await getUserAuthByEmailOrUsername(identifier);
+  if (!authUser) return null;
+  const { password_hash, ...user } = authUser;
+  return user;
+}
+
+/**
+ * Mengambil satu user berserta password_hash untuk keperluan verifikasi autentikasi.
+ * TIDAK BOLEH diekspos ke frontend.
+ */
+export async function getUserAuthByEmailOrUsername(
+  identifier: string
+): Promise<(User & { password_hash?: string | null }) | null> {
   await ensureUsersAndRolesTables();
   const pool = getPool();
   const cleanId = identifier.trim().toLowerCase();
@@ -367,7 +382,7 @@ export async function getUserByEmailOrUsername(identifier: string): Promise<User
   const res = await pool.query(
     `
     SELECT 
-      u.id, u.name, u.email, u.role_id, u.status, u.department, u.avatar_color,
+      u.id, u.name, u.email, u.password_hash, u.role_id, u.status, u.department, u.avatar_color,
       u.last_login_at, u.created_at, u.updated_at,
       r.name as role_name, r.description as role_desc, r.is_system as role_is_system, r.permissions as role_permissions,
       COALESCE(log_agg.question_count, 0) as question_count
@@ -386,13 +401,14 @@ export async function getUserByEmailOrUsername(identifier: string): Promise<User
     [cleanId]
   );
 
-  if (res.rows.length === 0) return null;
+  if (!res?.rows || res.rows.length === 0) return null;
   const row = res.rows[0];
 
   return {
     id: row.id,
     name: row.name,
     email: row.email,
+    password_hash: row.password_hash || null,
     role_id: row.role_id,
     status: row.status,
     department: row.department,
@@ -412,6 +428,19 @@ export async function getUserByEmailOrUsername(identifier: string): Promise<User
 }
 
 /**
+ * Memperbarui password hash individual seorang user.
+ */
+export async function updateUserPassword(userId: string, passwordHash: string): Promise<boolean> {
+  await ensureUsersAndRolesTables();
+  const pool = getPool();
+  const res = await pool.query(
+    `UPDATE users SET password_hash = $1, updated_at = now() WHERE id = $2 RETURNING id`,
+    [passwordHash, userId]
+  );
+  return (res.rowCount ?? 0) > 0;
+}
+
+/**
  * Membuat akun user baru.
  */
 export async function createUser(data: {
@@ -421,6 +450,7 @@ export async function createUser(data: {
   department?: string;
   status?: string;
   avatar_color?: string;
+  password_hash?: string;
 }): Promise<User> {
   await ensureUsersAndRolesTables();
   const pool = getPool();
@@ -430,8 +460,8 @@ export async function createUser(data: {
 
   const res = await pool.query(
     `
-    INSERT INTO users (name, email, role_id, department, status, avatar_color, last_login_at)
-    VALUES ($1, $2, $3, $4, $5, $6, now())
+    INSERT INTO users (name, email, role_id, department, status, avatar_color, password_hash, last_login_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, now())
     RETURNING *
     `,
     [
@@ -441,6 +471,7 @@ export async function createUser(data: {
       data.department?.trim() || 'General',
       data.status || 'active',
       data.avatar_color || randomColor,
+      data.password_hash || null,
     ]
   );
 
@@ -578,7 +609,7 @@ export async function getRoleById(id: string): Promise<Role | null> {
     [id]
   );
 
-  if (res.rows.length === 0) return null;
+  if (!res?.rows || res.rows.length === 0) return null;
   const row = res.rows[0];
 
   return {

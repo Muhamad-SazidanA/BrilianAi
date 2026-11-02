@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import AppShell from '@/components/layout/AppShell';
 import EnterprisePagination from '@/components/ui/EnterprisePagination';
+import TableEmptyState from '@/components/ui/TableEmptyState';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserSession } from '@/context/UserSessionContext';
 import { toast } from 'sonner';
@@ -395,21 +396,15 @@ export default function KnowledgeGapsPage() {
                 ))}
               </div>
             ) : filteredGaps.length === 0 ? (
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
-                <CheckCircle2 size={20} style={{ margin: '0 auto 6px', color: 'var(--text-muted)', opacity: 0.6 }} />
-                <p style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)', margin: 0 }}>
-                  {statusFilter === 'open'
-                    ? (language === 'en' ? 'No Open Knowledge Gaps' : 'Tidak Ada Kesenjangan Pengetahuan Terbuka')
-                    : (language === 'en' ? 'No Gaps Recorded' : 'Tidak Ada Data Kesenjangan')}
-                </p>
-                <p style={{ fontSize: '11.5px', marginTop: '3px', color: 'var(--text-secondary)' }}>
-                  {statusFilter === 'open'
-                    ? (language === 'en'
-                        ? 'All user questions are addressed or indexed in active knowledge bases.'
-                        : 'Seluruh pertanyaan pengguna saat ini berhasil dijawab atau telah dilengkapi oleh dokumen SOP aktif.')
-                    : (language === 'en' ? 'Try adjusting your search query or filter.' : 'Cobalah gunakan kata kunci pencarian yang berbeda.')}
-                </p>
-              </div>
+              <TableEmptyState
+                icon={FileQuestion}
+                title={searchQuery || statusFilter !== 'all' ? 'Tidak ada kesenjangan yang cocok' : 'Belum ada kesenjangan pengetahuan'}
+                description={
+                  statusFilter === 'open' && !searchQuery
+                    ? 'Seluruh pertanyaan pengguna saat ini berhasil dijawab atau telah terindeks oleh dokumen aktif.'
+                    : 'Coba sesuaikan kata kunci pencarian atau filter status di atas.'
+                }
+              />
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {paginatedGaps.map((gap, idx) => (

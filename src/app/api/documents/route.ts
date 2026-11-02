@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { listBatches, activateAllBatches } from '@lib/db/vectorStore';
 import { getAuthenticatedUser, canUserAccessDocument, hasServerPermission } from '@lib/auth/serverAuth';
 import { listUserGrantedBatchIds } from '@lib/db/documentGrantStore';
+import { recordAuditEvent } from '@/../lib/db/auditLogStore';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,6 +52,20 @@ export async function PATCH(request: NextRequest) {
     const { activateAll } = body;
     if (typeof activateAll === 'boolean') {
       const count = await activateAllBatches(activateAll);
+
+      await recordAuditEvent({
+        eventCategory: 'DOC_MGMT',
+        action: activateAll ? 'document.activate_all' : 'document.deactivate_all',
+        actorId: authUser.id,
+        actorName: authUser.name,
+        actorEmail: authUser.email,
+        actorDepartment: authUser.department,
+        resourceType: 'document',
+        resourceName: `Batch ${activateAll ? 'Activation' : 'Deactivation'}`,
+        status: 'success',
+        details: { affected_count: count },
+      });
+
       return NextResponse.json(
         {
           message: activateAll

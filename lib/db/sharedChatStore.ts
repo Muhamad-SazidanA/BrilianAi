@@ -13,27 +13,35 @@ export interface SharedChatRecord {
   updated_at: string;
 }
 
+let isSharedTableInitialized = false;
+
 /**
  * Pastikan tabel shared_chats dan kolom penanda last_shared_message_id ada di database.
  */
 async function ensureTableExists() {
-  const pool = getPool();
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS shared_chats (
-      share_id VARCHAR(64) PRIMARY KEY,
-      session_id UUID REFERENCES chat_sessions(id) ON DELETE SET NULL,
-      user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-      title VARCHAR(255) NOT NULL DEFAULT 'Percakapan AI',
-      messages JSONB NOT NULL DEFAULT '[]'::jsonb,
-      views_count INTEGER NOT NULL DEFAULT 0,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-    CREATE INDEX IF NOT EXISTS idx_shared_chats_session_id ON shared_chats(session_id);
+  if (isSharedTableInitialized) return;
+  try {
+    const pool = getPool();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS shared_chats (
+        share_id VARCHAR(64) PRIMARY KEY,
+        session_id UUID REFERENCES chat_sessions(id) ON DELETE SET NULL,
+        user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+        title VARCHAR(255) NOT NULL DEFAULT 'Percakapan AI',
+        messages JSONB NOT NULL DEFAULT '[]'::jsonb,
+        views_count INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS idx_shared_chats_session_id ON shared_chats(session_id);
 
-    -- Pastikan kolom last_shared_message_id tersedia di chat_sessions
-    ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS last_shared_message_id VARCHAR(64);
-  `);
+      -- Pastikan kolom last_shared_message_id tersedia di chat_sessions
+      ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS last_shared_message_id VARCHAR(64);
+    `);
+    isSharedTableInitialized = true;
+  } catch {
+    isSharedTableInitialized = true;
+  }
 }
 
 /**

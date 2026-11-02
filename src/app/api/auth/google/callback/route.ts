@@ -3,6 +3,7 @@ import { getUserByEmail, createUser, ensureUsersAndRolesTables } from '@lib/db/u
 import { createSession } from '@lib/db/sessionStore';
 import { getPool } from '@lib/db/dbClient';
 import { getGoogleRedirectUri } from '@lib/auth/googleOAuth';
+import { recordAuditEvent } from '@lib/db/auditLogStore';
 
 export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams;
@@ -153,7 +154,28 @@ export async function GET(req: NextRequest) {
     const ipAddress = forwardedFor ? forwardedFor.split(',')[0].trim() : req.headers.get('x-real-ip') || undefined;
     const sessionToken = await createSession(userId, userAgent, ipAddress);
 
-    // 4. Return HTML client-side transition to store session in localStorage and redirect
+    try {
+      await recordAuditEvent({
+        eventCategory: 'AUTH',
+        action: 'auth.google_login',
+        actorId: userId,
+        actorName: userName,
+        actorEmail: googleEmail,
+        actorDepartment: authenticatedUser?.department || 'Google Account',
+        actorIp: ipAddress,
+        resourceType: 'session',
+        resourceId: sessionToken,
+        resourceName: `${userName} (${googleEmail})`,
+        status: isPending ? 'warning' : 'success',
+        details: {
+          sso_provider: 'google',
+          status: userStatus,
+          user_agent: userAgent,
+        },
+      });
+    } catch (auditErr) {
+      console.warn('[Google OAuth] recordAuditEvent warning:', auditErr);
+    }
     const htmlResponse = `<!DOCTYPE html>
 <html lang="en">
 <head>

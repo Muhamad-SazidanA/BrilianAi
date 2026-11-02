@@ -3,13 +3,14 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Plus, Search, Eye, Pencil, RotateCcw, X, Loader2,
-  CheckCircle2, Clock, ShieldCheck, UserCheck, Trash2, KeyRound, Check,
+  CheckCircle2, Clock, ShieldCheck, UserCheck, Trash2, KeyRound, Check, Users, Copy,
 } from 'lucide-react';
 import { User, Role } from '@/types/user';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserSession } from '@/context/UserSessionContext';
 import { toast } from 'sonner';
 import UserAvatar from '@/components/ui/UserAvatar';
+import TableEmptyState, { TableLoadingState } from '@/components/ui/TableEmptyState';
 
 import EnterprisePagination from '@/components/ui/EnterprisePagination';
 import EnterpriseSelect, { EnterpriseSelectOption } from '@/components/ui/EnterpriseSelect';
@@ -27,15 +28,15 @@ function fmtDate(iso?: string | null) {
 }
 
 const ROLE_COLORS: Record<string, string> = {
-  admin: '#2563eb',
-  member: '#16a34a',
-  viewer: '#9333ea',
-  finance: '#d97706',
-  direktur: '#0891b2',
-  sales: '#db2777',
+  admin: 'var(--color-accent, #2F5DFF)',
+  member: 'var(--color-slate, #6B7078)',
+  viewer: 'var(--color-slate, #6B7078)',
+  finance: 'var(--color-slate, #6B7078)',
+  direktur: 'var(--color-accent, #2F5DFF)',
+  sales: 'var(--color-slate, #6B7078)',
 };
 function roleDot(rid: string) {
-  return ROLE_COLORS[rid.toLowerCase()] ?? '#64748b';
+  return ROLE_COLORS[rid.toLowerCase()] ?? 'var(--color-slate, #6B7078)';
 }
 
 const OL: React.CSSProperties = {
@@ -51,23 +52,23 @@ const OL: React.CSSProperties = {
   padding: '1.25rem',
 };
 
-function BOX(w = 520): React.CSSProperties {
+function BOX(w = 540): React.CSSProperties {
   return {
-    backgroundColor: 'var(--bg-card, #ffffff)',
-    border: '1px solid var(--border-default, #e2e8f0)',
-    borderRadius: '14px',
+    backgroundColor: 'var(--color-paper, #ffffff)',
+    border: '1px solid var(--color-hairline, #e7e7e5)',
+    borderRadius: 'var(--radius-md, 8px)',
     width: '100%',
     maxWidth: `${w}px`,
     padding: '1.5rem',
-    boxShadow: '0 20px 40px rgba(15, 23, 42, 0.16)',
+    boxShadow: 'var(--shadow-float)',
   };
 }
 
 const LBL: React.CSSProperties = {
   display: 'block',
-  fontSize: '12px',
-  fontWeight: 600,
-  color: 'var(--text-primary)',
+  fontSize: '11.5px',
+  fontWeight: 500,
+  color: 'var(--color-slate, #6B7078)',
   marginBottom: '5px',
 };
 
@@ -75,11 +76,11 @@ const INP: React.CSSProperties = {
   width: '100%',
   height: '34px',
   padding: '0 12px',
-  borderRadius: '8px',
-  border: '1px solid var(--border-default, #e2e8f0)',
+  borderRadius: 'var(--radius-sm, 4px)',
+  border: '1px solid var(--color-hairline, #E7E7E5)',
   fontSize: '12.5px',
-  color: 'var(--text-primary)',
-  backgroundColor: 'var(--bg-card, #ffffff)',
+  color: 'var(--color-ink, #14161B)',
+  backgroundColor: 'var(--color-paper, #ffffff)',
   outline: 'none',
   boxSizing: 'border-box',
 };
@@ -87,21 +88,49 @@ const INP: React.CSSProperties = {
 function StatusBadge({ status }: { status: 'active' | 'inactive' | 'pending_approval' }) {
   if (status === 'pending_approval') {
     return (
-      <span className="status-pill-warning" style={{ whiteSpace: 'nowrap' }}>
-        <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: '#f59e0b', flexShrink: 0 }} />
-        Menunggu Approval
+      <span
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '5px',
+          padding: '2px 8px',
+          borderRadius: 'var(--radius-sm, 4px)',
+          fontSize: '11px',
+          fontWeight: 500,
+          backgroundColor: 'var(--color-mist, #F6F6F4)',
+          color: 'var(--color-warning, #B7791F)',
+          border: '1px solid var(--color-hairline, #E7E7E5)',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: 'var(--color-warning, #B7791F)', flexShrink: 0 }} />
+        Menunggu persetujuan
       </span>
     );
   }
   const ok = status === 'active';
   return (
-    <span className={ok ? 'status-pill-success' : 'status-pill-neutral'} style={{ whiteSpace: 'nowrap' }}>
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '5px',
+        padding: '2px 8px',
+        borderRadius: 'var(--radius-sm, 4px)',
+        fontSize: '11px',
+        fontWeight: 500,
+        backgroundColor: 'var(--color-mist, #F6F6F4)',
+        color: 'var(--color-ink, #14161B)',
+        border: '1px solid var(--color-hairline, #E7E7E5)',
+        whiteSpace: 'nowrap',
+      }}
+    >
       <span
         style={{
           width: '5px',
           height: '5px',
           borderRadius: '50%',
-          backgroundColor: ok ? 'var(--color-success, #10b981)' : 'var(--text-muted)',
+          backgroundColor: ok ? 'var(--color-success, #1C8A5D)' : 'var(--color-slate, #6B7078)',
           flexShrink: 0,
         }}
       />
@@ -225,8 +254,57 @@ export default function UsersManagementView() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
   const [approvingUser, setApprovingUser] = useState<User | null>(null);
+  const [resettingUser, setResettingUser] = useState<User | null>(null);
+  const [rCustomPassword, setRCustomPassword] = useState('');
+  const [rIsAutoGenerate, setRIsAutoGenerate] = useState(true);
+  const [rGeneratedPassword, setRGeneratedPassword] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+
+  const openResetModal = (u: User) => {
+    setResettingUser(u);
+    setRCustomPassword('');
+    setRIsAutoGenerate(true);
+    setRGeneratedPassword(null);
+    setIsResetting(false);
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resettingUser) return;
+    if (!rIsAutoGenerate && rCustomPassword.length < 8) {
+      toast.error('Password manual minimal harus 8 karakter.');
+      return;
+    }
+
+    setIsResetting(true);
+    try {
+      const res = await fetch(`/api/users/${resettingUser.id}/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          newPassword: rIsAutoGenerate ? undefined : rCustomPassword,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Gagal mereset password pengguna');
+      }
+
+      if (data.temporaryPassword) {
+        setRGeneratedPassword(data.temporaryPassword);
+        toast.success(`Password sementara untuk ${resettingUser.name} berhasil dibuat.`);
+      } else {
+        toast.success(data.message || `Password untuk ${resettingUser.name} berhasil direset.`);
+        setResettingUser(null);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal mereset password');
+    } finally {
+      setIsResetting(false);
+    }
+  };
 
   // Approve form
   const [aRoleId, setARoleId] = useState('member');
@@ -730,18 +808,21 @@ export default function UsersManagementView() {
 
         {/* ── Table Content ── */}
         <div className="enterprise-table-wrapper">
-          <table style={{ width: '100%', minWidth: '1020px', borderCollapse: 'separate', borderSpacing: 0, fontSize: '12.5px' }}>
+          <table
+            className={isLoading ? 'table-loading' : filtered.length === 0 ? 'table-empty' : ''}
+            style={{ width: '100%', minWidth: '1020px', borderCollapse: 'separate', borderSpacing: 0, fontSize: '12.5px' }}
+          >
             <thead>
               <tr>
                 {[
-                  { label: 'Pengguna', align: 'left', minWidth: '220px' },
+                  { label: language === 'en' ? 'User' : 'Pengguna', align: 'left', minWidth: '220px' },
                   { label: 'Username', align: 'center', minWidth: '120px' },
-                  { label: 'Role Akses', align: 'center', minWidth: '200px' },
-                  { label: 'Departemen', align: 'center', minWidth: '180px' },
-                  { label: 'Pertanyaan AI', align: 'center', minWidth: '110px' },
-                  { label: 'Login Terakhir', align: 'center', minWidth: '130px' },
+                  { label: language === 'en' ? 'Access Role' : 'Role Akses', align: 'center', minWidth: '200px' },
+                  { label: language === 'en' ? 'Department' : 'Departemen', align: 'center', minWidth: '180px' },
+                  { label: language === 'en' ? 'AI Questions' : 'Pertanyaan AI', align: 'center', minWidth: '110px' },
+                  { label: language === 'en' ? 'Last Login' : 'Login Terakhir', align: 'center', minWidth: '130px' },
                   { label: 'Status', align: 'center', minWidth: '100px' },
-                  { label: 'Aksi', align: 'center', minWidth: '140px' },
+                  { label: language === 'en' ? 'Actions' : 'Aksi', align: 'center', minWidth: '140px' },
                 ].map((col) => (
                   <th
                     key={col.label}
@@ -771,22 +852,18 @@ export default function UsersManagementView() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={8} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-secondary)', verticalAlign: 'middle' }}>
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
-                      <Loader2 size={16} className="animate-spin" color="var(--color-primary, #2563eb)" />
-                      <span>Memuat data pengguna...</span>
-                    </div>
+                  <td colSpan={8}>
+                    <TableLoadingState message="Memuat data pengguna..." />
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)', verticalAlign: 'middle' }}>
-                    <p style={{ margin: 0, fontWeight: 600, color: 'var(--text-primary)', fontSize: '13px' }}>
-                      {searchQuery ? 'Tidak ada pengguna yang cocok' : 'Belum ada pengguna'}
-                    </p>
-                    <p style={{ margin: '4px 0 0', fontSize: '11.5px' }}>
-                      Coba sesuaikan kata kunci pencarian atau filter status di atas.
-                    </p>
+                  <td colSpan={8}>
+                    <TableEmptyState
+                      icon={Users}
+                      title={searchQuery ? 'Tidak ada pengguna yang cocok' : 'Belum ada pengguna'}
+                      description="Coba sesuaikan kata kunci pencarian atau filter status di atas."
+                    />
                   </td>
                 </tr>
               ) : (
@@ -956,6 +1033,12 @@ export default function UsersManagementView() {
                             </IBtn>
                           )}
 
+                          {canManage && (
+                            <IBtn title="Reset password" onClick={() => openResetModal(u)}>
+                              <KeyRound size={12} />
+                            </IBtn>
+                          )}
+
                           {canManage && !isSA && (
                             <IBtn title="Revoke sesi aktif" onClick={() => toast.info('Fitur revoke sesi belum tersedia')}>
                               <RotateCcw size={12} />
@@ -1117,16 +1200,16 @@ export default function UsersManagementView() {
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '10px 14px',
-                  borderRadius: '10px',
-                  border: '1px solid var(--border-default, #e2e8f0)',
-                  backgroundColor: 'var(--bg-subtle, #f8fafc)',
+                  borderRadius: 'var(--radius-md, 8px)',
+                  border: '1px solid var(--color-hairline, #E7E7E5)',
+                  backgroundColor: 'var(--color-mist, #F6F6F4)',
                   marginBottom: '1.25rem',
                 }}
               >
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: '12.5px', color: 'var(--text-primary)' }}>Akun Aktif Langsung</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '1px' }}>
-                    User aktif dapat langsung login ke portal KMS.
+                  <div style={{ fontWeight: 600, fontSize: '12.5px', color: 'var(--color-ink, #14161B)' }}>Akun aktif langsung</div>
+                  <div style={{ fontSize: '11px', color: 'var(--color-slate, #6B7078)', marginTop: '1px' }}>
+                    Pengguna aktif dapat langsung login ke portal KMS.
                   </div>
                 </div>
                 <Toggle checked={cActive} onChange={setCActive} />
@@ -1138,14 +1221,14 @@ export default function UsersManagementView() {
                   onClick={() => setShowCreate(false)}
                   style={{
                     height: '28px',
-                    padding: '0 14px',
-                    borderRadius: '9999px',
-                    border: '1px solid var(--border-default, #e2e8f0)',
-                    backgroundColor: 'var(--bg-card, #ffffff)',
+                    padding: '0 12px',
+                    borderRadius: 'var(--radius-sm, 4px)',
+                    border: '1px solid var(--color-hairline, #E7E7E5)',
+                    backgroundColor: 'var(--color-paper, #ffffff)',
                     fontSize: '12px',
                     fontWeight: 500,
                     cursor: 'pointer',
-                    color: 'var(--text-primary)',
+                    color: 'var(--color-ink, #14161B)',
                   }}
                 >
                   Batal
@@ -1162,9 +1245,9 @@ export default function UsersManagementView() {
                     fontSize: '12px',
                     fontWeight: 500,
                     color: '#FFFFFF',
-                    backgroundColor: '#2563EB',
-                    border: '1px solid #1D4ED8',
-                    borderRadius: '9999px',
+                    backgroundColor: 'var(--color-ink, #14161B)',
+                    border: '1px solid var(--color-ink, #14161B)',
+                    borderRadius: 'var(--radius-sm, 4px)',
                     cursor: 'pointer',
                     opacity: isSubmitting ? 0.7 : 1,
                   }}
@@ -1181,50 +1264,60 @@ export default function UsersManagementView() {
       {/* ════ MODAL: Detail User ════ */}
       {detailUser && (
         <div style={OL} onClick={() => setDetailUser(null)}>
-          <div style={{ ...BOX(520), maxHeight: '90vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
+          <div style={{ ...BOX(540), maxHeight: '90vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                  Detail Profil Pengguna
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'var(--color-ink, #14161B)' }}>
+                  Detail profil pengguna
                 </h3>
-                <p style={{ margin: '3px 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                <p style={{ margin: '3px 0 0', fontSize: '12px', color: 'var(--color-slate, #6B7078)' }}>
                   Informasi akun, unit kerja, dan riwayat aktivitas KMS.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setDetailUser(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--color-slate, #6B7078)',
+                  padding: '4px',
+                  borderRadius: 'var(--radius-sm, 4px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
               >
                 <X size={16} />
               </button>
             </div>
 
-            {/* User Profile Card */}
+            {/* User Profile Header Card */}
             <div
               style={{
-                border: '1px solid var(--border-default, #e2e8f0)',
-                borderRadius: '10px',
+                border: '1px solid var(--color-hairline, #E7E7E5)',
+                borderRadius: 'var(--radius-md, 8px)',
                 padding: '12px 14px',
-                marginBottom: '12px',
+                marginBottom: '10px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 gap: '12px',
                 flexWrap: 'wrap',
-                backgroundColor: 'var(--bg-subtle, #f8fafc)',
+                backgroundColor: 'var(--color-mist, #F6F6F4)',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <UserAvatar name={detailUser.name} size={40} />
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text-primary)' }}>
+                    <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--color-ink, #14161B)' }}>
                       {detailUser.name}
                     </span>
                     <StatusBadge status={detailUser.status} />
                   </div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--color-slate, #6B7078)', marginTop: '2px', fontFamily: 'var(--font-mono)' }}>
                     {detailUser.email}
                   </div>
                 </div>
@@ -1236,17 +1329,17 @@ export default function UsersManagementView() {
                     type="button"
                     onClick={() => openEdit(detailUser)}
                     style={{
-                      height: '26px',
+                      height: '28px',
                       padding: '0 10px',
-                      borderRadius: '9999px',
-                      border: '1px solid var(--border-default, #e2e8f0)',
-                      backgroundColor: 'var(--bg-card, #ffffff)',
-                      fontSize: '11.5px',
+                      borderRadius: 'var(--radius-sm, 4px)',
+                      border: '1px solid var(--color-hairline, #E7E7E5)',
+                      backgroundColor: 'var(--color-paper, #ffffff)',
+                      fontSize: '12px',
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '4px',
-                      color: 'var(--text-primary)',
+                      color: 'var(--color-ink, #14161B)',
                       fontWeight: 500,
                     }}
                   >
@@ -1259,14 +1352,14 @@ export default function UsersManagementView() {
                     type="button"
                     onClick={() => toggleStatus(detailUser)}
                     style={{
-                      height: '26px',
+                      height: '28px',
                       padding: '0 10px',
-                      borderRadius: '9999px',
-                      border: '1px solid var(--border-default, #e2e8f0)',
-                      backgroundColor: 'var(--bg-card, #ffffff)',
-                      fontSize: '11.5px',
+                      borderRadius: 'var(--radius-sm, 4px)',
+                      border: '1px solid var(--color-hairline, #E7E7E5)',
+                      backgroundColor: 'var(--color-paper, #ffffff)',
+                      fontSize: '12px',
                       cursor: 'pointer',
-                      color: 'var(--text-primary)',
+                      color: detailUser.status === 'active' ? 'var(--color-slate, #6B7078)' : 'var(--color-accent, #2F5DFF)',
                       fontWeight: 500,
                     }}
                   >
@@ -1276,82 +1369,92 @@ export default function UsersManagementView() {
               </div>
             </div>
 
-            {/* Metrics grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '8px' }}>
-              {[
-                { l: 'DEPARTEMEN', v: detailUser.department || '—' },
-                { l: 'PERTANYAAN AI', v: String(detailUser.question_count ?? 0) },
-                { l: 'ROLE', v: detailUser.role?.name || detailUser.role_id },
-                { l: 'STATUS', v: detailUser.status === 'active' ? 'Aktif' : 'Nonaktif' },
-              ].map(({ l, v }) => (
-                <div
-                  key={l}
-                  style={{
-                    border: '1px solid var(--border-default, #e2e8f0)',
-                    borderRadius: '8px',
-                    padding: '8px 10px',
-                    backgroundColor: 'var(--bg-card, #ffffff)',
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: '9.5px',
-                      fontWeight: 700,
-                      color: 'var(--text-muted)',
-                      letterSpacing: '0.05em',
-                      textTransform: 'uppercase',
-                      marginBottom: '3px',
-                    }}
-                  >
-                    {l}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: '12.5px',
-                      fontWeight: 600,
-                      color: 'var(--text-primary)',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                    }}
-                  >
-                    {v}
-                  </div>
+            {/* Account & Role Details (Spacious 2-column key-value grid) */}
+            <div
+              style={{
+                border: '1px solid var(--color-hairline, #E7E7E5)',
+                borderRadius: 'var(--radius-md, 8px)',
+                backgroundColor: 'var(--color-paper, #ffffff)',
+                padding: '14px 16px',
+                marginBottom: '10px',
+              }}
+            >
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px 20px' }}>
+                <div>
+                  <span style={{ display: 'block', fontSize: '11px', fontWeight: 500, color: 'var(--color-slate, #6B7078)', marginBottom: '3px' }}>
+                    Departemen
+                  </span>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-ink, #14161B)' }}>
+                    {detailUser.department || '—'}
+                  </span>
                 </div>
-              ))}
+
+                <div>
+                  <span style={{ display: 'block', fontSize: '11px', fontWeight: 500, color: 'var(--color-slate, #6B7078)', marginBottom: '3px' }}>
+                    Peran / Role
+                  </span>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-ink, #14161B)' }}>
+                    {detailUser.role?.name || detailUser.role_id}
+                  </span>
+                </div>
+
+                <div>
+                  <span style={{ display: 'block', fontSize: '11px', fontWeight: 500, color: 'var(--color-slate, #6B7078)', marginBottom: '3px' }}>
+                    Pertanyaan AI
+                  </span>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-ink, #14161B)', fontFamily: 'var(--font-mono)' }}>
+                    {detailUser.question_count ?? 0} <span style={{ fontSize: '11px', fontWeight: 400, color: 'var(--color-slate, #6B7078)' }}>kueri</span>
+                  </span>
+                </div>
+
+                <div>
+                  <span style={{ display: 'block', fontSize: '11px', fontWeight: 500, color: 'var(--color-slate, #6B7078)', marginBottom: '3px' }}>
+                    Akses dokumen
+                  </span>
+                  <span style={{ fontSize: '12px', color: 'var(--color-slate, #6B7078)' }}>
+                    {detailUser.role?.allowed_classifications?.join(', ') || 'Publik, Internal'}
+                  </span>
+                </div>
+              </div>
             </div>
 
-            {/* Timestamps */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '12px' }}>
-              {[
-                { l: 'LOGIN TERAKHIR', v: fmtDate(detailUser.last_login_at) },
-                { l: 'TANGGAL DIBUAT', v: fmtDate(detailUser.created_at) },
-                { l: 'TERAKHIR UPDATE', v: fmtDate(detailUser.updated_at) },
-              ].map(({ l, v }) => (
-                <div
-                  key={l}
-                  style={{
-                    border: '1px solid var(--border-default, #e2e8f0)',
-                    borderRadius: '8px',
-                    padding: '8px 10px',
-                    backgroundColor: 'var(--bg-card, #ffffff)',
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: '9.5px',
-                      fontWeight: 700,
-                      color: 'var(--text-muted)',
-                      letterSpacing: '0.05em',
-                      textTransform: 'uppercase',
-                      marginBottom: '3px',
-                    }}
-                  >
-                    {l}
-                  </div>
-                  <div style={{ fontSize: '11.5px', color: 'var(--text-primary)' }}>{v}</div>
+            {/* Timestamps (3 Columns, clean monospace dates) */}
+            <div
+              style={{
+                border: '1px solid var(--color-hairline, #E7E7E5)',
+                borderRadius: 'var(--radius-md, 8px)',
+                backgroundColor: 'var(--color-mist, #F6F6F4)',
+                padding: '12px 14px',
+              }}
+            >
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                <div>
+                  <span style={{ display: 'block', fontSize: '10.5px', fontWeight: 500, color: 'var(--color-slate, #6B7078)', marginBottom: '2px' }}>
+                    Login terakhir
+                  </span>
+                  <span style={{ fontSize: '11.5px', fontWeight: 500, color: 'var(--color-ink, #14161B)', fontFamily: 'var(--font-mono)' }}>
+                    {fmtDate(detailUser.last_login_at)}
+                  </span>
                 </div>
-              ))}
+
+                <div>
+                  <span style={{ display: 'block', fontSize: '10.5px', fontWeight: 500, color: 'var(--color-slate, #6B7078)', marginBottom: '2px' }}>
+                    Tanggal dibuat
+                  </span>
+                  <span style={{ fontSize: '11.5px', fontWeight: 500, color: 'var(--color-ink, #14161B)', fontFamily: 'var(--font-mono)' }}>
+                    {fmtDate(detailUser.created_at)}
+                  </span>
+                </div>
+
+                <div>
+                  <span style={{ display: 'block', fontSize: '10.5px', fontWeight: 500, color: 'var(--color-slate, #6B7078)', marginBottom: '2px' }}>
+                    Terakhir diperbarui
+                  </span>
+                  <span style={{ fontSize: '11.5px', fontWeight: 500, color: 'var(--color-ink, #14161B)', fontFamily: 'var(--font-mono)' }}>
+                    {fmtDate(detailUser.updated_at)}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1410,7 +1513,7 @@ export default function UsersManagementView() {
                     <button
                       type="button"
                       onClick={() => setECustomDept(!eCustomDept)}
-                      style={{ fontSize: '11px', color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                      style={{ fontSize: '11px', color: 'var(--color-accent, #2F5DFF)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
                     >
                       {eCustomDept ? 'Pilih dari List' : '+ Tambah Baru'}
                     </button>
@@ -1463,14 +1566,14 @@ export default function UsersManagementView() {
                   onClick={() => setEditingUser(null)}
                   style={{
                     height: '28px',
-                    padding: '0 14px',
-                    borderRadius: '9999px',
-                    border: '1px solid var(--border-default, #e2e8f0)',
-                    backgroundColor: 'var(--bg-card, #ffffff)',
+                    padding: '0 12px',
+                    borderRadius: 'var(--radius-sm, 4px)',
+                    border: '1px solid var(--color-hairline, #E7E7E5)',
+                    backgroundColor: 'var(--color-paper, #ffffff)',
                     fontSize: '12px',
                     fontWeight: 500,
                     cursor: 'pointer',
-                    color: 'var(--text-primary)',
+                    color: 'var(--color-ink, #14161B)',
                   }}
                 >
                   Batal
@@ -1487,9 +1590,9 @@ export default function UsersManagementView() {
                     fontSize: '12px',
                     fontWeight: 500,
                     color: '#FFFFFF',
-                    backgroundColor: '#2563EB',
-                    border: '1px solid #1D4ED8',
-                    borderRadius: '9999px',
+                    backgroundColor: 'var(--color-ink, #14161B)',
+                    border: '1px solid var(--color-ink, #14161B)',
+                    borderRadius: 'var(--radius-sm, 4px)',
                     cursor: 'pointer',
                     opacity: isSubmitting ? 0.7 : 1,
                   }}
@@ -1511,31 +1614,32 @@ export default function UsersManagementView() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div
                   style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '50%',
-                    backgroundColor: '#eff6ff',
-                    color: '#2563eb',
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: 'var(--radius-sm, 4px)',
+                    backgroundColor: 'var(--color-mist, #F6F6F4)',
+                    border: '1px solid var(--color-hairline, #E7E7E5)',
+                    color: 'var(--color-ink, #14161B)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <UserCheck size={18} />
+                  <UserCheck size={16} />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    Persetujuan Akun Google
+                  <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: 'var(--color-ink, #14161B)' }}>
+                    Persetujuan akun Google
                   </h3>
-                  <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>
-                    Verifikasi identitas dan tentukan hak akses (Role) pengguna.
+                  <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--color-slate, #6B7078)' }}>
+                    Verifikasi identitas dan tentukan peranan (role) pengguna.
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setApprovingUser(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-slate, #6B7078)' }}
               >
                 <X size={16} />
               </button>
@@ -1544,9 +1648,9 @@ export default function UsersManagementView() {
             {/* Profile Summary */}
             <div
               style={{
-                backgroundColor: 'var(--bg-subtle, #f8fafc)',
-                border: '1px solid var(--border-default, #e2e8f0)',
-                borderRadius: '10px',
+                backgroundColor: 'var(--color-mist, #F6F6F4)',
+                border: '1px solid var(--color-hairline, #E7E7E5)',
+                borderRadius: 'var(--radius-md, 8px)',
                 padding: '12px 14px',
                 marginBottom: '1.25rem',
                 display: 'flex',
@@ -1556,21 +1660,21 @@ export default function UsersManagementView() {
             >
               <UserAvatar name={approvingUser.name} size={38} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--text-primary)' }}>
+                <div style={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--color-ink, #14161B)' }}>
                   {approvingUser.name}
                 </div>
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{approvingUser.email}</div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--color-slate, #6B7078)', fontFamily: 'var(--font-mono)' }}>{approvingUser.email}</div>
+                <div style={{ fontSize: '11px', color: 'var(--color-slate, #6B7078)', marginTop: '2px' }}>
                   Mendaftar via Google SSO • {fmtDate(approvingUser.created_at)}
                 </div>
               </div>
-              <span className="status-pill-warning">Pending</span>
+              <span className="badge-neutral">Menunggu persetujuan</span>
             </div>
 
             <form onSubmit={handleApprove}>
               <div style={{ marginBottom: '1rem' }}>
                 <label style={LBL}>
-                  Pilih Role Akses (RBAC) <span style={{ color: '#dc2626' }}>*</span>
+                  Pilih Role Akses (RBAC) *
                 </label>
                 <EnterpriseSelect
                   value={aRoleId}
@@ -1579,7 +1683,7 @@ export default function UsersManagementView() {
                   size="sm"
                   width="100%"
                 />
-                <p style={{ margin: '4px 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>
+                <p style={{ margin: '4px 0 0', fontSize: '11px', color: 'var(--color-slate, #6B7078)' }}>
                   Hak akses menu dokumen, kurasi AI, chatbot, dan administrasi akan mengikuti role ini.
                 </p>
               </div>
@@ -1587,12 +1691,12 @@ export default function UsersManagementView() {
               <div style={{ marginBottom: '1.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
                   <label style={{ ...LBL, marginBottom: 0 }}>
-                    Departemen / Divisi <span style={{ color: '#dc2626' }}>*</span>
+                    Departemen / Divisi *
                   </label>
                   <button
                     type="button"
                     onClick={() => setACustomDept(!aCustomDept)}
-                    style={{ fontSize: '11px', color: '#2563eb', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                    style={{ fontSize: '11px', color: 'var(--color-accent, #2F5DFF)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
                   >
                     {aCustomDept ? 'Pilih dari List' : '+ Tambah Baru'}
                   </button>
@@ -1628,12 +1732,12 @@ export default function UsersManagementView() {
                   style={{
                     height: '28px',
                     padding: '0 12px',
-                    borderRadius: '9999px',
-                    border: '1px solid #fecaca',
-                    backgroundColor: '#fef2f2',
-                    color: '#dc2626',
+                    borderRadius: 'var(--radius-sm, 4px)',
+                    border: '1px solid var(--color-hairline, #E7E7E5)',
+                    backgroundColor: 'var(--color-paper, #ffffff)',
+                    color: 'var(--color-danger, #C53030)',
                     fontSize: '11.5px',
-                    fontWeight: 600,
+                    fontWeight: 500,
                     cursor: 'pointer',
                   }}
                 >
@@ -1646,14 +1750,14 @@ export default function UsersManagementView() {
                     onClick={() => setApprovingUser(null)}
                     style={{
                       height: '28px',
-                      padding: '0 14px',
-                      borderRadius: '9999px',
-                      border: '1px solid var(--border-default, #e2e8f0)',
-                      backgroundColor: 'var(--bg-card, #ffffff)',
+                      padding: '0 12px',
+                      borderRadius: 'var(--radius-sm, 4px)',
+                      border: '1px solid var(--color-hairline, #E7E7E5)',
+                      backgroundColor: 'var(--color-paper, #ffffff)',
                       fontSize: '12px',
                       fontWeight: 500,
                       cursor: 'pointer',
-                      color: 'var(--text-primary)',
+                      color: 'var(--color-ink, #14161B)',
                     }}
                   >
                     Batal
@@ -1666,15 +1770,14 @@ export default function UsersManagementView() {
                       alignItems: 'center',
                       gap: '6px',
                       height: '28px',
-                      padding: '0 16px',
+                      padding: '0 14px',
                       fontSize: '12px',
                       fontWeight: 500,
                       color: '#FFFFFF',
-                      backgroundColor: '#2563EB',
-                      border: '1px solid #1D4ED8',
-                      borderRadius: '9999px',
+                      backgroundColor: 'var(--color-ink, #14161B)',
+                      border: '1px solid var(--color-ink, #14161B)',
+                      borderRadius: 'var(--radius-sm, 4px)',
                       cursor: 'pointer',
-                      boxShadow: '0 1px 2px rgba(37,99,235,0.2)',
                       opacity: isApproving ? 0.7 : 1,
                     }}
                   >
@@ -1692,10 +1795,10 @@ export default function UsersManagementView() {
       {deletingUser && (
         <div style={OL} onClick={() => setDeletingUser(null)}>
           <div style={BOX(420)} onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ margin: '0 0 8px', fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>
-              Hapus Akun Pengguna?
+            <h3 style={{ margin: '0 0 8px', fontSize: '15px', fontWeight: 600, color: 'var(--color-ink, #14161B)' }}>
+              Hapus akun pengguna?
             </h3>
-            <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: '0 0 1.25rem', lineHeight: 1.5 }}>
+            <p style={{ fontSize: '12.5px', color: 'var(--color-slate, #6B7078)', margin: '0 0 1.25rem', lineHeight: 1.5 }}>
               Apakah Anda yakin ingin menghapus akun <strong>&quot;{deletingUser.name}&quot;</strong> ({deletingUser.email})?
               Tindakan ini tidak dapat dibatalkan.
             </p>
@@ -1705,14 +1808,14 @@ export default function UsersManagementView() {
                 onClick={() => setDeletingUser(null)}
                 style={{
                   height: '28px',
-                  padding: '0 14px',
-                  borderRadius: '9999px',
-                  border: '1px solid var(--border-default, #e2e8f0)',
-                  backgroundColor: 'var(--bg-card, #ffffff)',
+                  padding: '0 12px',
+                  borderRadius: 'var(--radius-sm, 4px)',
+                  border: '1px solid var(--color-hairline, #E7E7E5)',
+                  backgroundColor: 'var(--color-paper, #ffffff)',
                   fontSize: '12px',
                   fontWeight: 500,
                   cursor: 'pointer',
-                  color: 'var(--text-primary)',
+                  color: 'var(--color-ink, #14161B)',
                 }}
               >
                 Batal
@@ -1724,12 +1827,12 @@ export default function UsersManagementView() {
                 style={{
                   height: '28px',
                   padding: '0 14px',
-                  borderRadius: '9999px',
-                  border: 'none',
-                  backgroundColor: '#dc2626',
+                  borderRadius: 'var(--radius-sm, 4px)',
+                  border: '1px solid var(--color-danger, #C53030)',
+                  backgroundColor: 'var(--color-danger, #C53030)',
                   color: '#ffffff',
                   fontSize: '12px',
-                  fontWeight: 600,
+                  fontWeight: 500,
                   cursor: 'pointer',
                   opacity: isSubmitting ? 0.7 : 1,
                 }}
@@ -1737,6 +1840,207 @@ export default function UsersManagementView() {
                 {isSubmitting ? <Loader2 size={13} className="animate-spin" /> : 'Hapus Pengguna'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════ MODAL: Reset Password ════ */}
+      {resettingUser && (
+        <div style={OL} onClick={() => setResettingUser(null)}>
+          <div style={BOX(480)} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: 'var(--radius-sm, 4px)',
+                    backgroundColor: 'var(--color-mist, #F6F6F4)',
+                    border: '1px solid var(--color-hairline, #E7E7E5)',
+                    color: 'var(--color-accent, #2F5DFF)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <KeyRound size={16} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: 'var(--color-ink, #14161B)' }}>
+                    Reset Password Pengguna
+                  </h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--color-slate, #6B7078)' }}>
+                    {resettingUser.name} ({resettingUser.email})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setResettingUser(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-slate, #6B7078)' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {rGeneratedPassword ? (
+              <div>
+                <div
+                  style={{
+                    backgroundColor: 'var(--color-mist, #F6F6F4)',
+                    border: '1px solid var(--color-hairline, #E7E7E5)',
+                    borderRadius: 'var(--radius-md, 8px)',
+                    padding: '16px',
+                    marginBottom: '1.25rem',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div style={{ fontSize: '12px', color: 'var(--color-slate, #6B7078)', marginBottom: '8px' }}>
+                    Password baru berhasil dibuat. Salin dan berikan kredensial ini ke pengguna:
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      backgroundColor: '#FFFFFF',
+                      border: '1px solid var(--color-hairline, #E7E7E5)',
+                      borderRadius: 'var(--radius-sm, 4px)',
+                      padding: '8px 12px',
+                      fontFamily: 'monospace',
+                      fontSize: '15px',
+                      fontWeight: 700,
+                      color: 'var(--color-ink, #14161B)',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    <span>{rGeneratedPassword}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(rGeneratedPassword);
+                        toast.success('Password sementara disalin ke clipboard!');
+                      }}
+                      title="Salin ke clipboard"
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: 'var(--color-accent, #2F5DFF)',
+                        padding: '2px 6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Copy size={14} />
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    onClick={() => setResettingUser(null)}
+                    style={{
+                      height: '28px',
+                      padding: '0 16px',
+                      borderRadius: 'var(--radius-sm, 4px)',
+                      border: '1px solid var(--color-ink, #14161B)',
+                      backgroundColor: 'var(--color-ink, #14161B)',
+                      color: '#ffffff',
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Selesai
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleResetPassword}>
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      checked={rIsAutoGenerate}
+                      onChange={() => setRIsAutoGenerate(true)}
+                    />
+                    <span style={{ fontSize: '12.5px', color: 'var(--color-ink, #14161B)', fontWeight: 500 }}>
+                      Generate Password Sementara Otomatis (Rekomendasi)
+                    </span>
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      checked={!rIsAutoGenerate}
+                      onChange={() => setRIsAutoGenerate(false)}
+                    />
+                    <span style={{ fontSize: '12.5px', color: 'var(--color-ink, #14161B)', fontWeight: 500 }}>
+                      Tentukan Password Baru Manual
+                    </span>
+                  </label>
+
+                  {!rIsAutoGenerate && (
+                    <div style={{ marginTop: '10px', paddingLeft: '22px' }}>
+                      <label style={LBL}>Password Baru (min. 8 karakter) *</label>
+                      <input
+                        type="text"
+                        value={rCustomPassword}
+                        onChange={(e) => setRCustomPassword(e.target.value)}
+                        placeholder="Ketik password baru..."
+                        required={!rIsAutoGenerate}
+                        style={INP}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setResettingUser(null)}
+                    style={{
+                      height: '28px',
+                      padding: '0 12px',
+                      borderRadius: 'var(--radius-sm, 4px)',
+                      border: '1px solid var(--color-hairline, #E7E7E5)',
+                      backgroundColor: 'var(--color-paper, #ffffff)',
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      color: 'var(--color-ink, #14161B)',
+                    }}
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isResetting || (!rIsAutoGenerate && rCustomPassword.length < 8)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      height: '28px',
+                      padding: '0 14px',
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      color: '#FFFFFF',
+                      backgroundColor: 'var(--color-ink, #14161B)',
+                      border: '1px solid var(--color-ink, #14161B)',
+                      borderRadius: 'var(--radius-sm, 4px)',
+                      cursor: 'pointer',
+                      opacity: isResetting || (!rIsAutoGenerate && rCustomPassword.length < 8) ? 0.7 : 1,
+                    }}
+                  >
+                    {isResetting ? <Loader2 size={13} className="animate-spin" /> : <KeyRound size={13} />}
+                    Reset Password
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

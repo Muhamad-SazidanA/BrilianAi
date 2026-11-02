@@ -1,7 +1,6 @@
 import { getPool } from './dbClient';
 import { ChatSession, ChatMessage } from '@/types/chat';
 import { generateSessionTitle } from '@lib/chat/sessionTitleHelper';
-import { ensureCompleteDatabaseSchema } from './autoMigration';
 
 function rowToSession(row: Record<string, any>): ChatSession {
   let parsedMessages: ChatMessage[] = [];
@@ -41,7 +40,6 @@ export async function createChatSession(
   messages: ChatMessage[],
   title: string = generateSessionTitle(messages.find((message) => message.sender === 'user')?.text || 'Chat Baru')
 ): Promise<ChatSession> {
-  await ensureCompleteDatabaseSchema().catch(() => {});
   const pool = getPool();
   const res = await pool.query(
     `INSERT INTO chat_sessions (user_id, title, messages) VALUES ($1, $2, $3::jsonb) RETURNING *`,
@@ -59,7 +57,6 @@ export async function getChatSession(
   isAdmin: boolean = false
 ): Promise<ChatSession | null> {
   if (!isUuid(sessionId)) return null;
-  await ensureCompleteDatabaseSchema().catch(() => {});
   const pool = getPool();
 
   let res;
@@ -88,7 +85,6 @@ export async function listUserChatSessions(
   isAdmin: boolean = false
 ): Promise<ChatSession[]> {
   if (!isAdmin && !isUuid(userId)) return [];
-  await ensureCompleteDatabaseSchema().catch(() => {});
   const pool = getPool();
 
   let res;
@@ -130,7 +126,6 @@ export async function updateChatSession(
   isAdmin: boolean = false
 ): Promise<ChatSession | null> {
   if (!isUuid(sessionId)) return null;
-  await ensureCompleteDatabaseSchema().catch(() => {});
   const pool = getPool();
 
   const setClauses: string[] = ['updated_at = now()'];
@@ -176,7 +171,6 @@ export async function deleteChatSession(
   isAdmin: boolean = false
 ): Promise<boolean> {
   if (!isUuid(sessionId)) return false;
-  await ensureCompleteDatabaseSchema().catch(() => {});
   const pool = getPool();
   let res;
   if (isAdmin) {

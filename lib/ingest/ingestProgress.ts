@@ -30,6 +30,19 @@ export interface IngestProgressState {
 }
 
 const ingestProgressMap = new Map<string, IngestProgressState>();
+const PROGRESS_TTL_MS = 30 * 60 * 1000; // 30 menit TTL untuk entri yang ditinggalkan
+
+// Pembersihan berkala setiap 5 menit agar memori tetap bersih
+if (typeof setInterval !== 'undefined') {
+  setInterval(() => {
+    const now = Date.now();
+    ingestProgressMap.forEach((state, key) => {
+      if (now - state.updatedAt > PROGRESS_TTL_MS) {
+        ingestProgressMap.delete(key);
+      }
+    });
+  }, 5 * 60 * 1000).unref?.();
+}
 
 export function setIngestProgress(clientId: string, progress: Omit<IngestProgressState, 'updatedAt'>): IngestProgressState {
   const existing = ingestProgressMap.get(clientId);
@@ -44,9 +57,19 @@ export function setIngestProgress(clientId: string, progress: Omit<IngestProgres
 }
 
 export function getIngestProgress(clientId: string): IngestProgressState | null {
-  return ingestProgressMap.get(clientId) ?? null;
+  const state = ingestProgressMap.get(clientId);
+  if (!state) return null;
+
+  // Jika entri sudah melebihi TTL, bersihkan
+  if (Date.now() - state.updatedAt > PROGRESS_TTL_MS) {
+    ingestProgressMap.delete(clientId);
+    return null;
+  }
+
+  return state;
 }
 
 export function clearIngestProgress(clientId: string): void {
   ingestProgressMap.delete(clientId);
 }
+

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserById, updateUser, deleteUser } from '@/../lib/db/userStore';
 import { getAuthenticatedUser, hasServerPermission } from '@lib/auth/serverAuth';
+import { recordAuditEvent } from '@/../lib/db/auditLogStore';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,6 +65,23 @@ export async function PATCH(
     if (!updated) {
       return NextResponse.json({ error: 'Pengguna tidak ditemukan' }, { status: 404 });
     }
+
+    try {
+      await recordAuditEvent({
+        eventCategory: 'USER_MGMT',
+        action: body.status === 'active' && updated.status === 'active' ? 'user.approve' : 'user.update',
+        actorId: authUser.id,
+        actorName: authUser.name,
+        actorEmail: authUser.email,
+        actorDepartment: authUser.department,
+        resourceType: 'user',
+        resourceId: updated.id,
+        resourceName: `${updated.name} (${updated.email})`,
+        status: 'success',
+        details: { updates: body },
+      });
+    } catch {}
+
     return NextResponse.json({ user: updated });
   } catch (err: any) {
     console.error('[API User PATCH] Error:', err);
@@ -97,10 +115,27 @@ export async function DELETE(
       );
     }
 
+    const targetUser = await getUserById(params.id).catch(() => null);
     const success = await deleteUser(params.id);
     if (!success) {
       return NextResponse.json({ error: 'Pengguna tidak ditemukan' }, { status: 404 });
     }
+
+    try {
+      await recordAuditEvent({
+        eventCategory: 'USER_MGMT',
+        action: 'user.delete',
+        actorId: authUser.id,
+        actorName: authUser.name,
+        actorEmail: authUser.email,
+        actorDepartment: authUser.department,
+        resourceType: 'user',
+        resourceId: params.id,
+        resourceName: targetUser ? `${targetUser.name} (${targetUser.email})` : `User ${params.id}`,
+        status: 'success',
+      });
+    } catch {}
+
     return NextResponse.json({ success: true, message: 'Pengguna berhasil dihapus' });
   } catch (err: any) {
     console.error('[API User DELETE] Error:', err);

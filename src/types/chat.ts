@@ -43,6 +43,7 @@ export interface ChatRequestPayload {
     department?: string;
   };
   sessionId?: string;
+  history?: Array<{ role: 'user' | 'assistant'; content: string }>;
 }
 
 export interface ChatResponsePayload {

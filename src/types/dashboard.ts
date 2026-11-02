@@ -147,6 +147,7 @@ export interface DashboardRecord {
   dashboard_id: string;
   message_id: string;
   session_id?: string | null;
+  turn_index?: number | null;
   user_id?: string | null;
   title: string;
   data: DashboardData;

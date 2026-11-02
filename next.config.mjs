@@ -1,18 +1,23 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
+import { createMDX } from 'fumadocs-mdx/next';
 
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const withMDX = createMDX();
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
+  swcMinify: true,
 
   // Next.js 14.x: server-only native/WASM packages → stays in experimental
   experimental: {
     serverComponentsExternalPackages: ['mupdf', 'pg', 'mysql2', 'bullmq', 'undici'],
+    optimizePackageImports: ['lucide-react', 'sonner'],
     outputFileTracingIncludes: {
       '/api/documents/upload': ['./node_modules/mupdf/**'],
       '/api/documents/[id]/curate': ['./node_modules/mupdf/**'],
@@ -92,4 +97,4 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+export default withMDX(nextConfig);

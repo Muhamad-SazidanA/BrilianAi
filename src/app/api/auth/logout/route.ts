@@ -1,16 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revokeSession } from '@lib/db/sessionStore';
+import { getAuthenticatedUser } from '@lib/auth/serverAuth';
+import { recordAuditEvent } from '@lib/db/auditLogStore';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   const sessionToken = req.cookies.get('brilian_session_token')?.value;
+  const authUser = await getAuthenticatedUser(req).catch(() => null);
+
   if (sessionToken) {
     try {
       await revokeSession(sessionToken);
     } catch {
       // silent fallback
     }
+  }
+
+  if (authUser) {
+    try {
+      await recordAuditEvent({
+        eventCategory: 'AUTH',
+        action: 'auth.logout',
+        actorId: authUser.id,
+        actorName: authUser.name,
+        actorEmail: authUser.email,
+        actorDepartment: authUser.department,
+        resourceType: 'session',
+        resourceId: sessionToken || authUser.id,
+        resourceName: `${authUser.name} (${authUser.email})`,
+        status: 'success',
+      });
+    } catch {}
   }
 
   const response = NextResponse.json({

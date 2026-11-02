@@ -18,7 +18,11 @@ import {
   Cpu,
   Database,
   HelpCircle,
-  Users,
+  KeyRound,
+  Eye,
+  EyeOff,
+  Lock,
+  Loader2,
 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserSession } from '@/context/UserSessionContext';
@@ -43,14 +47,60 @@ export default function NavUser({
   isCollapsed = false,
 }: NavUserProps) {
   const { language, setLanguage, t } = useLanguage();
-  const { currentUser, allUsers, switchUser, logout } = useUserSession();
+  const { currentUser, logout } = useUserSession();
   const [isOpen, setIsOpen] = useState(false);
   const [showPreferencesSubmenu, setShowPreferencesSubmenu] = useState(false);
-  const [showSwitchUserSubmenu, setShowSwitchUserSubmenu] = useState(false);
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>('light');
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const [showHelpModal, setShowHelpModal] = useState(false);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPass, setShowCurrentPass] = useState(false);
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+
+  const resetPasswordForm = () => {
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setShowCurrentPass(false);
+    setShowNewPass(false);
+    setIsChangingPassword(false);
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassword || newPassword.length < 8) {
+      toast.error(language === 'en' ? 'New password must be at least 8 characters long.' : 'Password baru minimal harus 8 karakter.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error(language === 'en' ? 'New password and confirmation do not match.' : 'Konfirmasi password baru tidak cocok.');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword, confirmPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Gagal mengubah password');
+      }
+      toast.success(t('user.password_changed_success'));
+      setShowChangePasswordModal(false);
+      resetPasswordForm();
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal mengubah password');
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
 
   const activeName = currentUser?.name || user.name;
   const activeEmail = currentUser?.email || user.email;
@@ -121,7 +171,6 @@ export default function NavUser({
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
         setShowPreferencesSubmenu(false);
-        setShowSwitchUserSubmenu(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -144,7 +193,6 @@ export default function NavUser({
           setIsFlyoutHovered(false);
           setIsOpen(!isOpen);
           setShowPreferencesSubmenu(false);
-          setShowSwitchUserSubmenu(false);
         }}
         onMouseEnter={showUserFlyout}
         onMouseLeave={scheduleHideUserFlyout}
@@ -298,103 +346,34 @@ export default function NavUser({
             <span>{t('user.profile')}</span>
           </button>
 
-          {/* Item 1b: Ganti Akun Demo (Switch User) */}
-          <div style={{ position: 'relative' }}>
-            <button
-              type="button"
-              onClick={() => {
-                setShowSwitchUserSubmenu(!showSwitchUserSubmenu);
-                setShowPreferencesSubmenu(false);
-              }}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '6px 8px',
-                borderRadius: '5px',
-                fontSize: '12.5px',
-                fontWeight: 500,
-                color: 'var(--text-primary, #0F172A)',
-                backgroundColor: showSwitchUserSubmenu ? 'var(--bg-subtle, #F1F5F9)' : 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                textAlign: 'left',
-                transition: 'background-color 0.1s ease',
-              }}
-              className="hover:bg-slate-100 dark:hover:bg-slate-800"
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Users size={14} strokeWidth={1.75} color="var(--text-secondary, #64748B)" />
-                <span>{language === 'en' ? 'Switch User' : 'Ganti Akun'}</span>
-              </div>
-              <ChevronRight size={12} color="var(--text-secondary, #64748B)" />
-            </button>
-
-            {/* Submenu Switch User */}
-            {showSwitchUserSubmenu && (
-              <div
-                style={{
-                  position: 'absolute',
-                  left: 'calc(100% + 6px)',
-                  bottom: '-30px',
-                  width: '210px',
-                  backgroundColor: 'var(--bg-card, #FFFFFF)',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-default, #E2E8F0)',
-                  boxShadow: 'var(--shadow-lg, 0 10px 25px -5px rgba(0, 0, 0, 0.1))',
-                  padding: '4px',
-                  zIndex: 10000,
-                }}
-              >
-                <div style={{ padding: '4px 8px', fontSize: '10.5px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-                  {language === 'en' ? 'Select User' : 'Pilih Akun Demo'}
-                </div>
-                {allUsers.map((u) => {
-                  const isCurrent = (currentUser?.id || '') === u.id;
-                  return (
-                    <button
-                      key={u.id}
-                      type="button"
-                      onClick={() => {
-                        switchUser(u.id);
-                        setShowSwitchUserSubmenu(false);
-                        setIsOpen(false);
-                      }}
-                      style={{
-                        width: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '6px 8px',
-                        borderRadius: '4px',
-                        fontSize: '12px',
-                        backgroundColor: isCurrent ? 'var(--color-primary-subtle, #EFF6FF)' : 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        gap: '6px',
-                      }}
-                      className="hover:bg-slate-100 dark:hover:bg-slate-800"
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
-                        <UserAvatar name={u.name} size={18} />
-                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: isCurrent ? 600 : 400 }}>
-                          {u.name}
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
-                          {u.role_id}
-                        </span>
-                        {isCurrent && <Check size={12} color="var(--color-primary, #2563EB)" />}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          {/* Item 1b: Ganti Password */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsOpen(false);
+              setShowChangePasswordModal(true);
+            }}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '6px 8px',
+              borderRadius: '5px',
+              fontSize: '12.5px',
+              fontWeight: 500,
+              color: 'var(--text-primary, #0F172A)',
+              backgroundColor: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              textAlign: 'left',
+              transition: 'background-color 0.1s ease',
+            }}
+            className="hover:bg-slate-100 dark:hover:bg-slate-800"
+          >
+            <KeyRound size={14} strokeWidth={1.75} color="var(--text-secondary, #64748B)" />
+            <span>{t('user.change_password')}</span>
+          </button>
 
           {/* Item 2: Preferensi (Tema & Bahasa) */}
           <div style={{ position: 'relative' }}>
@@ -546,13 +525,12 @@ export default function NavUser({
             )}
           </div>
 
-          {/* Item 3: Help Center (Fully Functional Modal) */}
-          <button
-            type="button"
-            onClick={() => {
-              setIsOpen(false);
-              setShowHelpModal(true);
-            }}
+          {/* Item 3: Help Center (Opens Fumadocs /docs in new tab) */}
+          <a
+            href={language === 'id' ? '/docs/id/00-index' : '/docs/en/00-index'}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setIsOpen(false)}
             style={{
               width: '100%',
               display: 'flex',
@@ -564,16 +542,17 @@ export default function NavUser({
               fontWeight: 500,
               color: 'var(--text-primary, #0F172A)',
               backgroundColor: 'transparent',
-              border: 'none',
+              textDecoration: 'none',
               cursor: 'pointer',
               textAlign: 'left',
               transition: 'background-color 0.1s ease',
+              boxSizing: 'border-box',
             }}
             className="hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             <BookOpen size={14} strokeWidth={1.75} color="var(--text-secondary, #64748B)" />
             <span>{t('user.help')}</span>
-          </button>
+          </a>
 
           {/* Separator 3 */}
           <div style={{ height: '1px', backgroundColor: 'var(--border-default, #F1F5F9)', margin: '3px 0' }} />
@@ -730,8 +709,8 @@ export default function NavUser({
         </div>
       )}
 
-      {/* ── MODAL 2: Help Center Modal ─────────────────────────────── */}
-      {showHelpModal && (
+      {/* ── MODAL: Change Password Modal ──────────────────────────── */}
+      {showChangePasswordModal && (
         <div
           style={{
             position: 'fixed',
@@ -744,38 +723,43 @@ export default function NavUser({
             zIndex: 10001,
             padding: '1rem',
           }}
-          onClick={() => setShowHelpModal(false)}
+          onClick={() => {
+            setShowChangePasswordModal(false);
+            resetPasswordForm();
+          }}
         >
           <div
             style={{
               width: '100%',
-              maxWidth: '520px',
+              maxWidth: '440px',
               backgroundColor: 'var(--bg-card, #FFFFFF)',
               borderRadius: '16px',
               border: '1px solid var(--border-default, #E2E8F0)',
               boxShadow: 'var(--shadow-float, 0 20px 25px -5px rgba(0, 0, 0, 0.15))',
               padding: '1.75rem',
               position: 'relative',
-              maxHeight: '85vh',
-              overflowY: 'auto',
             }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Close button */}
             <button
               type="button"
-              onClick={() => setShowHelpModal(false)}
+              onClick={() => {
+                setShowChangePasswordModal(false);
+                resetPasswordForm();
+              }}
               className="btn btn-ghost btn-sm"
               style={{ position: 'absolute', right: '14px', top: '14px', padding: '6px' }}
             >
               <X size={16} />
             </button>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1rem' }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1.25rem' }}>
               <div
                 style={{
-                  width: '38px',
-                  height: '38px',
+                  width: '40px',
+                  height: '40px',
                   borderRadius: '10px',
                   backgroundColor: 'var(--color-primary-subtle, #EFF6FF)',
                   display: 'flex',
@@ -784,85 +768,193 @@ export default function NavUser({
                   color: 'var(--color-primary, #2563EB)',
                 }}
               >
-                <HelpCircle size={20} />
+                <KeyRound size={20} />
               </div>
               <div>
-                <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                  {t('help.title')}
+                <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {t('user.change_password')}
                 </h3>
-                <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)' }}>
-                  {t('help.subtitle')}
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                  {t('user.change_password_desc')}
                 </p>
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '1.5rem' }}>
-              {/* Step 1 */}
-              <div
-                style={{
-                  padding: '12px',
-                  borderRadius: '10px',
-                  backgroundColor: 'var(--bg-app, #F8FAFC)',
-                  border: '1px solid var(--border-default, #E2E8F0)',
-                }}
-              >
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                  {t('help.step1_title')}
+            {/* Form */}
+            <form onSubmit={handleChangePassword}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '1.25rem' }}>
+                {/* Current Password */}
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                      color: 'var(--text-secondary, #64748B)',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    {t('user.current_password')}
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showCurrentPass ? 'text' : 'password'}
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      placeholder="Masukkan password saat ini (cth: admin123)"
+                      style={{
+                        width: '100%',
+                        height: '36px',
+                        padding: '0 36px 0 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-default, #E2E8F0)',
+                        fontSize: '12.5px',
+                        color: 'var(--text-primary)',
+                        backgroundColor: 'var(--bg-app, #F8FAFC)',
+                        outline: 'none',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPass(!showCurrentPass)}
+                      style={{
+                        position: 'absolute',
+                        right: '8px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: 'var(--text-secondary)',
+                        padding: '4px',
+                      }}
+                    >
+                      {showCurrentPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
                 </div>
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '18px' }}>
-                  {t('help.step1_desc')}
+
+                {/* New Password */}
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                      color: 'var(--text-secondary, #64748B)',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    {t('user.new_password')} <span style={{ color: 'var(--color-danger, #EF4444)' }}>*</span>
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showNewPass ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Minimal 8 karakter"
+                      required
+                      style={{
+                        width: '100%',
+                        height: '36px',
+                        padding: '0 36px 0 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-default, #E2E8F0)',
+                        fontSize: '12.5px',
+                        color: 'var(--text-primary)',
+                        backgroundColor: 'var(--bg-app, #F8FAFC)',
+                        outline: 'none',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPass(!showNewPass)}
+                      style={{
+                        position: 'absolute',
+                        right: '8px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: 'var(--text-secondary)',
+                        padding: '4px',
+                      }}
+                    >
+                      {showNewPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Confirm New Password */}
+                <div>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                      color: 'var(--text-secondary, #64748B)',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    {t('user.confirm_password')} <span style={{ color: 'var(--color-danger, #EF4444)' }}>*</span>
+                  </label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Ulangi password baru"
+                    required
+                    style={{
+                      width: '100%',
+                      height: '36px',
+                      padding: '0 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border-default, #E2E8F0)',
+                      fontSize: '12.5px',
+                      color: 'var(--text-primary)',
+                      backgroundColor: 'var(--bg-app, #F8FAFC)',
+                      outline: 'none',
+                    }}
+                  />
                 </div>
               </div>
 
-              {/* Step 2 */}
-              <div
-                style={{
-                  padding: '12px',
-                  borderRadius: '10px',
-                  backgroundColor: 'var(--bg-app, #F8FAFC)',
-                  border: '1px solid var(--border-default, #E2E8F0)',
-                }}
-              >
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                  {t('help.step2_title')}
-                </div>
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '18px' }}>
-                  {t('help.step2_desc')}
-                </div>
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowChangePasswordModal(false);
+                    resetPasswordForm();
+                  }}
+                  className="btn btn-outline btn-sm"
+                  disabled={isChangingPassword}
+                >
+                  {t('user.cancel')}
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary btn-sm"
+                  disabled={isChangingPassword || !newPassword || !confirmPassword}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  {isChangingPassword ? (
+                    <>
+                      <Loader2 size={13} className="animate-spin" />
+                      <span>Menyimpan...</span>
+                    </>
+                  ) : (
+                    <span>{t('user.save_password')}</span>
+                  )}
+                </button>
               </div>
-
-              {/* Step 3 */}
-              <div
-                style={{
-                  padding: '12px',
-                  borderRadius: '10px',
-                  backgroundColor: 'var(--bg-app, #F8FAFC)',
-                  border: '1px solid var(--border-default, #E2E8F0)',
-                }}
-              >
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                  {t('help.step3_title')}
-                </div>
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '18px' }}>
-                  {t('help.step3_desc')}
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-              <button
-                type="button"
-                onClick={() => setShowHelpModal(false)}
-                className="btn btn-primary btn-sm"
-              >
-                {t('user.understand')}
-              </button>
-            </div>
+            </form>
           </div>
         </div>
       )}
 
-      {/* ── MODAL 3: Logout Dialog ─────────────────────────────────── */}
+      {/* ── MODAL: Logout Dialog ─────────────────────────────────── */}
       {showLogoutDialog && (
         <div
           style={{

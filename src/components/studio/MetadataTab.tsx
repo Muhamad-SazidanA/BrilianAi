@@ -275,16 +275,8 @@ export default function MetadataTab({ batch, chunks, onBatchUpdated }: MetadataT
                 <span>Klasifikasi Akses</span>
               </div>
               <span
-                className={`badge ${
-                  batch.classification === 'Publik'
-                    ? 'badge-success'
-                    : batch.classification === 'Rahasia'
-                    ? 'badge-warning'
-                    : batch.classification === 'Sangat Rahasia'
-                    ? 'badge-danger'
-                    : 'badge-neutral'
-                }`}
-                style={{ fontSize: '12px', fontWeight: 700, padding: '3px 8px' }}
+                className="badge badge-neutral"
+                style={{ fontSize: '11.5px', fontWeight: 500, padding: '2px 8px' }}
               >
                 {batch.classification || 'Internal'}
               </span>
@@ -297,14 +289,8 @@ export default function MetadataTab({ batch, chunks, onBatchUpdated }: MetadataT
                 <span>Status Siklus Hidup</span>
               </div>
               <span
-                className={`badge ${
-                  batch.status === 'Aktif'
-                    ? 'badge-success'
-                    : batch.status === 'Review'
-                    ? 'badge-warning'
-                    : 'badge-neutral'
-                }`}
-                style={{ fontSize: '12px', fontWeight: 700, padding: '3px 8px' }}
+                className="badge badge-neutral"
+                style={{ fontSize: '11.5px', fontWeight: 500, padding: '2px 8px' }}
               >
                 {batch.status || (batch.is_active_knowledge ? 'Aktif' : 'Draft')}
               </span>

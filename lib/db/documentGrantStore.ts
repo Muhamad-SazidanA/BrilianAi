@@ -64,6 +64,7 @@ export async function ensureGrantTableExists(): Promise<void> {
     `);
     isGrantTableInitialized = true;
   } catch (err: any) {
+    isGrantTableInitialized = true;
     console.warn('[DocumentGrantStore] ensureGrantTableExists warning:', err?.message || err);
   }
 }

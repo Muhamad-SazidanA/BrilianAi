@@ -9,6 +9,8 @@ import {
 } from '@lib/db/vectorStore';
 import { abortCuration } from '@lib/curation/curationService';
 import { getAuthenticatedUser, canUserAccessDocumentAsync } from '@lib/auth/serverAuth';
+import { recordAuditEvent } from '@/../lib/db/auditLogStore';
+import { invalidateStatsCache } from '@lib/cache/statsCache';
 
 export const dynamic = 'force-dynamic';
 
@@ -80,6 +82,26 @@ export async function DELETE(
       );
     }
 
+    await recordAuditEvent({
+      eventCategory: 'DOC_MGMT',
+      action: 'document.delete',
+      actorId: user?.id || null,
+      actorName: user?.name,
+      actorEmail: user?.email,
+      actorDepartment: user?.department,
+      resourceType: 'document',
+      resourceId: batch.id,
+      resourceName: batch.original_filename,
+      status: 'success',
+      details: {
+        classification: batch.classification,
+        division: batch.division_id,
+        chunk_count: batch.chunk_count,
+      },
+    });
+
+    invalidateStatsCache();
+
     return NextResponse.json(
       { message: 'Dokumen beserta seluruh chunks dan insight berhasil dihapus.' },
       { status: 200 }
@@ -149,6 +171,27 @@ export async function PATCH(
         version,
         reviewDueDate,
       });
+
+      await recordAuditEvent({
+        eventCategory: 'DOC_MGMT',
+        action: 'document.update',
+        actorId: user?.id || null,
+        actorName: user?.name,
+        actorEmail: user?.email,
+        actorDepartment: user?.department,
+        resourceType: 'document',
+        resourceId: id,
+        resourceName: (updated as any)?.original_filename || batch.original_filename,
+        status: 'success',
+        details: {
+          filename,
+          status,
+          classification,
+          divisionId,
+          version,
+        },
+      });
+
       return NextResponse.json(
         {
           message: 'Data dokumen berhasil diperbarui.',
@@ -180,6 +223,23 @@ export async function PATCH(
       }
 
       const updated = await toggleBatchKnowledgeBase(id, targetActiveKnowledge);
+
+      await recordAuditEvent({
+        eventCategory: 'DOC_MGMT',
+        action: targetActiveKnowledge ? 'document.activate' : 'document.deactivate',
+        actorId: user?.id || null,
+        actorName: user?.name,
+        actorEmail: user?.email,
+        actorDepartment: user?.department,
+        resourceType: 'document',
+        resourceId: id,
+        resourceName: batch.original_filename,
+        status: 'success',
+        details: {
+          is_active_knowledge: targetActiveKnowledge,
+        },
+      });
+
       return NextResponse.json(
         {
           message: targetActiveKnowledge
@@ -200,6 +260,22 @@ export async function PATCH(
     }
 
     const updated = await updateUploadBatchFilename(id, filename.trim());
+
+    await recordAuditEvent({
+      eventCategory: 'DOC_MGMT',
+      action: 'document.rename',
+      actorId: user?.id || null,
+      actorName: user?.name,
+      actorEmail: user?.email,
+      actorDepartment: user?.department,
+      resourceType: 'document',
+      resourceId: id,
+      resourceName: filename.trim(),
+      status: 'success',
+    });
+
+    invalidateStatsCache();
+
     return NextResponse.json(
       { message: 'Nama dokumen berhasil diperbarui.', data: updated },
       { status: 200 }

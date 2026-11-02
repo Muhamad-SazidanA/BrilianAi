@@ -48,7 +48,7 @@ export default function EnterpriseSelect({
   width = '100%',
   style,
   menuWidth,
-  menuMaxHeight = 220,
+  menuMaxHeight = 380,
   ariaLabel,
 }: EnterpriseSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -74,7 +74,7 @@ export default function EnterpriseSelect({
     } else if (containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
       const spaceBelow = window.innerHeight - rect.bottom;
-      const spaceNeeded = Math.min(options.length * 32 + 20, menuMaxHeight);
+      const spaceNeeded = Math.min(options.length * 48 + 20, menuMaxHeight);
       setDropUp(spaceBelow < spaceNeeded && rect.top > spaceNeeded);
     }
 
@@ -126,7 +126,7 @@ export default function EnterpriseSelect({
   const height = buttonHeight || (size === 'xs' ? '24px' : size === 'sm' ? '30px' : '36px');
   const fontSize = size === 'xs' ? '11px' : size === 'sm' ? '11.5px' : '12.5px';
   const paddingX = size === 'xs' ? '7px' : size === 'sm' ? '8px' : '10px';
-  const borderRadius = variant === 'pill' ? '9999px' : '6px';
+  const borderRadius = variant === 'pill' ? '9999px' : 'var(--radius-sm, 4px)';
 
   return (
     <div
@@ -156,15 +156,13 @@ export default function EnterpriseSelect({
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: '6px',
-          backgroundColor: disabled ? '#F8FAFC' : '#FFFFFF',
-          border: `1px solid ${isOpen ? '#2563EB' : '#CBD5E1'}`,
+          backgroundColor: disabled ? 'var(--color-mist, #F6F6F4)' : 'var(--color-paper, #FFFFFF)',
+          border: `1px solid ${isOpen ? 'var(--color-ink, #14161B)' : 'var(--color-hairline, #E7E7E5)'}`,
           borderRadius: borderRadius,
           fontSize: fontSize,
-          color: selectedOption ? '#0F172A' : '#94A3B8',
+          color: selectedOption ? 'var(--color-ink, #14161B)' : 'var(--color-slate, #6B7078)',
           cursor: disabled ? 'not-allowed' : 'pointer',
-          boxShadow: isOpen
-            ? '0 0 0 2px rgba(37, 99, 235, 0.12)'
-            : '0 1px 2px rgba(15, 23, 42, 0.04)',
+          boxShadow: isOpen ? '0 0 0 1px var(--color-ink, #14161B)' : 'none',
           transition: 'all 0.15s ease',
           outline: 'none',
           textAlign: 'left',
@@ -196,10 +194,10 @@ export default function EnterpriseSelect({
                 fontFamily: 'var(--font-mono)',
                 fontSize: '10px',
                 padding: '1px 6px',
-                borderRadius: '4px',
-                backgroundColor: 'var(--bg-subtle, #f1f5f9)',
-                color: 'var(--text-secondary, #64748b)',
-                border: '1px solid var(--border-default, #e2e8f0)',
+                borderRadius: 'var(--radius-sm, 4px)',
+                backgroundColor: 'var(--color-mist, #F6F6F4)',
+                color: 'var(--color-slate, #6B7078)',
+                border: '1px solid var(--color-hairline, #E7E7E5)',
                 flexShrink: 0,
               }}
             >
@@ -210,7 +208,7 @@ export default function EnterpriseSelect({
 
         <ChevronDown
           size={size === 'xs' ? 10 : 12}
-          color={disabled ? '#CBD5E1' : '#64748B'}
+          color={disabled ? 'var(--color-hairline, #E7E7E5)' : 'var(--color-slate, #6B7078)'}
           style={{
             flexShrink: 0,
             transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
@@ -219,10 +217,11 @@ export default function EnterpriseSelect({
         />
       </button>
 
-      {/* ── Floating Menu (Slate Minimalist) ── */}
+      {/* ── Floating Menu (Paper & Ink Floating Card) ── */}
       {isOpen && (
         <div
           role="listbox"
+          className="enterprise-select-dropdown"
           style={{
             position: 'absolute',
             left: 0,
@@ -230,10 +229,10 @@ export default function EnterpriseSelect({
             width: menuWidth || '100%',
             minWidth: '130px',
             maxWidth: '360px',
-            backgroundColor: '#FFFFFF',
-            border: '1px solid #E2E8F0',
-            borderRadius: '8px',
-            boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.06)',
+            backgroundColor: 'var(--color-paper, #FFFFFF)',
+            border: '1px solid var(--color-hairline, #E7E7E5)',
+            borderRadius: 'var(--radius-md, 8px)',
+            boxShadow: 'var(--shadow-float)',
             zIndex: 1100,
             overflow: 'hidden',
             display: 'flex',
@@ -276,9 +275,12 @@ export default function EnterpriseSelect({
 
           {/* Options List */}
           <div
+            className="no-scrollbar enterprise-select-options"
             style={{
               maxHeight: `${menuMaxHeight}px`,
               overflowY: 'auto',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
               padding: '4px',
               display: 'flex',
               flexDirection: 'column',
@@ -290,7 +292,7 @@ export default function EnterpriseSelect({
                 style={{
                   padding: '8px',
                   fontSize: '11px',
-                  color: '#94A3B8',
+                  color: 'var(--color-slate, #6B7078)',
                   textAlign: 'center',
                 }}
               >
@@ -317,26 +319,24 @@ export default function EnterpriseSelect({
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       padding: '6px 10px',
-                      borderRadius: '6px',
+                      borderRadius: 'var(--radius-sm, 4px)',
                       fontSize: fontSize,
                       cursor: isOptDisabled ? 'not-allowed' : 'pointer',
                       opacity: isOptDisabled ? 0.55 : 1,
                       transition: 'all 0.1s ease',
-                      backgroundColor: isSelected ? 'var(--color-primary-subtle, #eff6ff)' : 'transparent',
-                      color: isSelected ? 'var(--color-primary, #2563eb)' : '#334155',
-                      fontWeight: isSelected ? 600 : 450,
+                      backgroundColor: isSelected ? 'var(--color-mist, #F6F6F4)' : 'transparent',
+                      color: 'var(--color-ink, #14161B)',
+                      fontWeight: isSelected ? 600 : 400,
                       gap: '8px',
                     }}
                     onMouseEnter={(e) => {
                       if (!isSelected && !isOptDisabled) {
-                        e.currentTarget.style.backgroundColor = 'var(--bg-subtle, #f8fafc)';
-                        e.currentTarget.style.color = '#0F172A';
+                        e.currentTarget.style.backgroundColor = 'var(--color-mist, #F6F6F4)';
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (!isSelected && !isOptDisabled) {
                         e.currentTarget.style.backgroundColor = 'transparent';
-                        e.currentTarget.style.color = '#334155';
                       }
                     }}
                   >
@@ -353,13 +353,13 @@ export default function EnterpriseSelect({
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             letterSpacing: '-0.01em',
-                            color: isSelected ? 'var(--color-primary, #2563eb)' : '#0F172A',
+                            color: 'var(--color-ink, #14161B)',
                           }}
                         >
                           {opt.label}
                         </span>
                         {opt.sublabel && (
-                          <span style={{ fontSize: '10.5px', color: '#64748B', marginTop: '1px' }}>
+                          <span style={{ fontSize: '10.5px', color: 'var(--color-slate, #6B7078)', marginTop: '1px' }}>
                             {opt.sublabel}
                           </span>
                         )}
@@ -373,10 +373,10 @@ export default function EnterpriseSelect({
                             fontFamily: 'var(--font-mono)',
                             fontSize: '10px',
                             padding: '1px 6px',
-                            borderRadius: '4px',
-                            backgroundColor: isSelected ? '#ffffff' : 'var(--bg-subtle, #f1f5f9)',
-                            color: 'var(--text-secondary, #64748b)',
-                            border: '1px solid var(--border-default, #e2e8f0)',
+                            borderRadius: 'var(--radius-sm, 4px)',
+                            backgroundColor: 'var(--color-mist, #F6F6F4)',
+                            color: 'var(--color-slate, #6B7078)',
+                            border: '1px solid var(--color-hairline, #E7E7E5)',
                           }}
                         >
                           {opt.badge}
@@ -384,7 +384,7 @@ export default function EnterpriseSelect({
                       )}
 
                       {isSelected && (
-                        <Check size={12} color="#2563EB" style={{ strokeWidth: 2.5 }} />
+                        <Check size={13} color="var(--color-ink, #14161B)" style={{ strokeWidth: 2 }} />
                       )}
                     </div>
                   </div>

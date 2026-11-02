@@ -52,6 +52,8 @@ export interface ChatRequestOptions {
   divisionId?: string;
   allowedClassifications?: DocumentClassification[];
   grantedBatchIds?: string[];
+  history?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  sessionId?: string;
 }
 
 export interface ChatResponseResult {
@@ -162,8 +164,8 @@ export async function askDocumentChat(
     }
   }
 
-  // 1. Agent 3: Guardrail & Router
-  const guardrailDecision = await runGuardrailAndRouter(trimmedQuery);
+  // 1. Agent 3: Guardrail & Router (dengan contextual query rewriter)
+  const guardrailDecision = await runGuardrailAndRouter(trimmedQuery, options?.history);
 
   if (guardrailDecision.isBlocked) {
     return {
@@ -266,13 +268,13 @@ export async function askDocumentChat(
 
   const contextText = contextSections.join('\n\n====================\n\n');
 
-  // 5. Agent 4: Synthesizer & RAG Answer via DeepSeek-V3 / Multi-Agent
+  // 5. Agent 4: Synthesizer & RAG Answer via DeepSeek-V3 / Multi-Agent with History Memory
   let rawAnswer = '';
   try {
-    rawAnswer = await runRagSynthesizer(trimmedQuery, contextText, { allowPublicKnowledge });
+    rawAnswer = await runRagSynthesizer(trimmedQuery, contextText, { allowPublicKnowledge, history: options?.history });
   } catch (synthErr) {
     console.warn('[ChatService] Synthesizer fallback:', synthErr);
-    rawAnswer = await generateChatResponse(trimmedQuery, contextText, allowPublicKnowledge);
+    rawAnswer = await generateChatResponse(trimmedQuery, contextText, allowPublicKnowledge, { history: options?.history });
   }
 
   // 6. Agent 5: Safety & Output Evaluator via OpenAI GPT-4o-mini
@@ -438,8 +440,8 @@ export async function askDocumentChatStream(
     }
   }
 
-  // 1. Agent 3: Guardrail & Router
-  const guardrailDecision = await runGuardrailAndRouter(trimmedQuery);
+  // 1. Agent 3: Guardrail & Router (dengan contextual query rewriter)
+  const guardrailDecision = await runGuardrailAndRouter(trimmedQuery, options?.history);
   if (guardrailDecision.isBlocked) {
     return emitStaticResult({
       answer: guardrailDecision.blockReason || 'Permintaan Anda tidak dapat diproses karena tidak memenuhi kebijakan keamanan sistem.',
@@ -546,7 +548,7 @@ export async function askDocumentChatStream(
   }
   const contextText = contextSections.join('\n\n====================\n\n');
 
-  // 5. Agent 4: Stream Synthesizer
+  // 5. Agent 4: Stream Synthesizer with Multi-Turn Memory
   let rawAnswer = '';
   try {
     rawAnswer = await runRagSynthesizerStream(
@@ -554,6 +556,7 @@ export async function askDocumentChatStream(
       contextText,
       {
         allowPublicKnowledge,
+        history: options?.history,
         onToken: (tok) => {
           callbacks?.onToken?.(tok);
         },
@@ -567,6 +570,7 @@ export async function askDocumentChatStream(
       contextText,
       allowPublicKnowledge,
       {
+        history: options?.history,
         onToken: (tok) => {
           callbacks?.onToken?.(tok);
         },
@@ -671,12 +675,13 @@ export function determineAccurateSources(
 
   // Kumpulkan nama-nama file unik dari chunks & curated
   const allCandidateFiles = new Set<string>();
-  for (const c of chunks) allCandidateFiles.add(c.originalFilename);
-  for (const ci of curated) allCandidateFiles.add(ci.originalFilename);
+  for (const c of chunks) if (c?.originalFilename) allCandidateFiles.add(c.originalFilename);
+  for (const ci of curated) if (ci?.originalFilename) allCandidateFiles.add(ci.originalFilename);
 
   // Hitung skor kecocokan isi jawaban terhadap masing-masing file
   const fileScores = new Map<string, number>();
   for (const fn of Array.from(allCandidateFiles)) {
+    if (!fn) continue;
     let score = 0;
     const fnLower = fn.toLowerCase();
 

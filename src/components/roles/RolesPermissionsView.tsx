@@ -8,6 +8,7 @@ import {
 import { Role, PermissionKey, PERMISSIONS_CATALOG, PermissionCategory } from '@/types/user';
 import { DocumentClassification } from '@/types/document';
 import EnterprisePagination from '@/components/ui/EnterprisePagination';
+import TableEmptyState, { TableLoadingState } from '@/components/ui/TableEmptyState';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserSession } from '@/context/UserSessionContext';
 import { toast } from 'sonner';
@@ -15,24 +16,23 @@ import { toast } from 'sonner';
 export const ALL_CLASSIFICATIONS: {
   key: DocumentClassification;
   label: string;
+  labelEn: string;
   desc: string;
-  color: string;
-  bg: string;
-  border: string;
+  descEn: string;
 }[] = [
-  { key: 'Publik', label: 'Publik', desc: 'Dapat membaca dokumen umum & materi terbuka', color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' },
-  { key: 'Internal', label: 'Internal', desc: 'Dokumen operasional internal standar', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
-  { key: 'Rahasia', label: 'Rahasia', desc: 'Dokumen tim sensitif, manajerial & keuangan', color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
-  { key: 'Sangat Rahasia', label: 'Sangat Rahasia', desc: 'Dokumen strategis direksi & data rahasia tertinggi', color: '#dc2626', bg: '#fef2f2', border: '#fecaca' },
+  { key: 'Publik', label: 'Publik', labelEn: 'Public', desc: 'Dapat membaca dokumen umum & materi terbuka', descEn: 'Can read public documents & open material' },
+  { key: 'Internal', label: 'Internal', labelEn: 'Internal', desc: 'Dokumen operasional internal standar', descEn: 'Standard internal operational documents' },
+  { key: 'Rahasia', label: 'Rahasia', labelEn: 'Confidential', desc: 'Dokumen tim sensitif, manajerial & keuangan', descEn: 'Sensitive team, managerial & financial documents' },
+  { key: 'Sangat Rahasia', label: 'Sangat Rahasia', labelEn: 'Strictly Confidential', desc: 'Dokumen strategis direksi & data rahasia tertinggi', descEn: 'Strategic board documents & highest secret data' },
 ];
 
 /* ─── Category labels ─────────────────────────────── */
-const CAT_LABELS: Record<PermissionCategory, string> = {
-  dashboard: 'Akses Dasbor & Metrik',
-  documents: 'Dokumen & Ingestion RAG',
-  curation: 'Kurasi & Evaluasi AI',
-  chat: 'Asisten AI & Percakapan',
-  administration: 'Manajemen & Administrasi',
+const CAT_LABELS: Record<PermissionCategory, { id: string; en: string }> = {
+  dashboard: { id: 'Akses Dasbor & Metrik', en: 'Dashboard & Metrics Access' },
+  documents: { id: 'Dokumen & Ingestion RAG', en: 'Documents & RAG Ingestion' },
+  curation: { id: 'Kurasi & Evaluasi AI', en: 'AI Curation & Evaluation' },
+  chat: { id: 'Asisten AI & Percakapan', en: 'AI Assistant & Conversations' },
+  administration: { id: 'Manajemen & Administrasi', en: 'Management & Administration' },
 };
 const ALL_CATS = Object.keys(CAT_LABELS) as PermissionCategory[];
 
@@ -532,15 +532,18 @@ export default function RolesPermissionsView() {
 
         {/* ── Table Content ── */}
         <div className="enterprise-table-wrapper">
-          <table style={{ width: '100%', minWidth: '760px', borderCollapse: 'separate', borderSpacing: 0, fontSize: '12.5px' }}>
+          <table
+            className={isLoading ? 'table-loading' : filtered.length === 0 ? 'table-empty' : ''}
+            style={{ width: '100%', minWidth: '760px', borderCollapse: 'separate', borderSpacing: 0, fontSize: '12.5px' }}
+          >
             <thead>
               <tr>
                 {[
-                  { label: 'Role & Deskripsi', width: '32%', align: 'left' },
-                  { label: 'Pengguna', width: '10%', align: 'center' },
-                  { label: 'Cakupan Izin', width: '16%', align: 'center' },
-                  { label: 'Klasifikasi Akses', width: '26%', align: 'center' },
-                  { label: 'Aksi', width: '16%', align: 'center' },
+                  { label: language === 'en' ? 'Role & Description' : 'Role & Deskripsi', width: '38%', align: 'left' },
+                  { label: language === 'en' ? 'Users' : 'Pengguna', width: '12%', align: 'center' },
+                  { label: language === 'en' ? 'Permissions' : 'Cakupan Izin', width: '16%', align: 'center' },
+                  { label: language === 'en' ? 'Access Classifications' : 'Klasifikasi Akses', width: '18%', align: 'center' },
+                  { label: language === 'en' ? 'Actions' : 'Aksi', width: '16%', align: 'center' },
                 ].map((col) => (
                   <th
                     key={col.label}
@@ -570,22 +573,18 @@ export default function RolesPermissionsView() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={5} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-secondary)', verticalAlign: 'middle' }}>
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
-                      <Loader2 size={16} className="animate-spin" color="var(--color-primary, #2563eb)" />
-                      <span>Memuat data role...</span>
-                    </div>
+                  <td colSpan={5}>
+                    <TableLoadingState message={language === 'en' ? 'Loading roles data...' : 'Memuat data peranan...'} />
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)', verticalAlign: 'middle' }}>
-                    <p style={{ margin: 0, fontWeight: 600, color: 'var(--text-primary)', fontSize: '13px' }}>
-                      Tidak ada role yang cocok
-                    </p>
-                    <p style={{ margin: '4px 0 0', fontSize: '11.5px' }}>
-                      Coba sesuaikan kata kunci pencarian.
-                    </p>
+                  <td colSpan={5}>
+                    <TableEmptyState
+                      icon={Shield}
+                      title={searchQuery ? (language === 'en' ? 'No matching roles found' : 'Tidak ada peranan yang cocok') : (language === 'en' ? 'No roles yet' : 'Belum ada peranan')}
+                      description={language === 'en' ? 'Try adjusting your role search keyword above.' : 'Coba sesuaikan kata kunci pencarian peran di atas.'}
+                    />
                   </td>
                 </tr>
               ) : (
@@ -623,7 +622,7 @@ export default function RolesPermissionsView() {
                               }}
                             >
                               <Lock size={9} />
-                              Terkunci
+                              {language === 'en' ? 'System' : 'Terkunci'}
                             </span>
                           )}
                         </div>
@@ -654,91 +653,76 @@ export default function RolesPermissionsView() {
                       </span>
                     </td>
 
-                    {/* Permission Count */}
+                    {/* Cakupan Izin (Murni Angka Bersih Sesuai Referensi) */}
                     <td style={{ padding: '10px 14px', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                       <span
+                        title={language === 'en' ? `${role.permissions.length} configured permissions` : `${role.permissions.length} hak akses terkonfigurasi`}
                         style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          padding: '2px 8px',
-                          borderRadius: '9999px',
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          whiteSpace: 'nowrap',
-                          backgroundColor:
-                            role.permissions.length > 0
-                              ? 'rgba(37, 99, 235, 0.08)'
-                              : 'var(--bg-subtle, #f1f5f9)',
-                          color: role.permissions.length > 0 ? '#2563eb' : 'var(--text-muted)',
-                          border: `1px solid ${
-                            role.permissions.length > 0 ? 'rgba(37, 99, 235, 0.18)' : 'var(--border-default, #e2e8f0)'
-                          }`,
+                          fontSize: '13px',
+                          fontWeight: 500,
+                          fontVariantNumeric: 'tabular-nums',
+                          color: 'var(--text-primary, #0f172a)',
+                          cursor: 'default',
+                          userSelect: 'none',
                         }}
                       >
-                        {role.permissions.length} Hak Akses
+                        {role.permissions.length}
                       </span>
                     </td>
 
-                    {/* Klasifikasi Akses */}
-                    <td style={{ padding: '10px 14px', textAlign: 'center', verticalAlign: 'middle' }}>
-                      <div style={{ display: 'inline-flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'center', maxWidth: '280px' }}>
-                        {(role.allowed_classifications && role.allowed_classifications.length > 0
+                    {/* Klasifikasi Akses (Murni Angka Bersih Sesuai Referensi) */}
+                    <td style={{ padding: '10px 14px', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                      {(() => {
+                        const allowed = role.allowed_classifications && role.allowed_classifications.length > 0
                           ? role.allowed_classifications
-                          : (role.id === 'admin' ? ALL_CLASSIFICATIONS.map(c => c.key) : ['Publik', 'Internal'])
-                        ).map((clsKey) => {
-                          const meta = ALL_CLASSIFICATIONS.find(c => c.key === clsKey) || {
-                            label: clsKey,
-                            color: '#64748b',
-                            bg: '#f8fafc',
-                            border: '#e2e8f0',
-                          };
-                          return (
-                            <span
-                              key={clsKey}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                padding: '1px 6px',
-                                borderRadius: '4px',
-                                fontSize: '10.5px',
-                                fontWeight: 600,
-                                backgroundColor: meta.bg,
-                                color: meta.color,
-                                border: `1px solid ${meta.border}`,
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
-                              {meta.label}
-                            </span>
-                          );
-                        })}
-                      </div>
+                          : (role.id === 'admin' ? ALL_CLASSIFICATIONS.map(c => c.key) : ['Publik', 'Internal']);
+
+                        const count = allowed.length;
+                        const tooltipText = count > 0
+                          ? (language === 'en' ? `${count} Classifications: ${allowed.join(', ')}` : `${count} Klasifikasi: ${allowed.join(', ')}`)
+                          : (language === 'en' ? 'No classification access' : 'Tidak ada akses klasifikasi');
+
+                        return (
+                          <span
+                            title={tooltipText}
+                            style={{
+                              fontSize: '13px',
+                              fontWeight: 500,
+                              fontVariantNumeric: 'tabular-nums',
+                              color: 'var(--text-primary, #0f172a)',
+                              cursor: 'default',
+                              userSelect: 'none',
+                            }}
+                          >
+                            {count}
+                          </span>
+                        );
+                      })()}
                     </td>
 
                     {/* Actions */}
                     <td style={{ padding: '10px 14px', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
                         {role.is_system ? (
-                          <IBtn title="Lihat detail role" onClick={() => openView(role)}>
+                          <IBtn title={language === 'en' ? 'View role details' : 'Lihat detail role'} onClick={() => openView(role)}>
                             <Eye size={12} />
                           </IBtn>
                         ) : (
                           canManage && (
-                            <IBtn title="Edit role" onClick={() => openEdit(role)}>
+                            <IBtn title={language === 'en' ? 'Edit role' : 'Edit role'} onClick={() => openEdit(role)}>
                               <Pencil size={12} />
                             </IBtn>
                           )
                         )}
 
                         {canManage && (
-                          <IBtn title="Duplikasi role ini" onClick={() => openDuplicate(role)}>
+                          <IBtn title={language === 'en' ? 'Duplicate this role' : 'Duplikasi role ini'} onClick={() => openDuplicate(role)}>
                             <Copy size={12} />
                           </IBtn>
                         )}
 
                         {canManage && !role.is_system && (
-                          <IBtn title="Hapus role" onClick={() => setDeleteTarget(role)} danger>
+                          <IBtn title={language === 'en' ? 'Delete role' : 'Hapus role'} onClick={() => setDeleteTarget(role)} danger>
                             <Trash2 size={12} />
                           </IBtn>
                         )}
@@ -796,13 +780,15 @@ export default function RolesPermissionsView() {
               <div>
                 <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
                   {editor.mode === 'create'
-                    ? 'Buat Role Baru'
+                    ? (language === 'en' ? 'Create New Role' : 'Buat Role Baru')
                     : editor.mode === 'edit'
-                    ? 'Edit Konfigurasi Role'
-                    : 'Detail Role Sistem'}
+                    ? (language === 'en' ? 'Edit Role Configuration' : 'Edit Konfigurasi Role')
+                    : (language === 'en' ? 'System Role Details' : 'Detail Role Sistem')}
                 </h3>
                 <p style={{ margin: '3px 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>
-                  Tentukan informasi umum dan matriks hak akses modular untuk role ini.
+                  {language === 'en'
+                    ? 'Define general information and modular permissions matrix for this role.'
+                    : 'Tentukan informasi umum dan matriks hak akses modular untuk role ini.'}
                 </p>
               </div>
               <button
@@ -820,14 +806,14 @@ export default function RolesPermissionsView() {
                 {/* Form Row 1 */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
                   <div>
-                    <label style={LBL}>Nama Role *</label>
+                    <label style={LBL}>{language === 'en' ? 'Role Name *' : 'Nama Role *'}</label>
                     <input
                       type="text"
                       required
                       value={formName}
                       onChange={(e) => setFormName(e.target.value)}
                       disabled={isReadOnly}
-                      placeholder="Contoh: Tim Verifikasi"
+                      placeholder={language === 'en' ? 'e.g. Verification Team' : 'Contoh: Tim Verifikasi'}
                       style={INP}
                       autoFocus={!isReadOnly}
                     />
@@ -848,8 +834,12 @@ export default function RolesPermissionsView() {
                       }}
                     >
                       <div>
-                        <div style={{ fontWeight: 600, fontSize: '11.5px', color: 'var(--text-primary)' }}>Role Default</div>
-                        <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>Otomatis untuk akun baru</div>
+                        <div style={{ fontWeight: 600, fontSize: '11.5px', color: 'var(--text-primary)' }}>
+                          {language === 'en' ? 'Default Role' : 'Role Default'}
+                        </div>
+                        <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
+                          {language === 'en' ? 'Automatically assigned to new accounts' : 'Otomatis untuk akun baru'}
+                        </div>
                       </div>
                       <Toggle checked={formIsDefault} onChange={setFormIsDefault} disabled={isReadOnly} />
                     </div>
@@ -858,13 +848,13 @@ export default function RolesPermissionsView() {
 
                 {/* Deskripsi */}
                 <div style={{ marginBottom: '16px' }}>
-                  <label style={LBL}>Deskripsi Fungsional</label>
+                  <label style={LBL}>{language === 'en' ? 'Functional Description' : 'Deskripsi Fungsional'}</label>
                   <textarea
                     value={formDesc}
                     onChange={(e) => setFormDesc(e.target.value)}
                     disabled={isReadOnly}
                     rows={2}
-                    placeholder="Jelaskan ruang lingkup hak akses role ini..."
+                    placeholder={language === 'en' ? 'Describe the scope of access permissions for this role...' : 'Jelaskan ruang lingkup hak akses role ini...'}
                     style={{
                       width: '100%',
                       padding: '8px 12px',
@@ -886,34 +876,38 @@ export default function RolesPermissionsView() {
                   style={{
                     marginBottom: '18px',
                     padding: '14px 16px',
-                    borderRadius: '10px',
-                    border: '1px solid var(--border-default, #e2e8f0)',
-                    backgroundColor: 'var(--bg-subtle, #f8fafc)',
+                    borderRadius: 'var(--radius-md, 8px)',
+                    border: '1px solid var(--color-hairline, #E7E7E5)',
+                    backgroundColor: 'var(--color-mist, #F6F6F4)',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                      <Shield size={15} color="#2563eb" />
-                      <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text-primary)' }}>
-                        Izin Tingkat Kerahasiaan Dokumen (Security Clearance)
+                      <Shield size={15} color="var(--color-ink, #14161B)" />
+                      <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--color-ink, #14161B)' }}>
+                        {language === 'en' ? 'Document Classification Access (Security Clearance)' : 'Izin Tingkat Kerahasiaan Dokumen (Security Clearance)'}
                       </span>
                     </div>
                     <span
                       style={{
                         fontSize: '11px',
-                        fontWeight: 600,
+                        fontWeight: 500,
                         padding: '1px 8px',
-                        borderRadius: '9999px',
-                        backgroundColor: 'rgba(37, 99, 235, 0.08)',
-                        color: '#2563eb',
-                        border: '1px solid rgba(37, 99, 235, 0.18)',
+                        borderRadius: 'var(--radius-sm, 4px)',
+                        backgroundColor: 'var(--color-paper, #FFFFFF)',
+                        color: 'var(--color-slate, #6B7078)',
+                        border: '1px solid var(--color-hairline, #E7E7E5)',
                       }}
                     >
-                      {selectedClassifications.length} dari {ALL_CLASSIFICATIONS.length} diizinkan
+                      {language === 'en'
+                        ? `${selectedClassifications.length} of ${ALL_CLASSIFICATIONS.length} allowed`
+                        : `${selectedClassifications.length} dari ${ALL_CLASSIFICATIONS.length} diizinkan`}
                     </span>
                   </div>
-                  <p style={{ margin: '0 0 12px', fontSize: '11.5px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                    Menentukan tingkat klasifikasi dokumen divisi yang berhak dicari, dibaca, dan digunakan dalam prompt AI oleh pengguna dengan role ini.
+                  <p style={{ margin: '0 0 12px', fontSize: '12px', color: 'var(--color-slate, #6B7078)', lineHeight: 1.5 }}>
+                    {language === 'en'
+                      ? 'Determines which division document classification levels users with this role can search, read, and use in AI prompts.'
+                      : 'Menentukan tingkat klasifikasi dokumen divisi yang berhak dicari, dibaca, dan digunakan dalam prompt AI oleh pengguna dengan role ini.'}
                   </p>
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '8px' }}>
@@ -927,9 +921,9 @@ export default function RolesPermissionsView() {
                             alignItems: 'flex-start',
                             gap: '10px',
                             padding: '10px 12px',
-                            borderRadius: '8px',
-                            border: `1.5px solid ${isChecked ? c.color : 'var(--border-default, #e2e8f0)'}`,
-                            backgroundColor: isChecked ? c.bg : 'var(--bg-card, #ffffff)',
+                            borderRadius: 'var(--radius-md, 8px)',
+                            border: `1.5px solid ${isChecked ? 'var(--color-accent, #2F5DFF)' : 'var(--color-hairline, #E7E7E5)'}`,
+                            backgroundColor: 'var(--color-paper, #FFFFFF)',
                             cursor: isReadOnly ? 'default' : 'pointer',
                             transition: 'all 0.15s ease',
                             userSelect: 'none',
@@ -949,7 +943,7 @@ export default function RolesPermissionsView() {
                             }}
                             style={{
                               marginTop: '2px',
-                              accentColor: c.color,
+                              accentColor: 'var(--color-accent, #2F5DFF)',
                               cursor: isReadOnly ? 'default' : 'pointer',
                               width: '15px',
                               height: '15px',
@@ -958,12 +952,15 @@ export default function RolesPermissionsView() {
                           />
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span style={{ fontSize: '12px', fontWeight: 700, color: isChecked ? c.color : 'var(--text-primary)' }}>
-                                {c.label}
+                              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-ink, #14161B)' }}>
+                                {language === 'en' ? c.labelEn : c.label}
                               </span>
+                              {c.key === 'Sangat Rahasia' && (
+                                <Lock size={12} color="var(--color-slate, #6B7078)" />
+                              )}
                             </div>
-                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.35 }}>
-                              {c.desc}
+                            <span style={{ fontSize: '11.5px', color: 'var(--color-slate, #6B7078)', lineHeight: 1.4 }}>
+                              {language === 'en' ? c.descEn : c.desc}
                             </span>
                           </div>
                         </label>
@@ -985,7 +982,7 @@ export default function RolesPermissionsView() {
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text-primary)' }}>
-                      Katalog Hak Akses
+                      {language === 'en' ? 'Permissions Catalog' : 'Katalog Hak Akses'}
                     </span>
                     <span
                       style={{
@@ -998,7 +995,9 @@ export default function RolesPermissionsView() {
                         border: '1px solid rgba(37, 99, 235, 0.18)',
                       }}
                     >
-                      {totalSelected} dari {PERMISSIONS_CATALOG.length} aktif
+                      {language === 'en'
+                        ? `${totalSelected} of ${PERMISSIONS_CATALOG.length} active`
+                        : `${totalSelected} dari ${PERMISSIONS_CATALOG.length} aktif`}
                     </span>
                   </div>
 
@@ -1016,7 +1015,7 @@ export default function RolesPermissionsView() {
                     />
                     <input
                       type="text"
-                      placeholder="Filter izin..."
+                      placeholder={language === 'en' ? 'Filter permissions...' : 'Filter izin...'}
                       value={permSearch}
                       onChange={(e) => setPermSearch(e.target.value)}
                       style={{ ...INP, paddingLeft: '28px', height: '30px', fontSize: '11.5px' }}
@@ -1055,7 +1054,7 @@ export default function RolesPermissionsView() {
                         >
                           <div>
                             <span style={{ fontWeight: 600, fontSize: '12.5px', color: 'var(--text-primary)' }}>
-                              {CAT_LABELS[cat]}
+                              {CAT_LABELS[cat][language] || CAT_LABELS[cat].id}
                             </span>
                             <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '6px' }}>
                               ({selectedInCat}/{allCatKeys.length})
@@ -1076,7 +1075,9 @@ export default function RolesPermissionsView() {
                                 color: 'var(--text-secondary)',
                               }}
                             >
-                              {allSelected ? 'Hapus Semua' : 'Pilih Semua'}
+                              {allSelected
+                                ? (language === 'en' ? 'Deselect All' : 'Hapus Semua')
+                                : (language === 'en' ? 'Select All' : 'Pilih Semua')}
                             </button>
                           )}
                         </div>
@@ -1157,7 +1158,7 @@ export default function RolesPermissionsView() {
                   })}
                   {visibleCats.length === 0 && (
                     <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
-                      Tidak ada izin yang cocok dengan kata kunci pencarian.
+                      {language === 'en' ? 'No permissions match your search keyword.' : 'Tidak ada izin yang cocok dengan kata kunci pencarian.'}
                     </div>
                   )}
                 </div>
@@ -1190,7 +1191,9 @@ export default function RolesPermissionsView() {
                   color: 'var(--text-primary)',
                 }}
               >
-                {isReadOnly ? 'Tutup' : 'Batal'}
+                {isReadOnly
+                  ? (language === 'en' ? 'Close' : 'Tutup')
+                  : (language === 'en' ? 'Cancel' : 'Batal')}
               </button>
               {!isReadOnly && (
                 <button
@@ -1215,7 +1218,7 @@ export default function RolesPermissionsView() {
                   }}
                 >
                   {isSubmitting ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
-                  Simpan Role
+                  {language === 'en' ? 'Save Role' : 'Simpan Role'}
                 </button>
               )}
             </div>
@@ -1228,11 +1231,14 @@ export default function RolesPermissionsView() {
         <div style={OL} onClick={() => setDeleteTarget(null)}>
           <div style={{ ...BOX(420) }} onClick={(e) => e.stopPropagation()}>
             <h3 style={{ margin: '0 0 8px', fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>
-              Hapus Role Akses?
+              {language === 'en' ? 'Delete Access Role?' : 'Hapus Role Akses?'}
             </h3>
             <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: '0 0 1.25rem', lineHeight: 1.5 }}>
-              Apakah Anda yakin ingin menghapus role <strong>&quot;{deleteTarget.name}&quot;</strong>? Semua pengguna dengan role ini
-              akan kehilangan hak akses terkait.
+              {language === 'en' ? (
+                <>Are you sure you want to delete role <strong>&quot;{deleteTarget.name}&quot;</strong>? All users assigned to this role will lose their associated permissions.</>
+              ) : (
+                <>Apakah Anda yakin ingin menghapus role <strong>&quot;{deleteTarget.name}&quot;</strong>? Semua pengguna dengan role ini akan kehilangan hak akses terkait.</>
+              )}
             </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
               <button
@@ -1250,7 +1256,7 @@ export default function RolesPermissionsView() {
                   color: 'var(--text-primary)',
                 }}
               >
-                Batal
+                {language === 'en' ? 'Cancel' : 'Batal'}
               </button>
               <button
                 type="button"
@@ -1269,7 +1275,7 @@ export default function RolesPermissionsView() {
                   opacity: isSubmitting ? 0.7 : 1,
                 }}
               >
-                {isSubmitting ? <Loader2 size={13} className="animate-spin" /> : 'Hapus Role'}
+                {isSubmitting ? <Loader2 size={13} className="animate-spin" /> : (language === 'en' ? 'Delete Role' : 'Hapus Role')}
               </button>
             </div>
           </div>

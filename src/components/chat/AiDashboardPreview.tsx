@@ -23,8 +23,9 @@ import {
   X,
   Sparkles,
   LucideIcon,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
-import CardFloatingCopilot from '@/components/dashboard/CardFloatingCopilot';
 import {
   DashboardData,
   DashboardWidget,
@@ -79,23 +80,15 @@ const CHART_SWITCHER_OPTIONS: Array<{
 ];
 
 // ─────────────────────────────────────────────────────────────
-// Common Widget Header with Morph Switcher and Open/Ask AI Button
+// Common Widget Header
 // ─────────────────────────────────────────────────────────────
 
 function WidgetCardHeader({
   icon: Icon,
   title,
-  currentType,
-  onMorphTo,
-  onOpenCopilot,
-  isCopilotOpen,
 }: {
   icon: LucideIcon;
   title: string;
-  currentType?: MorphableChartType;
-  onMorphTo?: (target: MorphableChartType) => void;
-  onOpenCopilot?: () => void;
-  isCopilotOpen?: boolean;
 }) {
   return (
     <div
@@ -103,46 +96,13 @@ function WidgetCardHeader({
       style={{
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        gap: '6px',
         marginBottom: '10px',
+        minWidth: 0,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flex: 1, marginRight: '8px' }}>
-        <Icon size={14} style={{ flexShrink: 0 }} />
-        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</span>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-        {onMorphTo && (
-          <div className="db-chart-switcher-group" role="group" aria-label="Pilih Jenis Visualisasi">
-            {CHART_SWITCHER_OPTIONS.map((opt) => {
-              const OptIcon = opt.icon;
-              const isActive = currentType === opt.type;
-              return (
-                <button
-                  key={opt.type}
-                  type="button"
-                  onClick={() => onMorphTo(opt.type)}
-                  className={`db-chart-switcher-btn ${isActive ? 'active' : ''}`}
-                  title={`Ubah ke ${opt.label}`}
-                >
-                  <OptIcon size={11} />
-                </button>
-              );
-            })}
-          </div>
-        )}
-        {onOpenCopilot && (
-          <button
-            type="button"
-            onClick={onOpenCopilot}
-            className={`db-card-open-btn ${isCopilotOpen ? 'active' : ''}`}
-            title={isCopilotOpen ? 'Tutup Copilot' : 'Open AI Copilot'}
-          >
-            <Sparkles size={11} />
-            <span>{isCopilotOpen ? 'Tutup' : 'Open'}</span>
-          </button>
-        )}
-      </div>
+      <Icon size={14} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />
+      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 600, fontSize: '12.5px', color: 'var(--text-primary)' }}>{title}</span>
     </div>
   );
 }
@@ -153,14 +113,10 @@ function WidgetCardHeader({
 
 interface WidgetCommonProps {
   originalIndex: number;
-  onOpenCopilot?: () => void;
-  isCopilotOpen?: boolean;
 }
 
 function StatCard({
   widget,
-  onOpenCopilot,
-  isCopilotOpen,
 }: { widget: StatCardWidget } & WidgetCommonProps) {
   const color = widget.color || 'blue';
   const palette = CARD_COLORS[color] || CARD_COLORS.blue;
@@ -169,24 +125,10 @@ function StatCard({
 
   return (
     <div
-      className={`db-widget db-stat-card ${isCopilotOpen ? 'db-widget-copilot-active' : ''}`}
+      className="db-widget db-stat-card"
       style={{ background: palette.gradient, borderColor: palette.border }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-        <div className="db-stat-label">{widget.title}</div>
-        {onOpenCopilot && (
-          <button
-            type="button"
-            onClick={onOpenCopilot}
-            className={`db-card-open-btn ${isCopilotOpen ? 'active' : ''}`}
-            title={isCopilotOpen ? 'Tutup Copilot' : 'Open AI Copilot'}
-            style={{ padding: '1px 6px', fontSize: '10px' }}
-          >
-            <Sparkles size={10} />
-            <span>{isCopilotOpen ? 'Tutup' : 'Open'}</span>
-          </button>
-        )}
-      </div>
+      <div className="db-stat-label" style={{ marginBottom: '4px' }}>{widget.title}</div>
       <div className="db-stat-value" style={{ color: palette.icon }}>
         {widget.value}
         {widget.unit && <span className="db-stat-unit">{widget.unit}</span>}
@@ -203,20 +145,13 @@ function StatCard({
 
 function BarChart({
   widget,
-  onMorphTo,
-  onOpenCopilot,
-  isCopilotOpen,
-}: { widget: BarChartWidget; onMorphTo?: (target: MorphableChartType) => void } & WidgetCommonProps) {
+}: { widget: BarChartWidget } & WidgetCommonProps) {
   const max = Math.max(...widget.items.map(i => i.value), 1);
   return (
-    <div className={`db-widget db-barchart ${isCopilotOpen ? 'db-widget-copilot-active' : ''}`}>
+    <div className="db-widget db-barchart">
       <WidgetCardHeader
         icon={BarChart2}
         title={widget.title}
-        currentType="bar_chart"
-        onMorphTo={onMorphTo}
-        onOpenCopilot={onOpenCopilot}
-        isCopilotOpen={isCopilotOpen}
       />
       <div className="db-barchart-rows">
         {widget.items.map((item, i) => (
@@ -240,10 +175,7 @@ function BarChart({
 
 function LineChartComp({
   widget,
-  onMorphTo,
-  onOpenCopilot,
-  isCopilotOpen,
-}: { widget: LineChartWidget; onMorphTo?: (target: MorphableChartType) => void } & WidgetCommonProps) {
+}: { widget: LineChartWidget } & WidgetCommonProps) {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const items = widget.items || [];
   const max = Math.max(...items.map((i) => i.value), 1);
@@ -274,14 +206,10 @@ function LineChartComp({
   const areaId = `areaGrad-${safeTitle}`;
 
   return (
-    <div className={`db-widget db-linechart ${isCopilotOpen ? 'db-widget-copilot-active' : ''}`}>
+    <div className="db-widget db-linechart">
       <WidgetCardHeader
         icon={LineChart}
         title={widget.title}
-        currentType="line_chart"
-        onMorphTo={onMorphTo}
-        onOpenCopilot={onOpenCopilot}
-        isCopilotOpen={isCopilotOpen}
       />
       <div className="db-chart-svg-wrap">
         <svg viewBox={`0 0 ${width} ${height}`} className="db-svg-chart">
@@ -394,10 +322,7 @@ function LineChartComp({
 
 function AreaChartComp({
   widget,
-  onMorphTo,
-  onOpenCopilot,
-  isCopilotOpen,
-}: { widget: AreaChartWidget; onMorphTo?: (target: MorphableChartType) => void } & WidgetCommonProps) {
+}: { widget: AreaChartWidget } & WidgetCommonProps) {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const items = widget.items || [];
   const max = Math.max(...items.map((i) => i.value), 1);
@@ -428,14 +353,10 @@ function AreaChartComp({
   const fillId = `areaFill-${safeTitle}`;
 
   return (
-    <div className={`db-widget db-areachart ${isCopilotOpen ? 'db-widget-copilot-active' : ''}`}>
+    <div className="db-widget db-areachart">
       <WidgetCardHeader
         icon={AreaChart}
         title={widget.title}
-        currentType="area_chart"
-        onMorphTo={onMorphTo}
-        onOpenCopilot={onOpenCopilot}
-        isCopilotOpen={isCopilotOpen}
       />
       <div className="db-chart-svg-wrap">
         <svg viewBox={`0 0 ${width} ${height}`} className="db-svg-chart">
@@ -548,10 +469,7 @@ function AreaChartComp({
 
 function PieChartComp({
   widget,
-  onMorphTo,
-  onOpenCopilot,
-  isCopilotOpen,
-}: { widget: PieChartWidget; onMorphTo?: (target: MorphableChartType) => void } & WidgetCommonProps) {
+}: { widget: PieChartWidget } & WidgetCommonProps) {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const items = widget.items || [];
   const total = items.reduce((sum, item) => sum + Math.max(0, item.value), 0) || 1;
@@ -594,14 +512,10 @@ function PieChartComp({
   });
 
   return (
-    <div className={`db-widget db-piechart ${isCopilotOpen ? 'db-widget-copilot-active' : ''}`}>
+    <div className="db-widget db-piechart">
       <WidgetCardHeader
         icon={PieChart}
         title={widget.title}
-        currentType="pie_chart"
-        onMorphTo={onMorphTo}
-        onOpenCopilot={onOpenCopilot}
-        isCopilotOpen={isCopilotOpen}
       />
       <div className="db-pie-container">
         <div className="db-pie-svg-wrap">
@@ -663,16 +577,12 @@ function PieChartComp({
 
 function ListWidgetComp({
   widget,
-  onOpenCopilot,
-  isCopilotOpen,
 }: { widget: ListWidget } & WidgetCommonProps) {
   return (
-    <div className={`db-widget db-list ${isCopilotOpen ? 'db-widget-copilot-active' : ''}`}>
+    <div className="db-widget db-list">
       <WidgetCardHeader
         icon={List}
         title={widget.title}
-        onOpenCopilot={onOpenCopilot}
-        isCopilotOpen={isCopilotOpen}
       />
       <ul className="db-list-items">
         {widget.items.map((item, i) => {
@@ -710,19 +620,12 @@ function ListWidgetComp({
 
 function TableWidgetComp({
   widget,
-  onMorphTo,
-  onOpenCopilot,
-  isCopilotOpen,
-}: { widget: TableWidget; onMorphTo?: (target: MorphableChartType) => void } & WidgetCommonProps) {
+}: { widget: TableWidget } & WidgetCommonProps) {
   return (
-    <div className={`db-widget db-table-widget ${isCopilotOpen ? 'db-widget-copilot-active' : ''}`}>
+    <div className="db-widget db-table-widget">
       <WidgetCardHeader
         icon={Table2}
         title={widget.title}
-        currentType="table"
-        onMorphTo={onMorphTo}
-        onOpenCopilot={onOpenCopilot}
-        isCopilotOpen={isCopilotOpen}
       />
       <div className="db-table-wrap">
         <table className="db-table">
@@ -750,8 +653,6 @@ function TableWidgetComp({
 
 function TimelineWidgetComp({
   widget,
-  onOpenCopilot,
-  isCopilotOpen,
 }: { widget: TimelineWidget } & WidgetCommonProps) {
   const STATUS_COLORS = {
     done:    { dot: 'var(--color-success)', bg: 'var(--color-success-subtle)' },
@@ -759,12 +660,10 @@ function TimelineWidgetComp({
     pending: { dot: 'var(--text-muted)', bg: 'var(--bg-subtle)' },
   };
   return (
-    <div className={`db-widget db-timeline ${isCopilotOpen ? 'db-widget-copilot-active' : ''}`}>
+    <div className="db-widget db-timeline">
       <WidgetCardHeader
         icon={Clock}
         title={widget.title}
-        onOpenCopilot={onOpenCopilot}
-        isCopilotOpen={isCopilotOpen}
       />
       <div className="db-timeline-events">
         {widget.events.map((ev, i) => {
@@ -791,16 +690,12 @@ function TimelineWidgetComp({
 
 function ComparisonWidgetComp({
   widget,
-  onOpenCopilot,
-  isCopilotOpen,
 }: { widget: ComparisonWidget } & WidgetCommonProps) {
   return (
-    <div className={`db-widget db-comparison ${isCopilotOpen ? 'db-widget-copilot-active' : ''}`}>
+    <div className="db-widget db-comparison">
       <WidgetCardHeader
         icon={GitCompare}
         title={widget.title}
-        onOpenCopilot={onOpenCopilot}
-        isCopilotOpen={isCopilotOpen}
       />
       <div className="db-table-wrap">
         <table className="db-table">
@@ -827,16 +722,12 @@ function ComparisonWidgetComp({
 
 function TextSummaryWidgetComp({
   widget,
-  onOpenCopilot,
-  isCopilotOpen,
 }: { widget: TextSummaryWidget } & WidgetCommonProps) {
   return (
-    <div className={`db-widget db-text-summary ${isCopilotOpen ? 'db-widget-copilot-active' : ''}`}>
+    <div className="db-widget db-text-summary">
       <WidgetCardHeader
         icon={FileText}
         title={widget.title}
-        onOpenCopilot={onOpenCopilot}
-        isCopilotOpen={isCopilotOpen}
       />
       {widget.highlight && (
         <div className="db-text-highlight">{widget.highlight}</div>
@@ -851,22 +742,20 @@ function TextSummaryWidgetComp({
 // ─────────────────────────────────────────────────────────────
 export interface WidgetRendererProps extends WidgetCommonProps {
   widget: DashboardWidget;
-  onMorphTo?: (target: MorphableChartType) => void;
 }
 
 export function WidgetRenderer({
   widget,
-  onMorphTo,
   ...commonProps
 }: WidgetRendererProps) {
   switch (widget.type) {
     case 'stat_card':   return <StatCard widget={widget} {...commonProps} />;
-    case 'bar_chart':   return <BarChart widget={widget} onMorphTo={onMorphTo} {...commonProps} />;
-    case 'line_chart':  return <LineChartComp widget={widget} onMorphTo={onMorphTo} {...commonProps} />;
-    case 'pie_chart':   return <PieChartComp widget={widget} onMorphTo={onMorphTo} {...commonProps} />;
-    case 'area_chart':  return <AreaChartComp widget={widget} onMorphTo={onMorphTo} {...commonProps} />;
+    case 'bar_chart':   return <BarChart widget={widget} {...commonProps} />;
+    case 'line_chart':  return <LineChartComp widget={widget} {...commonProps} />;
+    case 'pie_chart':   return <PieChartComp widget={widget} {...commonProps} />;
+    case 'area_chart':  return <AreaChartComp widget={widget} {...commonProps} />;
     case 'list':        return <ListWidgetComp widget={widget} {...commonProps} />;
-    case 'table':       return <TableWidgetComp widget={widget} onMorphTo={onMorphTo} {...commonProps} />;
+    case 'table':       return <TableWidgetComp widget={widget} {...commonProps} />;
     case 'timeline':    return <TimelineWidgetComp widget={widget} {...commonProps} />;
     case 'comparison':  return <ComparisonWidgetComp widget={widget} {...commonProps} />;
     case 'text_summary':return <TextSummaryWidgetComp widget={widget} {...commonProps} />;
@@ -874,12 +763,15 @@ export function WidgetRenderer({
   }
 }
 
+
 // ─────────────────────────────────────────────────────────────
 // Main Dashboard Preview (inline in chat / dynamic dashboard)
 // ─────────────────────────────────────────────────────────────
 export interface AiDashboardPreviewProps {
   data: DashboardData;
   dashboardId: string;
+  sessionId?: string;
+  turnIndex?: number;
   onClose?: () => void;
   compact?: boolean;
   onMorphWidget?: (index: number, targetType: MorphableChartType) => void;
@@ -888,17 +780,22 @@ export interface AiDashboardPreviewProps {
 export function AiDashboardPreview({
   data,
   dashboardId,
+  sessionId,
+  turnIndex,
   onClose,
   compact = false,
   onMorphWidget,
 }: AiDashboardPreviewProps) {
   const [copiedLink, setCopiedLink] = useState(false);
   const [activeCopilotWidgetIndex, setActiveCopilotWidgetIndex] = useState<number | null>(null);
+  const [isMinimized, setIsMinimized] = useState(false);
   const { language } = useLanguage();
 
-  const dashboardUrl = `/dashboard/${dashboardId}`;
+  const dashboardUrl = sessionId && turnIndex
+    ? `/dashboard/w/${sessionId}/${turnIndex}`
+    : `/dashboard/w/${sessionId || 'default'}/${turnIndex || 1}`;
   const fullUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/dashboard/${dashboardId}`
+    ? `${window.location.origin}${dashboardUrl}`
     : dashboardUrl;
 
   const handleCopyLink = useCallback(() => {
@@ -917,19 +814,49 @@ export function AiDashboardPreview({
   const otherWidgets = data.widgets.filter(w => w.type !== 'stat_card');
 
   return (
-    <div className={`db-preview-container ${compact ? 'db-preview-compact' : ''}`}>
+    <div className={`db-preview-container ${compact ? 'db-preview-compact' : ''} ${isMinimized ? 'db-preview-minimized' : ''}`}>
       {/* Header */}
-      <div className="db-preview-header">
+      <div
+        className={`db-preview-header ${isMinimized ? 'db-preview-header-minimized' : ''}`}
+        onClick={isMinimized ? () => setIsMinimized(false) : undefined}
+        title={isMinimized ? (language === 'en' ? 'Click to expand dashboard' : 'Klik untuk memperluas dashboard') : undefined}
+      >
         <div className="db-preview-header-left">
           <div className="db-preview-icon">
             <LayoutDashboard size={14} />
           </div>
           <div>
-            <h3 className="db-preview-title">{data.title}</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <h3 className="db-preview-title">{data.title}</h3>
+              {isMinimized && (
+                <span className="db-preview-minimized-badge">
+                  {data.widgets.length} widget{data.widgets.length > 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
             {data.subtitle && <p className="db-preview-subtitle">{data.subtitle}</p>}
           </div>
         </div>
-        <div className="db-preview-header-actions">
+        <div className="db-preview-header-actions" onClick={(e) => e.stopPropagation()}>
+          {/* Minimize / Expand Toggle Button (Like Claude Artifacts) */}
+          <button
+            type="button"
+            onClick={() => setIsMinimized((prev) => !prev)}
+            className="db-icon-btn"
+            title={
+              isMinimized
+                ? language === 'en'
+                  ? 'Expand dashboard'
+                  : 'Perluas dashboard'
+                : language === 'en'
+                ? 'Minimize dashboard'
+                : 'Kecilkan dashboard'
+            }
+            aria-label={isMinimized ? 'Expand' : 'Minimize'}
+          >
+            {isMinimized ? <ChevronDown size={13} /> : <Minus size={13} />}
+          </button>
+
           <button
             type="button"
             onClick={handleCopyLink}
@@ -961,82 +888,53 @@ export function AiDashboardPreview({
         </div>
       </div>
 
-      {/* Stat cards row */}
-      {statCards.length > 0 && (
-        <div className="db-stat-grid">
-          {statCards.map((w, i) => {
-            const originalIndex = data.widgets.indexOf(w);
-            return (
-              <WidgetRenderer
-                key={i}
-                widget={w}
-                originalIndex={originalIndex}
-                onOpenCopilot={() =>
-                  setActiveCopilotWidgetIndex((prev) => (prev === originalIndex ? null : originalIndex))
-                }
-                isCopilotOpen={activeCopilotWidgetIndex === originalIndex}
-              />
-            );
-          })}
-        </div>
-      )}
+      {/* Collapsible Body (Widgets and Footer) */}
+      {!isMinimized && (
+        <>
+          {/* Stat cards row */}
+          {statCards.length > 0 && (
+            <div className="db-stat-grid">
+              {statCards.map((w, i) => {
+                const originalIndex = data.widgets.indexOf(w);
+                return (
+                  <WidgetRenderer
+                    key={i}
+                    widget={w}
+                    originalIndex={originalIndex}
+                  />
+                );
+              })}
+            </div>
+          )}
 
-      {/* Other widgets */}
-      {otherWidgets.length > 0 && (
-        <div className="db-widget-grid">
-          {otherWidgets.map((w, i) => {
-            const originalIndex = data.widgets.indexOf(w);
-            const isMorphable =
-              w.type === 'table' ||
-              w.type === 'bar_chart' ||
-              w.type === 'line_chart' ||
-              w.type === 'pie_chart' ||
-              w.type === 'area_chart';
+          {/* Other widgets */}
+          {otherWidgets.length > 0 && (
+            <div className="db-widget-grid">
+              {otherWidgets.map((w, i) => {
+                const originalIndex = data.widgets.indexOf(w);
+                return (
+                  <WidgetRenderer
+                    key={i}
+                    widget={w}
+                    originalIndex={originalIndex}
+                  />
+                );
+              })}
+            </div>
+          )}
 
-            const handleMorphTo = onMorphWidget && isMorphable
-              ? (targetType: MorphableChartType) => {
-                  onMorphWidget(originalIndex, targetType);
-                }
-              : undefined;
-
-            return (
-              <WidgetRenderer
-                key={i}
-                widget={w}
-                originalIndex={originalIndex}
-                onMorphTo={handleMorphTo}
-                onOpenCopilot={() =>
-                  setActiveCopilotWidgetIndex((prev) => (prev === originalIndex ? null : originalIndex))
-                }
-                isCopilotOpen={activeCopilotWidgetIndex === originalIndex}
-              />
-            );
-          })}
-        </div>
-      )}
-
-      {/* Footer */}
-      <div className="db-preview-footer">
-        <span className="db-preview-footer-info">
-          {data.widgets.length} widget{data.widgets.length > 1 ? 's' : ''}
-        </span>
-        <button type="button" onClick={handleOpenFull} className="db-open-btn">
-          <Share2 size={11} />
-          <span>{language === 'en' ? 'Open & Share Dashboard' : 'Buka & Bagikan Dashboard'}</span>
-          <ExternalLink size={11} />
-        </button>
-      </div>
-
-      {/* ── Floating Bottom Dock Copilot ── */}
-      {activeCopilotWidgetIndex !== null && data.widgets[activeCopilotWidgetIndex] && (
-        <CardFloatingCopilot
-          dashboardId={dashboardId}
-          dashboardData={data}
-          widget={data.widgets[activeCopilotWidgetIndex]}
-          widgetIndex={activeCopilotWidgetIndex}
-          onMorphWidget={onMorphWidget}
-          onClose={() => setActiveCopilotWidgetIndex(null)}
-        />
+          {/* Footer */}
+          <div className="db-preview-footer">
+            <span className="db-preview-footer-info">
+              {data.widgets.length} widget{data.widgets.length > 1 ? 's' : ''}
+            </span>
+            <button type="button" onClick={handleOpenFull} className="db-open-btn">
+              <Share2 size={11} />
+              <span>{language === 'en' ? 'Open & Share Dashboard' : 'Buka & Bagikan Dashboard'}</span>
+              <ExternalLink size={11} />
+            </button>
+          </div>
+        </>
       )}
     </div>
   );
@@ -1048,6 +946,7 @@ export function AiDashboardPreview({
 interface BuildDashboardButtonProps {
   messageId: string;
   sessionId?: string;
+  turnIndex?: number;
   answerText: string;
   queryText?: string;
   forceRegenerate?: boolean;
@@ -1061,6 +960,7 @@ interface BuildDashboardButtonProps {
 export function BuildDashboardButton({
   messageId,
   sessionId,
+  turnIndex,
   answerText,
   queryText,
   forceRegenerate = false,
@@ -1080,7 +980,7 @@ export function BuildDashboardButton({
       const res = await fetch('/api/chat/dashboard', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messageId, sessionId, answerText, queryText, forceRegenerate }),
+        body: JSON.stringify({ messageId, sessionId, turnIndex, answerText, queryText, forceRegenerate }),
       });
 
       if (!res.ok) {
@@ -1106,7 +1006,7 @@ export function BuildDashboardButton({
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, messageId, sessionId, answerText, queryText, forceRegenerate, onDashboardReady, language]);
+  }, [isLoading, messageId, sessionId, turnIndex, answerText, queryText, forceRegenerate, onDashboardReady, language]);
 
   const defaultTitle = language === 'en' ? 'Convert to interactive dashboard' : 'Ubah menjadi dashboard interaktif';
   const defaultLabel = language === 'en' ? 'Dashboard' : 'Dashboard';

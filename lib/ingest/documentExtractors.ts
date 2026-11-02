@@ -331,7 +331,6 @@ export async function extractDocPages(
 
   try {
     // Dynamic import WordExtractor
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const WordExtractor = require('word-extractor');
     const extractor = new WordExtractor();
     const extracted = await extractor.extract(fileBuffer);

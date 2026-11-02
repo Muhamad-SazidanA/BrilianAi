@@ -5,6 +5,7 @@ import {
   getDashboardById,
   getDashboardByMessageId,
   updateDashboardData,
+  _resetDashboardTableInitializedForTesting,
 } from '../lib/db/dashboardStore';
 import { DashboardData } from '../src/types/dashboard';
 
@@ -29,6 +30,7 @@ describe('dashboardStore unit tests', () => {
   beforeEach(() => {
     mockPool.query.mockReset();
     vi.clearAllMocks();
+    _resetDashboardTableInitializedForTesting();
     vi.spyOn(dbClient, 'getPool').mockReturnValue(mockPool as any);
   });
 

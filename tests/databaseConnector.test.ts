@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { encryptSecret, decryptSecret } from '../lib/connectors/credentialVault';
-import { validateReadOnlyQuery } from '../lib/connectors/databaseConnectorService';
+import { validateReadOnlyQuery, applyQueryLimit } from '../lib/connectors/databaseConnectorService';
 
 describe('Database Connector & Security (No Mock / Zero Dummy)', () => {
   describe('1. Credential Vault (AES-256-GCM Cryptographic Security)', () => {
@@ -57,4 +57,28 @@ describe('Database Connector & Security (No Mock / Zero Dummy)', () => {
       expect(validateReadOnlyQuery('   ').isValid).toBe(false);
     });
   });
+
+  describe('3. Outer Query Limit & Subquery Immunity', () => {
+    it('should append LIMIT 500 when query has no limit clause', () => {
+      const res = applyQueryLimit('SELECT * FROM employees', 500);
+      expect(res).toBe('SELECT * FROM employees LIMIT 500');
+    });
+
+    it('should not add redundant limit if query already has an outer LIMIT', () => {
+      const res = applyQueryLimit('SELECT * FROM employees LIMIT 25;', 500);
+      expect(res).toBe('SELECT * FROM employees LIMIT 25');
+    });
+
+    it('should not be fooled by LIMIT inside a WHERE subquery', () => {
+      const queryWithSubquery = 'SELECT * FROM orders WHERE customer_id = (SELECT id FROM customers LIMIT 1)';
+      const res = applyQueryLimit(queryWithSubquery, 500);
+      expect(res).toBe(`${queryWithSubquery} LIMIT 500`);
+    });
+
+    it('should support queries ending with LIMIT and OFFSET', () => {
+      const res = applyQueryLimit('SELECT * FROM products ORDER BY id LIMIT 50 OFFSET 100', 500);
+      expect(res).toBe('SELECT * FROM products ORDER BY id LIMIT 50 OFFSET 100');
+    });
+  });
 });
+

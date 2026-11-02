@@ -7,7 +7,8 @@ dotenv.config();
 export const INGEST_QUEUE_NAME = 'pdf-ingestion';
 
 export interface IngestJobData {
-  fileBufferBase64: string;
+  fileBufferBase64?: string;
+  tempFilePath?: string;
   filename: string;
   options?: IngestOptions;
   clientId?: string;
@@ -106,7 +107,6 @@ export async function isRedisReachable(host: string, port: number, timeoutMs = 3
   return result;
 }
 
-
 let queueInstance: Queue<IngestJobData, UploadResult> | null = null;
 let workerInstance: Worker<IngestJobData, UploadResult> | null = null;
 let queueEventsInstance: QueueEvents | null = null;
@@ -138,9 +138,30 @@ export function getIngestWorker(): Worker<IngestJobData, UploadResult> {
     workerInstance = new Worker<IngestJobData, UploadResult>(
       INGEST_QUEUE_NAME,
       async (job: Job<IngestJobData, UploadResult>) => {
-        const { fileBufferBase64, filename, options, clientId } = job.data;
-        const fileBuffer = Buffer.from(fileBufferBase64, 'base64');
-        return await ingestPdf(fileBuffer, filename, options, clientId);
+        const { fileBufferBase64, tempFilePath, filename, options, clientId } = job.data;
+        let fileBuffer: Buffer;
+
+        if (tempFilePath) {
+          const fs = await import('fs');
+          fileBuffer = await fs.promises.readFile(tempFilePath);
+        } else if (fileBufferBase64) {
+          fileBuffer = Buffer.from(fileBufferBase64, 'base64');
+        } else {
+          throw new Error('Payload berkas tidak ditemukan dalam antrean BullMQ.');
+        }
+
+        try {
+          return await ingestPdf(fileBuffer, filename, options, clientId);
+        } finally {
+          if (tempFilePath) {
+            try {
+              const fs = await import('fs');
+              await fs.promises.unlink(tempFilePath);
+            } catch {
+              // quiet cleanup
+            }
+          }
+        }
       },
       {
         connection,
@@ -170,11 +191,7 @@ export function getIngestQueueEvents(): QueueEvents {
 
 /**
  * Queues a PDF ingestion job to BullMQ and awaits the completed result.
- *
- * @param fileBuffer - In-memory Buffer of the uploaded PDF
- * @param filename - Name of the PDF file
- * @param options - Optional ingestion options
- * @returns Promise<UploadResult>
+ * Optimasi: Dokumen besar (>5MB) ditulis ke temporary file untuk mencegah lonjakan RAM pada Redis.
  */
 export async function queuePdfIngestion(
   fileBuffer: Buffer,
@@ -192,27 +209,53 @@ export async function queuePdfIngestion(
     return await ingestPdf(fileBuffer, filename, options, clientId);
   }
 
+  let tempPath: string | undefined;
   try {
     const queue = getIngestQueue();
-    // Ensure worker is running to process jobs in local server lifecycle
     getIngestWorker();
     const queueEvents = getIngestQueueEvents();
 
-    const job = await queue.add('ingest-pdf', {
-      fileBufferBase64: fileBuffer.toString('base64'),
-      filename,
-      options,
-      clientId,
-    });
+    const LARGE_PAYLOAD_THRESHOLD = 5 * 1024 * 1024; // 5 MB threshold
+    let jobData: IngestJobData;
 
+    if (fileBuffer.length > LARGE_PAYLOAD_THRESHOLD) {
+      const fs = await import('fs');
+      const os = await import('os');
+      const path = await import('path');
+      tempPath = path.join(
+        os.tmpdir(),
+        `brilian_ingest_${Date.now()}_${Math.random().toString(16).slice(2)}.tmp`
+      );
+      await fs.promises.writeFile(tempPath, fileBuffer);
+      jobData = {
+        tempFilePath: tempPath,
+        filename,
+        options,
+        clientId,
+      };
+    } else {
+      jobData = {
+        fileBufferBase64: fileBuffer.toString('base64'),
+        filename,
+        options,
+        clientId,
+      };
+    }
+
+    const job = await queue.add('ingest-pdf', jobData);
     const result = await job.waitUntilFinished(queueEvents);
     return result;
   } catch (error) {
+    if (tempPath) {
+      try {
+        const fs = await import('fs');
+        await fs.promises.unlink(tempPath);
+      } catch {}
+    }
     console.warn(
       '[IngestQueue] BullMQ queue dispatch encountered an error. Falling back to direct execution:',
       error instanceof Error ? error.message : error
     );
-    // Fallback directly to ingestPdf
     return await ingestPdf(fileBuffer, filename, options, clientId);
   }
 }

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { queuePdfIngestion } from '@lib/queue/ingestQueue';
 import { getIngestProgress, clearIngestProgress, setIngestProgress } from '@lib/ingest/ingestProgress';
 import { getAuthenticatedUser, hasServerPermission } from '@lib/auth/serverAuth';
+import { recordAuditEvent } from '@/../lib/db/auditLogStore';
+import { invalidateStatsCache } from '@lib/cache/statsCache';
 
 export const dynamic = 'force-dynamic';
 
@@ -126,6 +128,25 @@ export async function POST(req: NextRequest) {
           await bulkGrantDocumentAccess(result.uploadBatchId, userGrants, ownerId);
         }
 
+        await recordAuditEvent({
+          eventCategory: 'DOC_MGMT',
+          action: 'document.upload',
+          actorId: authUser.id,
+          actorName: authUser.name,
+          actorEmail: authUser.email,
+          actorDepartment: authUser.department,
+          resourceType: 'document',
+          resourceId: result.uploadBatchId,
+          resourceName: filename,
+          status: 'success',
+          details: {
+            page_count: result.pageCount,
+            chunk_count: result.chunkCount,
+            classification,
+            division_id: divisionId,
+          },
+        });
+
         setIngestProgress(clientId, {
           clientId,
           filename,
@@ -143,6 +164,7 @@ export async function POST(req: NextRequest) {
             chunk_count: result.chunkCount,
           },
         });
+        invalidateStatsCache();
       } catch (err: any) {
         console.error(`[Background Ingestion Error] ${filename} (clientId: ${clientId}):`, err);
         setIngestProgress(clientId, {
@@ -178,6 +200,25 @@ export async function POST(req: NextRequest) {
       await bulkGrantDocumentAccess(result.uploadBatchId, userGrants, ownerId);
     }
 
+    await recordAuditEvent({
+      eventCategory: 'DOC_MGMT',
+      action: 'document.upload',
+      actorId: authUser.id,
+      actorName: authUser.name,
+      actorEmail: authUser.email,
+      actorDepartment: authUser.department,
+      resourceType: 'document',
+      resourceId: result.uploadBatchId,
+      resourceName: filename,
+      status: 'success',
+      details: {
+        page_count: result.pageCount,
+        chunk_count: result.chunkCount,
+        classification,
+        division_id: divisionId,
+      },
+    });
+
     setIngestProgress(clientId, {
       clientId,
       filename,
@@ -195,6 +236,8 @@ export async function POST(req: NextRequest) {
         chunk_count: result.chunkCount,
       },
     });
+
+    invalidateStatsCache();
 
     return NextResponse.json(
       {

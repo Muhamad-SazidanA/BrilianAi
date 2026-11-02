@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRoleById, updateRole, deleteRole } from '@/../lib/db/userStore';
 import { getAuthenticatedUser, hasServerPermission } from '@lib/auth/serverAuth';
+import { recordAuditEvent } from '@/../lib/db/auditLogStore';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,6 +49,24 @@ export async function PATCH(
     if (!updated) {
       return NextResponse.json({ error: 'Role tidak ditemukan' }, { status: 404 });
     }
+
+    await recordAuditEvent({
+      eventCategory: 'ROLE_MGMT',
+      action: 'role.update',
+      actorId: authUser.id,
+      actorName: authUser.name,
+      actorEmail: authUser.email,
+      actorDepartment: authUser.department,
+      resourceType: 'role',
+      resourceId: updated.id,
+      resourceName: updated.name,
+      status: 'success',
+      details: {
+        permissions_count: updated.permissions?.length || 0,
+        classifications: updated.allowed_classifications || [],
+      },
+    });
+
     return NextResponse.json({ role: updated });
   } catch (err: any) {
     console.error('[API Role PATCH] Error:', err);
@@ -77,6 +96,20 @@ export async function DELETE(
     if (!success) {
       return NextResponse.json({ error: 'Role tidak ditemukan' }, { status: 404 });
     }
+
+    await recordAuditEvent({
+      eventCategory: 'ROLE_MGMT',
+      action: 'role.delete',
+      actorId: authUser.id,
+      actorName: authUser.name,
+      actorEmail: authUser.email,
+      actorDepartment: authUser.department,
+      resourceType: 'role',
+      resourceId: params.id,
+      resourceName: params.id,
+      status: 'success',
+    });
+
     return NextResponse.json({ success: true, message: 'Role berhasil dihapus' });
   } catch (err: any) {
     console.error('[API Role DELETE] Error:', err);

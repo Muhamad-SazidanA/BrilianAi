@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listUsers, createUser } from '@/../lib/db/userStore';
 import { getAuthenticatedUser, hasServerPermission } from '@lib/auth/serverAuth';
+import { recordAuditEvent } from '@/../lib/db/auditLogStore';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,8 +13,9 @@ export async function GET(req: NextRequest) {
     }
 
     const canManage = await hasServerPermission(req, 'users:manage');
-    if (!canManage) {
-      return NextResponse.json({ error: 'Forbidden: Hak akses users:manage diperlukan.' }, { status: 403 });
+    const canReadAudit = await hasServerPermission(req, 'audit:read');
+    if (!canManage && !canReadAudit) {
+      return NextResponse.json({ error: 'Forbidden: Hak akses users:manage atau audit:read diperlukan.' }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);
@@ -65,6 +67,22 @@ export async function POST(req: NextRequest) {
       status: status || 'active',
       avatar_color,
     });
+
+    try {
+      await recordAuditEvent({
+        eventCategory: 'USER_MGMT',
+        action: 'user.create',
+        actorId: authUser.id,
+        actorName: authUser.name,
+        actorEmail: authUser.email,
+        actorDepartment: authUser.department,
+        resourceType: 'user',
+        resourceId: newUser.id,
+        resourceName: `${newUser.name} (${newUser.email})`,
+        status: 'success',
+        details: { role_id: newUser.role_id, department: newUser.department, status: newUser.status },
+      });
+    } catch {}
 
     return NextResponse.json({ user: newUser }, { status: 201 });
   } catch (err: any) {

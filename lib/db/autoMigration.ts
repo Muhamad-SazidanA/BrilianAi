@@ -1,4 +1,3 @@
-import { Pool } from 'pg';
 import { getPool } from './dbClient';
 
 let isMigrationRunning = false;
@@ -44,6 +43,7 @@ export async function ensureCompleteDatabaseSchema(): Promise<void> {
       ALTER TABLE upload_batches ADD COLUMN IF NOT EXISTS supersedes_id UUID;
       ALTER TABLE upload_batches ADD COLUMN IF NOT EXISTS effective_date TIMESTAMPTZ NOT NULL DEFAULT now();
       ALTER TABLE upload_batches ADD COLUMN IF NOT EXISTS review_due_date TIMESTAMPTZ;
+      ALTER TABLE upload_batches ADD COLUMN IF NOT EXISTS suggested_questions TEXT[] DEFAULT '{}';
       CREATE INDEX IF NOT EXISTS idx_batches_status ON upload_batches (status);
       CREATE INDEX IF NOT EXISTS idx_batches_division ON upload_batches (division_id);
       CREATE INDEX IF NOT EXISTS idx_batches_classification ON upload_batches (classification);
@@ -101,6 +101,7 @@ export async function ensureCompleteDatabaseSchema(): Promise<void> {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS department VARCHAR(100);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_color VARCHAR(20) DEFAULT '#2563EB';
       ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;
       CREATE INDEX IF NOT EXISTS idx_users_role_id ON users (role_id);
       CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
       CREATE INDEX IF NOT EXISTS idx_users_status ON users (status);
@@ -266,17 +267,80 @@ export async function ensureCompleteDatabaseSchema(): Promise<void> {
       );
 
       CREATE TABLE IF NOT EXISTS chat_audit_logs (
-          id BIGSERIAL PRIMARY KEY,
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          session_id VARCHAR(100),
           user_id UUID REFERENCES users(id) ON DELETE SET NULL,
           user_name VARCHAR(120),
           user_email VARCHAR(150),
           user_role VARCHAR(50),
-          query TEXT NOT NULL,
+          user_department VARCHAR(100),
+          query_text TEXT,
+          query TEXT,
+          topic VARCHAR(200),
+          answer_excerpt TEXT,
           answer TEXT,
+          sources_used JSONB NOT NULL DEFAULT '[]',
           sources_count INT DEFAULT 0,
+          retrieved_count INT NOT NULL DEFAULT 0,
           latency_ms INT,
           created_at TIMESTAMPTZ NOT NULL DEFAULT now()
       );
+      ALTER TABLE chat_audit_logs ADD COLUMN IF NOT EXISTS session_id VARCHAR(100);
+      ALTER TABLE chat_audit_logs ADD COLUMN IF NOT EXISTS user_department VARCHAR(100);
+      ALTER TABLE chat_audit_logs ADD COLUMN IF NOT EXISTS query_text TEXT;
+      ALTER TABLE chat_audit_logs ADD COLUMN IF NOT EXISTS topic VARCHAR(200);
+      ALTER TABLE chat_audit_logs ADD COLUMN IF NOT EXISTS answer_excerpt TEXT;
+      ALTER TABLE chat_audit_logs ADD COLUMN IF NOT EXISTS sources_used JSONB NOT NULL DEFAULT '[]';
+      ALTER TABLE chat_audit_logs ADD COLUMN IF NOT EXISTS retrieved_count INT NOT NULL DEFAULT 0;
+      ALTER TABLE chat_audit_logs ADD COLUMN IF NOT EXISTS user_role VARCHAR(50);
+      ALTER TABLE chat_audit_logs ADD COLUMN IF NOT EXISTS query TEXT;
+      ALTER TABLE chat_audit_logs ADD COLUMN IF NOT EXISTS answer TEXT;
+      ALTER TABLE chat_audit_logs ADD COLUMN IF NOT EXISTS sources_count INT DEFAULT 0;
+      ALTER TABLE chat_audit_logs ADD COLUMN IF NOT EXISTS latency_ms INT;
+      CREATE INDEX IF NOT EXISTS idx_chat_audit_user_id ON chat_audit_logs (user_id);
+      CREATE INDEX IF NOT EXISTS idx_chat_audit_created_at ON chat_audit_logs (created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_chat_audit_topic ON chat_audit_logs (topic);
+      CREATE INDEX IF NOT EXISTS idx_chat_audit_session ON chat_audit_logs (session_id);
+
+      -- 13. Tabel unified audit_logs
+      CREATE TABLE IF NOT EXISTS audit_logs (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          event_category VARCHAR(50) NOT NULL DEFAULT 'SYSTEM',
+          action VARCHAR(100) NOT NULL,
+          actor_id UUID REFERENCES users(id) ON DELETE SET NULL,
+          actor_name VARCHAR(150),
+          actor_email VARCHAR(150),
+          actor_department VARCHAR(100),
+          actor_ip VARCHAR(50),
+          resource_type VARCHAR(50),
+          resource_id VARCHAR(150),
+          resource_name VARCHAR(255),
+          status VARCHAR(20) NOT NULL DEFAULT 'success',
+          details JSONB NOT NULL DEFAULT '{}',
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS idx_audit_created_at ON audit_logs (created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_audit_category ON audit_logs (event_category);
+      CREATE INDEX IF NOT EXISTS idx_audit_actor_id ON audit_logs (actor_id);
+      CREATE INDEX IF NOT EXISTS idx_audit_status ON audit_logs (status);
+
+      -- 14. Tabel ai_dashboards
+      CREATE TABLE IF NOT EXISTS ai_dashboards (
+          dashboard_id VARCHAR(64) PRIMARY KEY,
+          message_id VARCHAR(255) NOT NULL,
+          session_id UUID REFERENCES chat_sessions(id) ON DELETE SET NULL,
+          turn_index INTEGER,
+          user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+          title VARCHAR(255) NOT NULL DEFAULT 'Dashboard AI',
+          data JSONB NOT NULL DEFAULT '{}'::jsonb,
+          views_count INTEGER NOT NULL DEFAULT 0,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+      ALTER TABLE ai_dashboards ADD COLUMN IF NOT EXISTS turn_index INTEGER;
+      CREATE INDEX IF NOT EXISTS idx_ai_dashboards_message_id ON ai_dashboards(message_id);
+      CREATE INDEX IF NOT EXISTS idx_ai_dashboards_user_id ON ai_dashboards(user_id);
+      CREATE INDEX IF NOT EXISTS idx_ai_dashboards_session_turn ON ai_dashboards(session_id, turn_index);
     `).catch((e) => console.warn('[AutoMigration] audit & feedback tables warn:', e?.message));
 
     // 13. Auto-Purge Cache: Bersihkan jawaban gagal/tidak ditemukan dari chat_response_cache
@@ -290,10 +354,10 @@ export async function ensureCompleteDatabaseSchema(): Promise<void> {
          OR (sources::text = '[]' AND allow_public_knowledge = false);
     `).catch((e) => console.warn('[AutoMigration] purge cache warn:', e?.message));
 
-    isMigrationDone = true;
   } catch (err: any) {
     console.warn('[AutoMigration] ensureCompleteDatabaseSchema warning:', err?.message || err);
   } finally {
+    isMigrationDone = true;
     isMigrationRunning = false;
   }
 }

@@ -16,6 +16,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Forbidden: Hak akses audit:read diperlukan.' }, { status: 403 });
     }
     const { searchParams } = new URL(req.url);
+    const category = searchParams.get('category') || undefined;
+    const status = searchParams.get('status') || undefined;
     const userId = searchParams.get('userId') || undefined;
     const search = searchParams.get('search') || undefined;
     const topic = searchParams.get('topic') || undefined;
@@ -24,6 +26,8 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20', 10);
 
     const result = await listAuditLogs({
+      category,
+      status,
       userId,
       search,
       topic,

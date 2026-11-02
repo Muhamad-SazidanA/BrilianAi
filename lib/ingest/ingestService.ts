@@ -218,7 +218,17 @@ export async function ingestPdf(
     console.log(`[IngestPipeline] Dokumen siap. Status: Menunggu Kurasi (tersedia kurasi manual via Studio).`);
   }
 
-  // 8. Return complete upload result
+  // 8. Pre-generate saran pertanyaan AI untuk batch ini di background (Hybrid & Cache)
+  Promise.resolve().then(async () => {
+    try {
+      const { generateDocumentSuggestions } = await import('../ai/suggestionService');
+      await generateDocumentSuggestions(batchId, filename);
+    } catch (err) {
+      console.warn('[IngestPipeline] Background suggestions generation warning:', err);
+    }
+  });
+
+  // 9. Return complete upload result
   return {
     uploadBatchId: batchId,
     originalFilename: filename,

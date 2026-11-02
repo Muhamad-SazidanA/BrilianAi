@@ -5,7 +5,7 @@ import { embedTexts } from '../ai/embeddingClient';
 import { createUploadBatch, insertChunks } from '../db/vectorStore';
 import { bulkGrantDocumentAccess } from '../db/documentGrantStore';
 import { formatRowsToMarkdownTable } from '../ingest/documentExtractors';
-import { encryptSecret, decryptSecret } from './credentialVault';
+import { decryptSecret } from './credentialVault';
 import type { DocumentClassification, DocumentStatus } from '@/types/document';
 
 export type SupportedDbType = 'postgres' | 'mysql';
@@ -145,8 +145,15 @@ export async function testDbConnection(config: DbConnectorConfig): Promise<DbTes
 }
 
 /**
- * Mengeksekusi query SELECT yang aman dan mengambil rows serta kolom.
+ * Memastikan kueri SQL memiliki batas LIMIT baris terluar untuk mencegah OOM.
+ * Menangani subquery agar LIMIT di dalam klausa WHERE tidak menipu pembatas kueri utama.
  */
+export function applyQueryLimit(query: string, maxRows = 500): string {
+  const clean = query.trim().replace(/;+\s*$/, '');
+  const hasOuterLimit = /\bLIMIT\s+\d+(\s+OFFSET\s+\d+)?\s*$/i.test(clean);
+  return hasOuterLimit ? clean : `${clean} LIMIT ${maxRows}`;
+}
+
 export async function executeSafeQuery(
   config: DbConnectorConfig,
   maxRows = 500
@@ -157,11 +164,7 @@ export async function executeSafeQuery(
   }
 
   const password = resolvePassword(config);
-  // Tambahkan limit jika belum memiliki limit eksplisit
-  let limitedQuery = config.query.trim().replace(/;+$/, '');
-  if (!/\bLIMIT\s+\d+/i.test(limitedQuery)) {
-    limitedQuery = `${limitedQuery} LIMIT ${maxRows}`;
-  }
+  const limitedQuery = applyQueryLimit(config.query, maxRows);
 
   if (config.dbType === 'postgres') {
     const client = new PgClient({

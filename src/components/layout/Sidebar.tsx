@@ -29,8 +29,10 @@ import ChatHistoryItem from '@/components/chat/ChatHistoryItem';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import { toast } from 'sonner';
 
-// Module-level in-memory cache for instant zero-flicker sidebar history
+// Module-level in-memory cache for instant zero-flicker sidebar history & doc count
 let cachedSidebarSessions: ChatSession[] | null = null;
+let cachedSidebarDocCount: number | null = null;
+let lastDocCountFetchTime = 0;
 
 interface SidebarProps {
   stats?: {
@@ -50,7 +52,7 @@ export default function Sidebar({
   const router = useRouter();
   const { language, t } = useLanguage();
   const { currentUser, hasPermission } = useUserSession();
-  const [docCount, setDocCount] = useState<number>(stats?.totalDocuments || 0);
+  const [docCount, setDocCount] = useState<number>(() => stats?.totalDocuments ?? cachedSidebarDocCount ?? 0);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
   // ── Chat History State (Instantly seeded from in-memory cache) ──
@@ -398,12 +400,20 @@ export default function Sidebar({
   }, [theme, isCollapsed]);
 
   useEffect(() => {
+    const now = Date.now();
+    // Revalidasi cepat: jika sudah ada cache dan baru di-fetch kurang dari 15 detik lalu, jangan fetch ulang
+    if (cachedSidebarDocCount !== null && now - lastDocCountFetchTime < 15000) {
+      return;
+    }
+    lastDocCountFetchTime = now;
     async function checkDocCount() {
       try {
         const res = await fetch('/api/stats');
         if (res.ok) {
           const data = await res.json();
-          setDocCount(data.totalDocuments || 0);
+          const count = data.totalDocuments || 0;
+          cachedSidebarDocCount = count;
+          setDocCount(count);
         }
       } catch {
         // quiet fallback
@@ -512,7 +522,7 @@ export default function Sidebar({
             if (isCollapsed) {
               showFlyout({
                 id: 'toggle-collapse',
-                category: language === 'en' ? 'SIDEBAR' : 'TAMPILAN',
+                category: language === 'en' ? 'Sidebar' : 'Tampilan',
                 title: t('nav.open_sidebar'),
                 description: language === 'en' ? 'Expand sidebar to show full menu titles' : 'Buka sidebar untuk melihat judul menu lengkap',
                 actionText: language === 'en' ? 'Click to expand' : 'Klik untuk membuka',
@@ -603,11 +613,10 @@ export default function Sidebar({
             {!isCollapsed && (
               <div
                 style={{
-                  fontSize: '9.5px',
+                  fontSize: '10px',
                   fontWeight: 600,
-                  textTransform: 'uppercase',
                   color: 'var(--text-muted)',
-                  letterSpacing: '0.04em',
+                  letterSpacing: '0.02em',
                   padding: '1px 6px',
                   marginBottom: '0',
                 }}
@@ -638,7 +647,7 @@ export default function Sidebar({
                 if (isCollapsed) {
                   showFlyout({
                     id: 'assistant',
-                    category: language === 'en' ? 'AI ASSISTANT' : 'ASISTEN AI',
+                    category: language === 'en' ? 'AI Assistant' : 'Asisten AI',
                     title: language === 'en' ? 'New AI Chat' : 'Percakapan Baru',
                     description: language === 'en' ? 'Start a fresh document inquiry with AI Assistant' : 'Mulai sesi tanya jawab baru dengan Asisten AI',
                     actionText: language === 'en' ? 'Start chat' : 'Mulai chat',
@@ -698,11 +707,10 @@ export default function Sidebar({
                 >
                   <span
                     style={{
-                      fontSize: '9.5px',
+                      fontSize: '10px',
                       fontWeight: 600,
-                      textTransform: 'uppercase',
                       color: 'var(--text-muted)',
-                      letterSpacing: '0.04em',
+                      letterSpacing: '0.02em',
                       lineHeight: 1,
                       userSelect: 'none',
                     }}
@@ -966,7 +974,7 @@ export default function Sidebar({
               if (isCollapsed) {
                 showFlyout({
                   id: 'login',
-                  category: language === 'en' ? 'AUTHENTICATION' : 'AUTENTIKASI',
+                  category: language === 'en' ? 'Authentication' : 'Autentikasi',
                   title: language === 'en' ? 'Log in' : 'Masuk ke Akun',
                   description: language === 'en' ? 'Sign in to access your documents and history' : 'Masuk untuk mengakses dokumen dan riwayat',
                   actionText: language === 'en' ? 'Go to login' : 'Menuju login',
@@ -1063,10 +1071,9 @@ export default function Sidebar({
               {hoveredFlyout.category && (
                 <span
                   style={{
-                    fontSize: '9px',
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
+                    fontSize: '9.5px',
+                    fontWeight: 600,
+                    letterSpacing: '0.02em',
                     color: 'var(--text-muted)',
                     lineHeight: 1,
                   }}

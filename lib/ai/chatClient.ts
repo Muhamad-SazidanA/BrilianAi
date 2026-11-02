@@ -1,5 +1,5 @@
 import { ChatOllama } from '@langchain/ollama';
-import { HumanMessage, SystemMessage, BaseMessage } from '@langchain/core/messages';
+import { HumanMessage, SystemMessage, AIMessage, BaseMessage } from '@langchain/core/messages';
 import { parseUserFormattingInstruction, formatInstructionPrompt } from '../chat/chatUtils';
 
 // Configure Node.js undici dispatcher timeout to allow long AI/LLM inferences
@@ -20,6 +20,7 @@ export interface ChatClientOptions {
   model?: string;
   baseUrl?: string;
   temperature?: number;
+  history?: Array<{ role: 'user' | 'assistant'; content: string }>;
 }
 
 export const SYSTEM_STRICT_PROMPT = `Anda adalah asisten AI analis dokumen profesional yang komprehensif, mendalam, dan akurat.
@@ -164,8 +165,13 @@ ${formatDirective ? `\n${formatDirective}\n` : ''}
 PERTANYAAN PENGGUNA:
 ${query}`;
 
+  const historyMessages: BaseMessage[] = (options?.history || []).map((h) =>
+    h.role === 'assistant' ? new AIMessage(h.content) : new HumanMessage(h.content)
+  );
+
   const messages: BaseMessage[] = [
     new SystemMessage(systemPrompt),
+    ...historyMessages,
     new HumanMessage(userMessageContent),
   ];
 
@@ -256,8 +262,13 @@ ${formatDirective ? `\n${formatDirective}\n` : ''}
 PERTANYAAN PENGGUNA:
 ${query}`;
 
+  const historyMessages: BaseMessage[] = (options?.history || []).map((h) =>
+    h.role === 'assistant' ? new AIMessage(h.content) : new HumanMessage(h.content)
+  );
+
   const messages: BaseMessage[] = [
     new SystemMessage(systemPrompt),
+    ...historyMessages,
     new HumanMessage(userMessageContent),
   ];
 

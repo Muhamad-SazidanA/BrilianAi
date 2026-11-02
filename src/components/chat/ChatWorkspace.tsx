@@ -71,6 +71,7 @@ export default function ChatWorkspace({
   });
   const [inputQuery, setInputQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [activeQueryText, setActiveQueryText] = useState('');
   const [allowPublicKnowledge, setAllowPublicKnowledge] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -152,12 +153,14 @@ export default function ChatWorkspace({
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const isNearBottomRef = useRef<boolean>(true);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const pendingScrollUserMsgIdRef = useRef<string | null>(null);
+  const isInitialMountRef = useRef<boolean>(true);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isFirstMessageRef = useRef<boolean>(true);
   const sessionIdRef = useRef<string | undefined>(sessionId);
   const isCreatingSessionRef = useRef(false);
-  const executeAiResponseRef = useRef<((queryText: string, targetMessageId?: string, isRetry?: boolean) => Promise<void>) | null>(null);
+
   const aiAbortControllerRef = useRef<AbortController | null>(null);
 
   const handleContainerScroll = () => {
@@ -177,9 +180,12 @@ export default function ChatWorkspace({
       aiAbortControllerRef.current = null;
     }
     setIsLoading(false);
+    setIsGenerating(false);
     setActiveQueryText('');
     setAnimatingMessageId(null);
     isNearBottomRef.current = true;
+    pendingScrollUserMsgIdRef.current = null;
+    isInitialMountRef.current = true;
 
     if (!sessionId && !shareId) {
       setMessages([]);
@@ -391,8 +397,18 @@ export default function ChatWorkspace({
 
     setActiveQueryText(trimmed);
     setIsLoading(true);
+    setIsGenerating(true);
 
     try {
+      // Extract up to 8 recent messages as multi-turn conversation memory
+      const recentHistory = messages
+        .slice(-8)
+        .filter((m) => !m.isError && m.text && m.text.trim().length > 0)
+        .map((m) => ({
+          role: (m.sender === 'ai' ? 'assistant' : 'user') as 'user' | 'assistant',
+          content: m.text.trim(),
+        }));
+
       const payload: ChatRequestPayload & { stream?: boolean } = {
         query: trimmed,
         allowPublicKnowledge,
@@ -406,6 +422,7 @@ export default function ChatWorkspace({
             }
           : undefined,
         sessionId: activeSessionId || `sess-${Date.now()}`,
+        history: recentHistory,
         stream: true,
       };
 
@@ -439,6 +456,7 @@ export default function ChatWorkspace({
         const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const aiMessageId = targetMessageId || `ai-${Date.now()}`;
         let messageInitialized = false;
+        let isStreamDone = false;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -528,6 +546,10 @@ export default function ChatWorkspace({
                 const finalSources = eventData.sources || streamedSources;
 
                 setIsLoading(false);
+                setIsGenerating(false);
+                if (aiAbortControllerRef.current === controller) {
+                  aiAbortControllerRef.current = null;
+                }
                 setMessages((prev) => {
                   const updated = prev.map((m) => {
                     if (m.id !== aiMessageId) return m;
@@ -549,6 +571,12 @@ export default function ChatWorkspace({
                   scheduleSave(updated);
                   return updated;
                 });
+
+                isStreamDone = true;
+                try {
+                  await reader.cancel();
+                } catch {}
+                break;
               } else if (eventData.type === 'error') {
                 throw new Error(eventData.error || 'Terjadi kesalahan saat memproses streaming');
               }
@@ -557,6 +585,7 @@ export default function ChatWorkspace({
               // Ignore partial JSON parsing chunk
             }
           }
+          if (isStreamDone) break;
         }
         return;
       }
@@ -623,8 +652,9 @@ export default function ChatWorkspace({
     } finally {
       if (aiAbortControllerRef.current === controller) {
         aiAbortControllerRef.current = null;
-        setIsLoading(false);
       }
+      setIsLoading(false);
+      setIsGenerating(false);
     }
   };
 
@@ -634,10 +664,11 @@ export default function ChatWorkspace({
       aiAbortControllerRef.current = null;
     }
     setIsLoading(false);
+    setIsGenerating(false);
     toast.info(language === 'en' ? 'Response generation stopped.' : 'Generasi jawaban dihentikan.');
   };
 
-  executeAiResponseRef.current = executeAiResponse;
+
 
   const handleSwitchVariant = (messageId: string, newIndex: number) => {
     setMessages((prev) => {
@@ -668,6 +699,7 @@ export default function ChatWorkspace({
       aiAbortControllerRef.current = null;
     }
     setIsLoading(false);
+    setIsGenerating(false);
 
     const targetUserMsg = messages[messageIndex];
     if (!targetUserMsg || targetUserMsg.sender !== 'user') return;
@@ -690,16 +722,45 @@ export default function ChatWorkspace({
 
     // 3. Immediately trigger AI response from this point
     isNearBottomRef.current = true;
-    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+    pendingScrollUserMsgIdRef.current = updatedUserMessage.id;
     await executeAiResponse(trimmed);
   };
 
-  // ── Auto scroll ───────────────────────────────────────────────────
+  // ── Smart User-Question Anchor Auto Scroll ─────────────────────────
+  // Anchors viewport to the user question so reading starts from question down into the answer
   useEffect(() => {
-    if (messages.length > 0 && isNearBottomRef.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      if (messages.length > 0) {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      }
+      return;
     }
-  }, [messages, isLoading]);
+
+    if (pendingScrollUserMsgIdRef.current) {
+      const scrollFn = () => {
+        const container = scrollContainerRef.current;
+        if (!container) return;
+        const userEl = container.querySelector<HTMLElement>(
+          `[data-msg-id="${pendingScrollUserMsgIdRef.current}"]`
+        );
+        if (userEl) {
+          const containerRect = container.getBoundingClientRect();
+          const userRect = userEl.getBoundingClientRect();
+          const relativeTop = userRect.top - containerRect.top + container.scrollTop;
+          const targetScroll = Math.max(0, relativeTop - 24);
+          container.scrollTo({ top: targetScroll, behavior: 'smooth' });
+          if (!isLoading && !isGenerating) {
+            pendingScrollUserMsgIdRef.current = null;
+          }
+        }
+      };
+
+      scrollFn();
+      const raf = requestAnimationFrame(scrollFn);
+      return () => cancelAnimationFrame(raf);
+    }
+  }, [messages, isLoading, isGenerating]);
 
   // Focus input on load
   useEffect(() => {
@@ -716,7 +777,34 @@ export default function ChatWorkspace({
     };
   }, []);
 
-  const promptChips = ['Q4 Financial Audit', 'Compliance & SOC2', 'Curated Policies'];
+  const [promptChips, setPromptChips] = useState<string[]>([
+    'Bagaimana cara mengunggah dokumen ke Knowledge Base?',
+    'Format berkas apa saja yang didukung oleh sistem?',
+    'Bagaimana cara kerja kurasi wawasan otomatis AI?',
+    'Apakah data dokumen saya aman dan terlindungi enkripsi?',
+  ]);
+
+  // Muat rekomendasi pertanyaan AI secara dinamis berdasarkan dokumen aktif pengguna
+  useEffect(() => {
+    let isMounted = true;
+    const loadDynamicSuggestions = async () => {
+      try {
+        const res = await fetch('/api/chat/suggestions');
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted && Array.isArray(data.suggestions) && data.suggestions.length > 0) {
+            setPromptChips(data.suggestions);
+          }
+        }
+      } catch {
+        // Fallback default aman
+      }
+    };
+    loadDynamicSuggestions();
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser?.id]);
 
   const handleSend = async (queryText?: string) => {
     if (isGuestOnShare) {
@@ -745,7 +833,7 @@ export default function ChatWorkspace({
     }
 
     if (!textToSend) {
-      if (messages.length > 0 && !isLoading) {
+      if (messages.length > 0 && !isLoading && !isGenerating) {
         const lastMsg = messages[messages.length - 1];
         if (lastMsg.sender === 'user') {
           await executeAiResponse(lastMsg.text);
@@ -754,7 +842,7 @@ export default function ChatWorkspace({
       return;
     }
 
-    if (isLoading || isCreatingSessionRef.current) return;
+    if (isLoading || isGenerating || isCreatingSessionRef.current) return;
 
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
@@ -764,6 +852,7 @@ export default function ChatWorkspace({
     };
     setAnimatingMessageId(userMessage.id);
     isNearBottomRef.current = true;
+    pendingScrollUserMsgIdRef.current = userMessage.id;
 
     // ── Kasus 1: Memulai chat dari link share milik orang lain ──
     // "ketika memulai chat di bawah link share maka akan membuat percakapan baru"
@@ -1229,26 +1318,31 @@ export default function ChatWorkspace({
           ) : (
             /* Active Message Stream */
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-              {messages.map((msg, idx) => (
-                <React.Fragment key={msg.id}>
-                  <ChatMessageItem
-                    message={msg}
-                    sessionId={sessionId}
-                    animateEntrance={msg.id === animatingMessageId}
-                    onSelectCitation={(source) => setInspectingSource(source)}
-                    onSwitchVariant={(newIndex) => {
-                      setAnimatingMessageId(msg.id);
-                      handleSwitchVariant(msg.id, newIndex);
-                    }}
+              {messages.map((msg, idx) => {
+                const turnIndex = messages.slice(0, idx + 1).filter((m) => m.sender === 'user').length;
+                return (
+                  <React.Fragment key={msg.id}>
+                    <ChatMessageItem
+                      message={msg}
+                      sessionId={sessionId}
+                      turnIndex={turnIndex > 0 ? turnIndex : 1}
+                      animateEntrance={msg.id === animatingMessageId}
+                      onSelectCitation={(source) => setInspectingSource(source)}
+                      onSwitchVariant={(newIndex) => {
+                        setAnimatingMessageId(msg.id);
+                        handleSwitchVariant(msg.id, newIndex);
+                      }}
                     onRetry={() => {
                       if (isPublicShare) return;
                       if (msg.sender === 'user') {
+                        pendingScrollUserMsgIdRef.current = msg.id;
                         executeAiResponse(msg.text);
                       } else {
                         const prevUser = [...messages.slice(0, idx)]
                           .reverse()
                           .find((m) => m.sender === 'user');
                         if (prevUser) {
+                          pendingScrollUserMsgIdRef.current = prevUser.id;
                           executeAiResponse(prevUser.text, msg.id, true);
                         }
                       }
@@ -1317,7 +1411,8 @@ export default function ChatWorkspace({
                     </div>
                   )}
                 </React.Fragment>
-              ))}
+              );
+            })}
 
               {/* AI Thinking Indicator: strictly only show when waiting for AI response to the latest user message */}
               {isLoading &&
@@ -1454,24 +1549,24 @@ export default function ChatWorkspace({
                     handleLoginRedirect();
                     return;
                   }
-                  if (isLoading || aiAbortControllerRef.current) {
+                  if (isGenerating || isLoading) {
                     handleStopGeneration();
                     return;
                   }
                   handleSend();
                 }}
-                disabled={!isGuestOnShare && !isLoading && !aiAbortControllerRef.current && !inputQuery.trim()}
+                disabled={!isGuestOnShare && !isGenerating && !isLoading && !inputQuery.trim()}
                 aria-label={
                   isGuestOnShare
                     ? 'Log in to chat'
-                    : isLoading || aiAbortControllerRef.current
+                    : isGenerating || isLoading
                     ? 'Stop generating'
                     : 'Submit query'
                 }
                 title={
                   isGuestOnShare
                     ? (language === 'en' ? 'Log in to chat' : 'Masuk untuk mulai chat')
-                    : isLoading || aiAbortControllerRef.current
+                    : isGenerating || isLoading
                     ? (language === 'en' ? 'Stop generating' : 'Hentikan jawaban')
                     : undefined
                 }
@@ -1479,15 +1574,15 @@ export default function ChatWorkspace({
                   width: '28px',
                   height: '28px',
                   borderRadius: '50%',
-                  backgroundColor: isLoading || aiAbortControllerRef.current ? '#0F172A' : '#2563EB',
+                  backgroundColor: isGenerating || isLoading ? '#0F172A' : '#2563EB',
                   color: '#FFFFFF',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   border: 'none',
                   cursor: 'pointer',
-                  opacity: !isGuestOnShare && !isLoading && !aiAbortControllerRef.current && !inputQuery.trim() ? 0.6 : 1,
-                  boxShadow: isLoading || aiAbortControllerRef.current
+                  opacity: !isGuestOnShare && !isGenerating && !isLoading && !inputQuery.trim() ? 0.6 : 1,
+                  boxShadow: isGenerating || isLoading
                     ? '0 2px 6px rgba(15, 23, 42, 0.2)'
                     : '0 2px 6px rgba(37, 99, 235, 0.25)',
                   transition: 'all 0.15s ease',
@@ -1495,7 +1590,7 @@ export default function ChatWorkspace({
               >
                 {isGuestOnShare ? (
                   <LogIn size={14} strokeWidth={2.2} />
-                ) : isLoading || aiAbortControllerRef.current ? (
+                ) : isGenerating || isLoading ? (
                   <Square size={11} fill="currentColor" strokeWidth={0} />
                 ) : (
                   <ArrowUp size={15} strokeWidth={2.5} />

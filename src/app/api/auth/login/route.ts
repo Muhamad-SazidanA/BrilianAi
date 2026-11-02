@@ -1,15 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserByEmail, getUserByEmailOrUsername, ensureUsersAndRolesTables } from '@lib/db/userStore';
+import {
+  getUserByEmail,
+  getUserAuthByEmailOrUsername,
+  updateUserPassword,
+  ensureUsersAndRolesTables,
+} from '@lib/db/userStore';
+import { hashPassword, verifyPassword } from '@lib/security/passwordHasher';
 import { createSession } from '@lib/db/sessionStore';
 import { getPool } from '@lib/db/dbClient';
 import { checkRateLimit, recordRateLimitHit, resetRateLimit } from '@lib/security/rateLimiter';
+import { recordAuditEvent } from '@lib/db/auditLogStore';
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { email, password } = body;
+    const { email, identifier, password } = body;
 
-    const cleanInput = (email || '').trim().toLowerCase();
+    const cleanInput = (email || identifier || '').trim().toLowerCase();
     const cleanPassword = (password || '').trim();
 
     if (!cleanInput) {
@@ -50,10 +57,21 @@ export async function POST(req: NextRequest) {
     const envSuperadminEmail = (process.env.SUPERADMIN_EMAIL || 'superadmin@brilian.ai').trim().toLowerCase();
     const rawEnvPassword = (process.env.SUPERADMIN_PASSWORD || 'admin123').trim();
     const envSuperadminPassword = rawEnvPassword.replace(/^["']|["']$/g, '').trim();
+    const defaultUserPassword = (process.env.DEFAULT_USER_PASSWORD || 'admin123').trim();
 
-    const isPasswordValid = (pwd: string) => {
+    const isSuperPasswordValid = (pwd: string) => {
       if (!pwd) return false;
       return (
+        (Boolean(envSuperadminPassword) && pwd === envSuperadminPassword) ||
+        (Boolean(rawEnvPassword) && pwd === rawEnvPassword)
+      );
+    };
+
+    const isDemoUserPasswordValid = (pwd: string) => {
+      if (!pwd) return false;
+      return (
+        pwd === defaultUserPassword ||
+        pwd === 'admin123' ||
         (Boolean(envSuperadminPassword) && pwd === envSuperadminPassword) ||
         (Boolean(rawEnvPassword) && pwd === rawEnvPassword)
       );
@@ -66,8 +84,27 @@ export async function POST(req: NextRequest) {
       cleanInput === 'superadmin@brilian.ai';
 
     if (isSuperadminMatch) {
-      // Validate password
-      if (!isPasswordValid(cleanPassword)) {
+      // Find or insert superadmin in DB
+      let userAuth = await getUserAuthByEmailOrUsername(envSuperadminEmail);
+      if (!userAuth) {
+        userAuth = await getUserAuthByEmailOrUsername('superadmin@brilian.ai');
+      }
+
+      let isSuperValid = false;
+      if (userAuth?.password_hash) {
+        isSuperValid = await verifyPassword(cleanPassword, userAuth.password_hash);
+      }
+      // Fallback to configured env password
+      if (!isSuperValid && isSuperPasswordValid(cleanPassword)) {
+        isSuperValid = true;
+        // Auto-hash superadmin password if missing
+        if (userAuth && !userAuth.password_hash) {
+          const newHash = await hashPassword(cleanPassword);
+          await updateUserPassword(userAuth.id, newHash);
+        }
+      }
+
+      if (!isSuperValid) {
         recordRateLimitHit(rateLimitKey);
         return NextResponse.json(
           { error: 'Incorrect username or password.' },
@@ -78,20 +115,16 @@ export async function POST(req: NextRequest) {
       // Successful credentials, reset rate limit counter
       resetRateLimit(rateLimitKey);
 
-      // Find or insert superadmin in DB
-      let user = await getUserByEmail(envSuperadminEmail);
-      if (!user) {
-        user = await getUserByEmail('superadmin@brilian.ai');
-      }
-
+      let user = userAuth;
       const pool = getPool();
       if (!user) {
+        const initialHash = await hashPassword(cleanPassword);
         const res = await pool.query(
-          `INSERT INTO users (id, name, email, role_id, status, department, avatar_color, last_login_at)
-           VALUES ('a0000000-0000-0000-0000-000000000001', 'Super Admin', $1, 'admin', 'active', 'System Administration', '#2563EB', now())
+          `INSERT INTO users (id, name, email, password_hash, role_id, status, department, avatar_color, last_login_at)
+           VALUES ('a0000000-0000-0000-0000-000000000001', 'Super Admin', $1, $2, 'admin', 'active', 'System Administration', '#2563EB', now())
            ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, last_login_at = now()
            RETURNING *`,
-          [envSuperadminEmail]
+          [envSuperadminEmail, initialHash]
         );
         const row = res.rows[0];
         user = {
@@ -130,6 +163,7 @@ export async function POST(req: NextRequest) {
         await pool.query('UPDATE users SET last_login_at = now() WHERE id = $1', [user.id]);
       }
 
+      const { password_hash: _omitSuper, ...safeSuperUser } = user;
       const userAgent = req.headers.get('user-agent') || undefined;
       const forwardedFor = req.headers.get('x-forwarded-for');
       const ipAddress = forwardedFor ? forwardedFor.split(',')[0].trim() : req.headers.get('x-real-ip') || undefined;
@@ -137,7 +171,7 @@ export async function POST(req: NextRequest) {
 
       const response = NextResponse.json({
         success: true,
-        user,
+        user: safeSuperUser,
       });
       response.cookies.set({
         name: 'brilian_session_token',
@@ -173,8 +207,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Check other registered database users
-    const dbUser = await getUserByEmailOrUsername(cleanInput);
-    if (!dbUser) {
+    const dbUserWithAuth = await getUserAuthByEmailOrUsername(cleanInput);
+    if (!dbUserWithAuth) {
       recordRateLimitHit(rateLimitKey);
       return NextResponse.json(
         { error: 'Incorrect username or password.' },
@@ -182,23 +216,46 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (dbUser.status === 'pending_approval') {
+    if (dbUserWithAuth.status === 'pending_approval') {
       return NextResponse.json(
         { error: 'Akun Anda sedang menunggu persetujuan Super Administrator.' },
         { status: 403 }
       );
     }
 
-    if (dbUser.status === 'inactive') {
+    if (dbUserWithAuth.status === 'inactive') {
       return NextResponse.json(
         { error: 'This account is currently inactive. Contact your administrator.' },
         { status: 403 }
       );
     }
 
-    // Standard password check against environment password
-    if (!isPasswordValid(cleanPassword)) {
+    // Verify individual password hash, with fallback to env password & progressive auto-migration
+    let isDbUserValid = false;
+    if (dbUserWithAuth.password_hash) {
+      isDbUserValid = await verifyPassword(cleanPassword, dbUserWithAuth.password_hash);
+    } else {
+      // Legacy user without hash: check against default env password and auto-upgrade
+      if (isDemoUserPasswordValid(cleanPassword)) {
+        isDbUserValid = true;
+        const newHash = await hashPassword(cleanPassword);
+        await updateUserPassword(dbUserWithAuth.id, newHash);
+      }
+    }
+
+    if (!isDbUserValid) {
       recordRateLimitHit(rateLimitKey);
+      try {
+        await recordAuditEvent({
+          eventCategory: 'AUTH',
+          action: 'auth.login_failed',
+          actorName: dbUserWithAuth?.name || cleanInput,
+          actorEmail: dbUserWithAuth?.email || cleanInput,
+          actorDepartment: dbUserWithAuth?.department,
+          status: 'failed',
+          details: { reason: 'Incorrect credentials' },
+        });
+      } catch {}
       return NextResponse.json(
         { error: 'Incorrect username or password.' },
         { status: 401 }
@@ -209,12 +266,34 @@ export async function POST(req: NextRequest) {
     resetRateLimit(rateLimitKey);
 
     const pool = getPool();
-    await pool.query('UPDATE users SET last_login_at = now() WHERE id = $1', [dbUser.id]);
+    await pool.query('UPDATE users SET last_login_at = now() WHERE id = $1', [dbUserWithAuth.id]);
+
+    const { password_hash: _omitDb, ...dbUser } = dbUserWithAuth;
 
     const userAgent = req.headers.get('user-agent') || undefined;
     const forwardedFor = req.headers.get('x-forwarded-for');
     const ipAddress = forwardedFor ? forwardedFor.split(',')[0].trim() : req.headers.get('x-real-ip') || undefined;
     const sessionToken = await createSession(dbUser.id, userAgent, ipAddress);
+
+    try {
+      await recordAuditEvent({
+        eventCategory: 'AUTH',
+        action: 'auth.login',
+        actorId: dbUser.id,
+        actorName: dbUser.name,
+        actorEmail: dbUser.email,
+        actorDepartment: dbUser.department,
+        actorIp: ipAddress,
+        resourceType: 'session',
+        resourceId: sessionToken,
+        resourceName: `${dbUser.name} (${dbUser.email})`,
+        status: 'success',
+        details: {
+          role: dbUser.role?.name || dbUser.role_id,
+          user_agent: userAgent,
+        },
+      });
+    } catch {}
 
     const response = NextResponse.json({
       success: true,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listRoles, createRole } from '@/../lib/db/userStore';
+import { recordAuditEvent } from '@/../lib/db/auditLogStore';
 import { PERMISSIONS_CATALOG } from '@/types/user';
 import { getAuthenticatedUser, hasServerPermission } from '@lib/auth/serverAuth';
 
@@ -54,6 +55,23 @@ export async function POST(req: NextRequest) {
       description: description || '',
       permissions: Array.isArray(permissions) ? permissions : [],
       allowed_classifications: Array.isArray(allowed_classifications) ? allowed_classifications : undefined,
+    });
+
+    await recordAuditEvent({
+      eventCategory: 'ROLE_MGMT',
+      action: 'role.create',
+      actorId: authUser.id,
+      actorName: authUser.name,
+      actorEmail: authUser.email,
+      actorDepartment: authUser.department,
+      resourceType: 'role',
+      resourceId: newRole.id,
+      resourceName: newRole.name,
+      status: 'success',
+      details: {
+        permissions_count: newRole.permissions?.length || 0,
+        classifications: newRole.allowed_classifications || [],
+      },
     });
 
     return NextResponse.json({ role: newRole }, { status: 201 });

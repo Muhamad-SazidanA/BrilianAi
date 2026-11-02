@@ -25,7 +25,7 @@ Semua service (`brilian_postgres`, `brilian_redis`, `brilian_ollama`) akan berst
 
 ## 🗄️ 2. Migrasi Database (pgvector)
 
-Skema database otomatis dimuat saat container database pertama kali dibuat melalui mount `./db/migrations/001_create_ingestion_tables.sql` ke `/docker-entrypoint-initdb.d/`.
+Skema database otomatis dimuat saat container database pertama kali dibuat melalui mount `./db/migrations` ke `/docker-entrypoint-initdb.d/`.
 
 Jika database sudah berjalan dan ingin menjalankan migrasi secara manual:
 
@@ -36,7 +36,9 @@ npm run db:migrate
 
 **Opsi B: Menggunakan psql di dalam container**
 ```bash
-docker compose exec postgres psql -U postgres -d brilian_ai -f /docker-entrypoint-initdb.d/001_create_ingestion_tables.sql
+docker compose exec postgres psql -U postgres -d brilian_ai -f /docker-entrypoint-initdb.d/001_core_identity_and_auth.sql
+docker compose exec postgres psql -U postgres -d brilian_ai -f /docker-entrypoint-initdb.d/002_knowledge_base_and_documents.sql
+docker compose exec postgres psql -U postgres -d brilian_ai -f /docker-entrypoint-initdb.d/003_ai_chat_and_analytics.sql
 ```
 
 **Verifikasi pgvector extension:**
@@ -181,7 +183,9 @@ npm run verify:db
 ├── next.config.mjs
 ├── db/
 │   └── migrations/
-│       └── 001_create_ingestion_tables.sql
+│       ├── 001_core_identity_and_auth.sql
+│       ├── 002_knowledge_base_and_documents.sql
+│       └── 003_ai_chat_and_analytics.sql
 ├── lib/
 │   ├── ai/
 │   │   ├── embeddingClient.ts           # Batch embedding BGE-M3 (1024 dim)

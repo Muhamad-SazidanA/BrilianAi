@@ -19,7 +19,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.chat': 'AI Assistant',
     'nav.users': 'Kelola Pengguna',
     'nav.roles': 'Role & Hak Akses',
-    'nav.audit_logs': 'Audit Log Percakapan',
+    'nav.audit_logs': 'Audit Log',
     'nav.close_sidebar': 'Tutup Sidebar (Collapse)',
     'nav.open_sidebar': 'Buka Sidebar (Expand)',
 
@@ -30,7 +30,7 @@ const translations: Record<Language, Record<string, string>> = {
     'header.chat': 'AI Assistant',
     'header.users': 'Kelola Pengguna',
     'header.roles': 'Role & Hak Akses',
-    'header.logs': 'Audit Log Percakapan',
+    'header.logs': 'Audit Log',
     'header.upload_btn': 'Upload PDF',
     'header.chat_btn': 'Tanya AI',
 
@@ -43,6 +43,13 @@ const translations: Record<Language, Record<string, string>> = {
     'user.language': 'Bahasa',
     'user.lang_id': 'Indonesia',
     'user.lang_en': 'English',
+    'user.change_password': 'Ganti Password',
+    'user.change_password_desc': 'Perbarui kata sandi akun Anda untuk menjaga keamanan data enterprise.',
+    'user.current_password': 'Password Saat Ini',
+    'user.new_password': 'Password Baru',
+    'user.confirm_password': 'Konfirmasi Password Baru',
+    'user.save_password': 'Simpan Password',
+    'user.password_changed_success': 'Password berhasil diperbarui.',
     'user.help': 'Help Center',
     'user.logout': 'Keluar',
     'user.logout_confirm_title': 'Keluar dari sesi?',
@@ -55,6 +62,13 @@ const translations: Record<Language, Record<string, string>> = {
     'user.toast_lang_id': 'Bahasa diubah ke Indonesia',
     'user.toast_lang_en': 'Language switched to English',
     'user.toast_logout': 'Sesi akun berhasil dikeluarkan.',
+
+    // Session & Inactivity
+    'session.inactivity_title': 'Sesi Tidak Aktif',
+    'session.inactivity_desc': 'Sesi akun enterprise Anda akan ditutup secara otomatis untuk menjaga keamanan data. Klik tombol di bawah untuk memperpanjang sesi.',
+    'session.stay_signed_in': 'Tetap Masuk',
+    'session.sign_out_now': 'Keluar',
+    'session.timed_out_banner': 'Sesi Anda habis, silakan login lagi.',
 
     // Profile Modal
     'profile.title': 'Profil Pengguna',
@@ -302,7 +316,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.chat': 'AI Assistant',
     'nav.users': 'User Management',
     'nav.roles': 'Roles & Permissions',
-    'nav.audit_logs': 'Chat Audit Logs',
+    'nav.audit_logs': 'Audit Logs',
     'nav.close_sidebar': 'Collapse Sidebar',
     'nav.open_sidebar': 'Expand Sidebar',
 
@@ -313,7 +327,7 @@ const translations: Record<Language, Record<string, string>> = {
     'header.chat': 'AI Assistant',
     'header.users': 'User Management',
     'header.roles': 'Roles & Permissions',
-    'header.logs': 'Chat Audit Logs',
+    'header.logs': 'Audit Logs',
     'header.upload_btn': 'Upload PDF',
     'header.chat_btn': 'Ask AI',
 
@@ -326,6 +340,13 @@ const translations: Record<Language, Record<string, string>> = {
     'user.language': 'Language',
     'user.lang_id': 'Indonesian',
     'user.lang_en': 'English',
+    'user.change_password': 'Change Password',
+    'user.change_password_desc': 'Update your account password to maintain enterprise data security.',
+    'user.current_password': 'Current Password',
+    'user.new_password': 'New Password',
+    'user.confirm_password': 'Confirm New Password',
+    'user.save_password': 'Save Password',
+    'user.password_changed_success': 'Password updated successfully.',
     'user.help': 'Help Center',
     'user.logout': 'Sign Out',
     'user.logout_confirm_title': 'Sign out of session?',
@@ -338,6 +359,13 @@ const translations: Record<Language, Record<string, string>> = {
     'user.toast_lang_id': 'Language switched to Indonesian',
     'user.toast_lang_en': 'Language switched to English',
     'user.toast_logout': 'Signed out successfully.',
+
+    // Session & Inactivity
+    'session.inactivity_title': 'Session Inactive',
+    'session.inactivity_desc': 'Your enterprise account session will automatically close to maintain data security. Click below to continue your session.',
+    'session.stay_signed_in': 'Stay Signed In',
+    'session.sign_out_now': 'Sign Out',
+    'session.timed_out_banner': 'Your session has expired due to 30 minutes of inactivity for enterprise account security. Please sign in again.',
 
     // Profile Modal
     'profile.title': 'User Profile',

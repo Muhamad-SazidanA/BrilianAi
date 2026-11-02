@@ -151,10 +151,10 @@ export const PERMISSIONS_CATALOG: PermissionDefinition[] = [
   {
     key: 'audit:read',
     category: 'administration',
-    labelId: 'Lihat Audit Log Percakapan',
-    labelEn: 'View Chat Audit Logs',
-    descId: 'Melihat aktivitas dan riwayat chat seluruh pengguna',
-    descEn: 'Inspect query volume, topics, and full chat audit logs',
+    labelId: 'Lihat Audit Log Sistem',
+    labelEn: 'View Enterprise Audit Logs',
+    descId: 'Memeriksa jejak audit aktivitas autentikasi, dokumen, pengguna, dan interaksi AI',
+    descEn: 'Inspect comprehensive audit trail of authentication, documents, users, and AI interactions',
   },
 ];
 
@@ -187,6 +187,26 @@ export interface User {
   created_at?: string;
   updated_at?: string;
   question_count?: number;
+}
+
+export type AuditCategory = 'AUTH' | 'USER_MGMT' | 'ROLE_MGMT' | 'DOC_MGMT' | 'AI_QUERY' | 'SYSTEM' | 'DASHBOARD';
+export type AuditStatus = 'success' | 'failed' | 'warning';
+
+export interface AuditLogEntry {
+  id: string;
+  event_category: AuditCategory;
+  action: string;
+  actor_id?: string | null;
+  actor_name: string;
+  actor_email: string;
+  actor_department?: string | null;
+  actor_ip?: string | null;
+  resource_type?: string | null;
+  resource_id?: string | null;
+  resource_name?: string | null;
+  status: AuditStatus;
+  details: Record<string, any>;
+  created_at: string;
 }
 
 export interface ChatAuditLog {
@@ -222,4 +242,6 @@ export interface AuditAnalyticsSummary {
   total_active_users: number;
   top_topics: { topic: string; count: number }[];
   top_users: TopActiveUser[];
+  category_breakdown?: { category: AuditCategory; count: number }[];
+  status_breakdown?: { status: AuditStatus; count: number }[];
 }

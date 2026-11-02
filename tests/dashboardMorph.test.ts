@@ -7,7 +7,7 @@ import {
   convertBarChartToTable,
   convertChartToTable,
   morphWidget,
-} from '../src/lib/utils/dashboardMorph';
+} from '../lib/utils/dashboardMorph';
 import { TableWidget, BarChartWidget, LineChartWidget, PieChartWidget, AreaChartWidget } from '../src/types/dashboard';
 
 describe('dashboardMorph utility', () => {

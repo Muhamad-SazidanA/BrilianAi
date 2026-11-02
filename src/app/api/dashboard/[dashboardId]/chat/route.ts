@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { askDashboardCopilot, DashboardCopilotInput } from '@lib/ai/dashboardClient';
 import { getAuthenticatedUser } from '@lib/auth/serverAuth';
+import { recordAuditEvent } from '@lib/db/auditLogStore';
 import { checkRateLimit, recordRateLimitHit } from '@lib/security/rateLimiter';
 
 export const dynamic = 'force-dynamic';
@@ -111,6 +112,30 @@ export async function POST(
       },
       history: sanitizedHistory,
     });
+
+    const actorIp =
+      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      request.headers.get('x-real-ip') ||
+      '127.0.0.1';
+
+    await recordAuditEvent({
+      eventCategory: 'DASHBOARD',
+      action: 'dashboard.copilot_query',
+      actorId: user.id,
+      actorName: user.name,
+      actorEmail: user.email,
+      actorDepartment: user.department || 'General',
+      actorIp,
+      resourceType: 'dashboard',
+      resourceId: dashboardId,
+      resourceName: dashboard?.title || 'Interactive Dashboard',
+      status: 'success',
+      details: {
+        messagePreview: trimmedMessage.slice(0, 150),
+        answerPreview: response.answer?.slice(0, 150),
+        actionType: response.action?.type || null,
+      },
+    }).catch((err) => console.warn('[AuditLog] Failed to log copilot query:', err));
 
     return NextResponse.json(response);
   } catch (err: any) {

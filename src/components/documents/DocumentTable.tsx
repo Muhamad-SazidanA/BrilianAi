@@ -25,6 +25,7 @@ import { toast } from 'sonner';
 import { UploadBatch } from '@/types/document';
 import RenameModal from './RenameModal';
 import EnterprisePagination from '@/components/ui/EnterprisePagination';
+import TableEmptyState from '@/components/ui/TableEmptyState';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserSession } from '@/context/UserSessionContext';
 import { useIngestion } from '@/context/IngestionContext';
@@ -407,15 +408,11 @@ export default function DocumentTable({
               ))}
             </div>
           ) : filteredBatches.length === 0 ? (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
-              <FileText size={20} style={{ margin: '0 auto 6px', color: 'var(--text-muted)', opacity: 0.6 }} />
-              <p style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)', margin: 0 }}>
-                {searchQuery ? t('table.empty_search_title') : t('table.empty_title')}
-              </p>
-              <p style={{ fontSize: '11.5px', marginTop: '3px', color: 'var(--text-secondary)' }}>
-                {searchQuery ? t('table.empty_search_desc') : t('table.empty_desc')}
-              </p>
-            </div>
+            <TableEmptyState
+              icon={FileText}
+              title={searchQuery ? 'Tidak ada dokumen yang cocok' : 'Belum ada dokumen'}
+              description={searchQuery ? 'Coba sesuaikan kata kunci pencarian atau filter klasifikasi di atas.' : 'Unggah dokumen baru atau sesuaikan filter klasifikasi di atas.'}
+            />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {/* ── Active Background Ingestion Live Progress Rows ── */}

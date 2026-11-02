@@ -20,6 +20,7 @@ export interface UploadBatch {
   supersedes_id?: string | null;
   effective_date?: Date | string;
   review_due_date?: Date | string | null;
+  suggested_questions?: string[];
 }
 
 export interface ChunkInput {
@@ -230,6 +231,7 @@ export async function listBatches(): Promise<UploadBatch[]> {
         COALESCE(b.version, '1.0') AS version,
         b.effective_date,
         b.review_due_date,
+        COALESCE(b.suggested_questions, '{}') AS suggested_questions,
         COALESCE(ci.curated_count, 0)::int AS curated_count,
         COALESCE(ci.processed_chunks, 0)::int AS processed_chunks
       FROM upload_batches b
@@ -247,7 +249,7 @@ export async function listBatches(): Promise<UploadBatch[]> {
     return result.rows;
   } catch {
     const fallbackSql = `
-      SELECT id, original_filename, chunk_count, page_count, uploaded_at, COALESCE(is_active_knowledge, false) AS is_active_knowledge
+      SELECT id, original_filename, chunk_count, page_count, uploaded_at, COALESCE(is_active_knowledge, false) AS is_active_knowledge, COALESCE(suggested_questions, '{}') AS suggested_questions
       FROM upload_batches
       ORDER BY uploaded_at DESC;
     `;
@@ -261,7 +263,7 @@ export async function listBatches(): Promise<UploadBatch[]> {
         ORDER BY uploaded_at DESC;
       `;
       const result = await pool.query<UploadBatch>(basicSql);
-      return result.rows.map((b) => ({ ...b, is_active_knowledge: false, curated_count: 0, processed_chunks: 0 }));
+      return result.rows.map((b) => ({ ...b, is_active_knowledge: false, curated_count: 0, processed_chunks: 0, suggested_questions: [] }));
     }
   }
 }
@@ -290,6 +292,7 @@ export async function getBatchById(batchId: string): Promise<UploadBatch | null>
         COALESCE(b.version, '1.0') AS version,
         b.effective_date,
         b.review_due_date,
+        COALESCE(b.suggested_questions, '{}') AS suggested_questions,
         COALESCE(ci.curated_count, 0)::int AS curated_count,
         COALESCE(ci.processed_chunks, 0)::int AS processed_chunks
       FROM upload_batches b
@@ -308,7 +311,7 @@ export async function getBatchById(batchId: string): Promise<UploadBatch | null>
     return result.rows[0] || null;
   } catch {
     const fallbackSql = `
-      SELECT id, original_filename, chunk_count, page_count, uploaded_at, COALESCE(is_active_knowledge, false) AS is_active_knowledge
+      SELECT id, original_filename, chunk_count, page_count, uploaded_at, COALESCE(is_active_knowledge, false) AS is_active_knowledge, COALESCE(suggested_questions, '{}') AS suggested_questions
       FROM upload_batches
       WHERE id = $1;
     `;
@@ -474,6 +477,24 @@ export async function activateAllBatches(active: boolean = true): Promise<number
   } catch (err) {
     console.error('[VectorStore] Error activateAllBatches:', err);
     throw err;
+  }
+}
+
+/**
+ * Updates suggested questions cached on an upload batch.
+ */
+export async function updateBatchSuggestedQuestions(
+  batchId: string,
+  questions: string[]
+): Promise<void> {
+  const pool = getPool();
+  try {
+    await pool.query(
+      `UPDATE upload_batches SET suggested_questions = $1 WHERE id = $2`,
+      [questions, batchId]
+    );
+  } catch (err) {
+    console.warn('[VectorStore] Warning updating suggested_questions:', err);
   }
 }
 

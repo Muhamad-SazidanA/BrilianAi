@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   Copy,
   Check,
@@ -24,13 +24,15 @@ import { ChatMessage, ChatSource } from '@/types/chat';
 import { DashboardData, MorphableChartType } from '@/types/dashboard';
 import MarkdownContent from '@/components/ui/MarkdownContent';
 import { BuildDashboardButton, AiDashboardPreview } from '@/components/chat/AiDashboardPreview';
-import { morphWidget } from '@/lib/utils/dashboardMorph';
+import { morphWidget } from '@lib/utils/dashboardMorph';
+import { checkDashboardEligibility } from '@lib/utils/dashboardEligibility';
 import { useLanguage } from '@/context/LanguageContext';
 import { toast } from 'sonner';
 
 interface ChatMessageItemProps {
   message: ChatMessage;
   sessionId?: string;
+  turnIndex?: number;
   onSelectCitation: (_source: ChatSource) => void;
   onRetry?: () => void;
   onSwitchVariant?: (_newIndex: number) => void;
@@ -42,6 +44,7 @@ interface ChatMessageItemProps {
 export default function ChatMessageItem({
   message,
   sessionId,
+  turnIndex,
   onSelectCitation,
   onRetry,
   onSwitchVariant,
@@ -200,6 +203,12 @@ export default function ChatMessageItem({
   const activeAiText = currentVariant?.text ?? message.text;
   const activeAiSources = currentVariant?.sources ?? message.sources ?? [];
 
+  // Determine whether this AI message has enough analytical/structured data for a dashboard
+  const isDashboardEligible = useMemo(() => {
+    if (isUser) return false;
+    return checkDashboardEligibility(activeAiText).eligible;
+  }, [isUser, activeAiText]);
+
   const isLongMessage = isUser && message.text.length > 350;
   const displayText =
     isUser && isLongMessage && !isExpanded
@@ -310,6 +319,9 @@ export default function ChatMessageItem({
 
   return (
     <div
+      id={`msg-${message.id}`}
+      data-msg-id={message.id}
+      data-sender={message.sender}
       className={
         isUser
           ? (animateEntrance ? 'user-message-entrance' : '')
@@ -565,6 +577,28 @@ export default function ChatMessageItem({
             )}
           </div>
 
+          {/* ── Inline Dashboard Preview (Placed ABOVE action toolbar and sources) ── */}
+          {showDashboard && dashboardData && dashboardId && (
+            <div
+              style={{
+                marginTop: '12px',
+                marginBottom: '8px',
+                width: '100%',
+                animation: 'fadeIn 0.3s ease',
+              }}
+            >
+              <AiDashboardPreview
+                data={dashboardData}
+                dashboardId={dashboardId}
+                sessionId={sessionId}
+                turnIndex={turnIndex}
+                onClose={() => setShowDashboard(false)}
+                compact={true}
+                onMorphWidget={handleMorphWidget}
+              />
+            </div>
+          )}
+
           {/* Action Icons Row (Variants Pager, Salin, Read Audio, Try Again) & Verified Source Citations */}
           <div
             className="ai-response-actions"
@@ -781,8 +815,8 @@ export default function ChatMessageItem({
                 <ThumbsDown size={13} />
               </button>
 
-              {/* 6. Buat / Buka Dashboard — convert AI answer to interactive dashboard */}
-              {!message.isError && (
+              {/* 6. Buat / Buka Dashboard — only shown if eligible or already created */}
+              {!message.isError && (dashboardId || isDashboardEligible) && (
                 <>
                   {/* Separator */}
                   <div style={{ width: '1px', height: '14px', background: 'var(--border-default)', margin: '0 2px' }} />
@@ -819,6 +853,7 @@ export default function ChatMessageItem({
                       <BuildDashboardButton
                         messageId={message.id}
                         sessionId={sessionId}
+                        turnIndex={turnIndex}
                         answerText={activeAiText}
                         queryText={undefined}
                         forceRegenerate={true}
@@ -833,6 +868,7 @@ export default function ChatMessageItem({
                     <BuildDashboardButton
                       messageId={message.id}
                       sessionId={sessionId}
+                      turnIndex={turnIndex}
                       answerText={activeAiText}
                       queryText={undefined}
                       onDashboardReady={handleDashboardReady}
@@ -969,25 +1005,6 @@ export default function ChatMessageItem({
               </div>
             )}
           </div>
-
-          {/* ── Inline Dashboard Preview ── */}
-          {showDashboard && dashboardData && dashboardId && (
-            <div
-              style={{
-                marginTop: '12px',
-                width: '100%',
-                animation: 'fadeIn 0.3s ease',
-              }}
-            >
-              <AiDashboardPreview
-                data={dashboardData}
-                dashboardId={dashboardId}
-                onClose={() => setShowDashboard(false)}
-                compact={true}
-                onMorphWidget={handleMorphWidget}
-              />
-            </div>
-          )}
         </div>
       )}
     </div>

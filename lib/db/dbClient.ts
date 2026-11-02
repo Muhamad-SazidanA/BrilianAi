@@ -11,7 +11,7 @@ let poolInstance: Pool | null = null;
 export function getResolvedDatabaseUrl(): string {
   let connectionString =
     process.env.DATABASE_URL ||
-    'postgresql://postgres:postgres@localhost:5432/brilian_db';
+    'postgresql://postgres:postgres@localhost:5432/brilian_ai';
 
   if (connectionString.includes('@postgres:') && !process.env.DOCKER_CONTAINER) {
     connectionString = connectionString.replace('@postgres:', '@localhost:');

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import localFont from 'next/font/local';
+import { IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
 import { LanguageProvider } from '@/context/LanguageContext';
 import { UserSessionProvider } from '@/context/UserSessionContext';
@@ -8,15 +8,17 @@ import { IngestionProvider } from '@/context/IngestionContext';
 import IngestionDock from '@/components/documents/IngestionDock';
 import ToastProvider from '@/components/providers/ToastProvider';
 
-const geistSans = localFont({
-  src: './fonts/Geist-Variable.woff2',
-  variable: '--font-geist-sans',
+const plexSans = IBM_Plex_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-plex-sans',
   display: 'swap',
 });
 
-const geistMono = localFont({
-  src: './fonts/GeistMono-Variable.woff2',
-  variable: '--font-geist-mono',
+const plexMono = IBM_Plex_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500'],
+  variable: '--font-plex-mono',
   display: 'swap',
 });
 
@@ -25,11 +27,12 @@ export const metadata: Metadata = {
   description: 'Sistem Ingestion PDF dan Basis Pengetahuan Enterprise Brilian.Ai dengan pgvector.',
   icons: {
     icon: [
-      { url: '/favicon.png', type: 'image/png' },
-      { url: '/images/BrilianLogo-Close-P.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/favicon-32x32.png', type: 'image/png', sizes: '32x32' },
+      { url: '/favicon.png', type: 'image/png', sizes: '256x256' },
     ],
-    shortcut: '/favicon.png',
-    apple: '/favicon.png',
+    shortcut: '/favicon.ico',
+    apple: '/apple-touch-icon.png',
   },
 };
 
@@ -39,8 +42,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="id" className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
+    <html lang="id" className={`${plexSans.variable} ${plexMono.variable}`} suppressHydrationWarning>
       <head>
+        <link rel="shortcut icon" href="/favicon.ico" />
+        <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+        <link rel="icon" type="image/png" sizes="256x256" href="/favicon.png" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -55,7 +63,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={geistSans.className} suppressHydrationWarning>
+      <body className={`${plexSans.className} antialiased`} suppressHydrationWarning>
         <LanguageProvider>
           <UserSessionProvider>
             <SidebarProvider>

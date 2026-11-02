@@ -454,4 +454,49 @@ describe('AI Chatbot Service (Llama 3.2 3B & pgvector RAG)', () => {
       expect(adminKey).not.toBe(memberKey);
     });
   });
+
+  describe('8. Multi-Turn Conversation Memory & Contextual Follow-up', () => {
+    it('should pass history array down to generateChatResponse when history is provided', async () => {
+      const generateSpy = vi
+        .spyOn(chatClient, 'generateChatResponse')
+        .mockResolvedValueOnce('Direktur Utama adalah Bapak Ahmad. Kontak: 0812345678.');
+
+      const dummyVector = new Array(1024).fill(0.1);
+      vi.spyOn(embeddingClient, 'embedTexts').mockResolvedValueOnce([dummyVector]);
+
+      mockPool.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'c1',
+            uploadBatchId: 'b1',
+            originalFilename: 'Profil.pdf',
+            chunkIndex: 0,
+            sourcePageStart: 1,
+            sourcePageEnd: 1,
+            content: 'Profil Direksi: Direktur Utama Bapak Ahmad, telp 0812345678',
+            similarity: 0.9,
+            classification: 'Internal',
+            version: 'v1.0',
+          },
+        ],
+        rowCount: 1,
+      });
+
+      const history = [
+        { role: 'user' as const, content: 'Siapa Direktur Utama?' },
+        { role: 'assistant' as const, content: 'Direktur Utama adalah Bapak Ahmad.' },
+      ];
+
+      const result = await askDocumentChat('Berapa nomor kontaknya?', {
+        history,
+        bypassCache: true,
+      });
+
+      expect(result.answer).toContain('Bapak Ahmad');
+      expect(generateSpy).toHaveBeenCalled();
+      const lastCall = generateSpy.mock.calls[0];
+      expect(lastCall[3]?.history).toEqual(history);
+    });
+  });
 });
+

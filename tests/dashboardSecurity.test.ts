@@ -243,11 +243,14 @@ describe('Interactive Dashboard Security Boundaries & Exploit Shield', () => {
         updated_at: new Date().toISOString(),
       });
 
+      const validAnswer =
+        'Berikut adalah data metrik keuangan kuartal Q1 2026:\n- Total Pendapatan: Rp 120.000.000\n- Laba Bersih: Rp 35.000.000\n- Efisiensi: 88.5%';
+
       for (let i = 0; i < 10; i++) {
         const req = new NextRequest('http://localhost:3000/api/chat/dashboard', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messageId: `msg-${i}`, answerText: 'Laporan keuangan 2026' }),
+          body: JSON.stringify({ messageId: `msg-${i}`, answerText: validAnswer }),
         });
         const res = await handleBuildDashboard(req);
         expect(res.status).toBe(200);
@@ -257,7 +260,7 @@ describe('Interactive Dashboard Security Boundaries & Exploit Shield', () => {
       const blockedReq = new NextRequest('http://localhost:3000/api/chat/dashboard', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messageId: 'msg-11', answerText: 'Laporan keuangan 2026' }),
+        body: JSON.stringify({ messageId: 'msg-11', answerText: validAnswer }),
       });
       const blockedRes = await handleBuildDashboard(blockedReq);
       expect(blockedRes.status).toBe(429);
@@ -265,4 +268,84 @@ describe('Interactive Dashboard Security Boundaries & Exploit Shield', () => {
       expect(data.error).toContain('Batas pembuatan dashboard tercapai');
     });
   });
+
+  describe('GET /api/dashboard/[dashboardId] (View Authorization & HMAC Shield)', () => {
+    it('1. should reject unauthenticated visitor without share token with 403 Forbidden', async () => {
+      vi.spyOn(serverAuthModule, 'getAuthenticatedUser').mockResolvedValueOnce(null);
+      vi.spyOn(dashboardStoreModule, 'getDashboardById').mockResolvedValueOnce({
+        dashboard_id: 'dash-secure-1',
+        session_id: '24d7acf9-5109-42e2-a5d1-48ab658dcd5e',
+        turn_index: 1,
+        message_id: 'msg-1',
+        user_id: 'user-owner-123',
+        title: 'Sensitive Financials',
+        data: sampleDashboard,
+        views_count: 3,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+
+      const req = new NextRequest('http://localhost:3000/api/dashboard/dash-secure-1');
+      const res = await handleDashboardGet(req, { params: { dashboardId: 'dash-secure-1' } });
+      expect(res.status).toBe(403);
+      const data = await res.json();
+      expect(data.error).toContain('Akses Ditolak');
+    });
+
+    it('2. should allow visitor with valid HMAC share token', async () => {
+      vi.spyOn(serverAuthModule, 'getAuthenticatedUser').mockResolvedValueOnce(null);
+      const { generateDashboardShareToken } = await import('../lib/security/dashboardShareToken');
+      const validToken = generateDashboardShareToken('24d7acf9-5109-42e2-a5d1-48ab658dcd5e', 1, 'dash-secure-1');
+
+      vi.spyOn(dashboardStoreModule, 'getDashboardById').mockResolvedValueOnce({
+        dashboard_id: 'dash-secure-1',
+        session_id: '24d7acf9-5109-42e2-a5d1-48ab658dcd5e',
+        turn_index: 1,
+        message_id: 'msg-1',
+        user_id: 'user-owner-123',
+        title: 'Sensitive Financials',
+        data: sampleDashboard,
+        views_count: 3,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+
+      const req = new NextRequest(`http://localhost:3000/api/dashboard/dash-secure-1?share=${validToken}`);
+      const res = await handleDashboardGet(req, { params: { dashboardId: 'dash-secure-1' } });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.dashboardId).toBe('dash-secure-1');
+      expect(data.canEdit).toBe(false);
+    });
+
+    it('3. should allow logged-in owner without needing a share token', async () => {
+      vi.spyOn(serverAuthModule, 'getAuthenticatedUser').mockResolvedValueOnce({
+        id: 'user-owner-123',
+        name: 'Dashboard Owner',
+        email: 'owner@test.com',
+        role_id: 'member',
+        status: 'active',
+      } as any);
+
+      vi.spyOn(dashboardStoreModule, 'getDashboardById').mockResolvedValueOnce({
+        dashboard_id: 'dash-secure-1',
+        session_id: '24d7acf9-5109-42e2-a5d1-48ab658dcd5e',
+        turn_index: 1,
+        message_id: 'msg-1',
+        user_id: 'user-owner-123',
+        title: 'Sensitive Financials',
+        data: sampleDashboard,
+        views_count: 3,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+
+      const req = new NextRequest('http://localhost:3000/api/dashboard/dash-secure-1');
+      const res = await handleDashboardGet(req, { params: { dashboardId: 'dash-secure-1' } });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.canEdit).toBe(true);
+    });
+  });
 });
+

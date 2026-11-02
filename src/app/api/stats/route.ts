@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/../lib/db/dbClient';
 import { getAuthenticatedUser } from '@lib/auth/serverAuth';
-import { ensureSessionsTable } from '@/../lib/db/sessionStore';
-import { ensureAuditLogsTable } from '@/../lib/db/auditLogStore';
 import { getKnowledgeGapStats } from '@/../lib/db/knowledgeGapStore';
+import { getCachedStats, setCachedStats } from '@lib/cache/statsCache';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,11 +20,12 @@ export async function GET(req: NextRequest) {
       Boolean(authenticatedUser.role?.permissions.includes('audit:read')) ||
       Boolean(authenticatedUser.role?.permissions.includes('users:manage'));
 
-    // Ensure all optional tables exist before querying
-    await Promise.all([
-      ensureSessionsTable().catch(() => {}),
-      ensureAuditLogsTable().catch(() => {}),
-    ]);
+    // Fast-path: SWR In-Memory cache (< 1ms reload)
+    const cacheKey = `${authenticatedUser.id}:${isAdminOrAuditor ? 'admin' : 'member'}`;
+    const cachedData = getCachedStats(cacheKey);
+    if (cachedData) {
+      return NextResponse.json(cachedData);
+    }
 
     // 1. Fetch Aggregated Document & Vector Metrics
     const statsQuery = `
@@ -276,7 +276,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({
+    const statsData = {
       totalDocuments: row.total_documents,
       totalChunks: row.total_chunks,
       totalPages: row.total_pages,
@@ -310,7 +310,10 @@ export async function GET(req: NextRequest) {
         topTopics,
       },
       personal: personalStats,
-    });
+    };
+
+    setCachedStats(cacheKey, statsData);
+    return NextResponse.json(statsData);
   } catch (error: any) {
     console.warn('[API /api/stats] Database offline/not ready:', error?.message);
 
