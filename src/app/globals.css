@@ -61,6 +61,39 @@
    1. 3-COLUMN LAYOUT & SPACING
    ===================================================== */
 
+/* Mobile / Tablet Header Fix: Hide mobile subnav and mobile tocnav on desktop */
+@media (min-width: 768px) {
+  #nd-subnav,
+  header#nd-subnav,
+  .md\:hidden {
+    display: none !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .max-md\:hidden {
+    display: none !important;
+  }
+  #nd-subnav {
+    display: flex !important;
+  }
+}
+
+@media (min-width: 1280px) {
+  #nd-tocnav,
+  header#nd-tocnav,
+  .xl\:hidden {
+    display: none !important;
+  }
+}
+
+@media (max-width: 1279px) {
+  #nd-toc,
+  .max-xl\:hidden {
+    display: none !important;
+  }
+}
+
 /* Fix Sticky / Fixed Positioning for Documentation Pages */
 html:has(#nd-docs-layout),
 body:has(#nd-docs-layout) {
